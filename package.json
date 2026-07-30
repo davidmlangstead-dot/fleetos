@@ -1,0 +1,11 @@
+{
+  "name": "fleetros-monorepo",
+  "private": true,
+  "packageManager": "pnpm@11.18.0",
+  "scripts": {
+    "dev:web": "pnpm --filter @fleetros/web dev",
+    "dev:api": "pnpm --filter @fleetros/api dev",
+    "build": "pnpm -r build",
+    "db:gen": "pnpm --filter @fleetros/api prisma generate"
+  }
+}
