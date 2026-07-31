@@ -12,20 +12,6 @@ const createJob = z.object({
   scheduledAt: z.coerce.date(),
 });
 
-interface JobWithRelations {
-  id: string;
-  jobNumber: string | null;
-  customerName: string;
-  collectionAddress: string;
-  deliveryAddress: string;
-  collectionDateTime: Date | null;
-  deliveryDateTime: Date | null;
-  createdAt: Date;
-  driver: any;
-  vehicle: any;
-  [key: string]: any;
-}
-
 export const jobsRouter = Router();
 jobsRouter.use(requireAuth);
 
@@ -39,12 +25,11 @@ jobsRouter.get(
       take: 100,
     });
 
-    res.json(
-      (jobs as JobWithRelations[]).map((job) => ({
-        ...job,
-        scheduledAt: job.collectionDateTime ?? job.deliveryDateTime ?? job.createdAt,
-      }))
-    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    res.json(jobs.map((job: any) => ({
+      ...job,
+      scheduledAt: job.collectionDateTime ?? job.deliveryDateTime ?? job.createdAt,
+    })));
   })
 );
 
