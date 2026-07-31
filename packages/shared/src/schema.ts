@@ -8,3 +8,5 @@ export const CompanySchema = z.object({
 });
 
 export type Company = z.infer<typeof CompanySchema>;
+// New: derive Role type from the schema to avoid duplication
+export type Role = z.infer<typeof RoleSchema>;
