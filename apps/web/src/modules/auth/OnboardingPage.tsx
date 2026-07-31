@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api } from "../../lib/api";
+import { supabase } from "../../lib/supabase";
 
 export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
   const [companyName, setCompanyName] = useState("");
@@ -12,18 +12,33 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
     setError("");
 
     try {
-      await api("/onboarding/company", {
-        method: "POST",
-        body: JSON.stringify({ companyName }),
-      });
-      onComplete();
-    } catch (err) {
-      const status = (err as Error & { status?: number }).status;
-      if (status === 409) {
-        onComplete();
-      } else {
-        setError("We couldn’t create your workspace. Please try again.");
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+
+      if (!userId) {
+        setError("You must be signed in to create a workspace.");
+        setBusy(false);
+        return;
       }
+
+      const { error: insertError } = await supabase
+        .from("companies")
+        .insert({ name: companyName.trim(), owner_id: userId })
+        .single();
+
+      if (insertError) {
+        if (insertError.code === "23505") {
+          // Already exists — just proceed
+          onComplete();
+          return;
+        }
+        throw insertError;
+      }
+
+      onComplete();
+    } catch (err: any) {
+      console.error("Onboarding error:", err);
+      setError(err?.message || "We couldn't create your workspace. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -42,10 +57,19 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
         <form onSubmit={submit}>
           <label>
             Company name
-            <input autoFocus required value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="e.g. Northstar Haulage" />
+            <input
+              autoFocus
+              required
+              value={companyName}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCompanyName(e.target.value)}
+              placeholder="e.g. Northstar Haulage"
+            />
           </label>
-          {error && <p className="form-message">{error}</p>}
-          <button className="primary-button auth-submit" disabled={busy}>
+          {error && <p className="form-message error">{error}</p>}
+          <button
+            className="primary-button auth-submit"
+            disabled={busy || !companyName.trim()}
+          >
             {busy ? "Creating workspace…" : "Create workspace"}
           </button>
         </form>

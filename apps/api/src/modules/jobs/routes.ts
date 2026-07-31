@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { asyncHandler } from "../../lib/asyncHandler.js";
 import { prisma } from "../../lib/prisma.js";
 import { requireAuth } from "../../middleware/auth.js";
@@ -11,6 +12,10 @@ const createJob = z.object({
   deliveryAddress: z.string().min(1),
   scheduledAt: z.coerce.date(),
 });
+
+type JobWithRelations = Prisma.JobGetPayload<{
+  include: { driver: true; vehicle: true };
+}>;
 
 export const jobsRouter = Router();
 jobsRouter.use(requireAuth);
@@ -25,7 +30,12 @@ jobsRouter.get(
       take: 100,
     });
 
-    res.json(jobs.map((job) => ({ ...job, scheduledAt: job.collectionDateTime ?? job.deliveryDateTime ?? job.createdAt })));
+    res.json(
+      jobs.map((job: JobWithRelations) => ({
+        ...job,
+        scheduledAt: job.collectionDateTime ?? job.deliveryDateTime ?? job.createdAt,
+      }))
+    );
   })
 );
 
@@ -44,6 +54,10 @@ jobsRouter.post(
       },
     });
 
-    res.status(201).json({ ...job, reference: job.jobNumber, scheduledAt: job.collectionDateTime ?? job.deliveryDateTime ?? job.createdAt });
+    res.status(201).json({
+      ...job,
+      reference: job.jobNumber,
+      scheduledAt: job.collectionDateTime ?? job.deliveryDateTime ?? job.createdAt,
+    });
   })
 );
