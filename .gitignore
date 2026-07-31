@@ -6,3 +6,6 @@ coverage
 .turbo
 *.tsbuildinfo
 apps/api/prisma/dev.db
+
+.vercel
+.env*
