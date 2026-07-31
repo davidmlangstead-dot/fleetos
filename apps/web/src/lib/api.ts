@@ -1,9 +1,13 @@
-import { supabase } from "./supabase";
+﻿import { supabase } from "./supabase";
 
 const apiUrl = import.meta.env.VITE_API_URL as string | undefined;
-const baseUrl = apiUrl ?? (typeof window !== "undefined" ? `${window.location.origin}/api` : "http://localhost:3001/api");
+const baseUrl = apiUrl ?? (import.meta.env.DEV ? "http://localhost:3001/api" : undefined);
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+  if (!baseUrl) {
+    throw new Error("VITE_API_URL is required in production. Set VITE_API_URL to your hosted FleetOS API in Vercel.");
+  }
+
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -13,7 +17,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
     headers: {
       "content-type": "application/json",
       ...options.headers,
-      ...(session ? { authorization: `Bearer ${session.access_token}` } : {}),
+      ...(session?.access_token ? { authorization: `Bearer ${session.access_token}` } : {}),
     },
   });
 
@@ -29,7 +33,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   }
 
   if (!response.ok) {
-    const error = new Error((payload as { error?: string } | undefined)?.error ?? "Unable to load this information");
+    const error = new Error((payload as { error?: string } | undefined)?.error ?? `Request failed: ${response.status}`);
     (error as Error & { status?: number }).status = response.status;
     throw error;
   }

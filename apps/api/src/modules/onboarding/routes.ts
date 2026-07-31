@@ -1,75 +1,75 @@
-import { Router } from "express";
-import { supabase } from "../../lib/supabase"; // adjust path if needed
+﻿import { Router } from "express";
+import { asyncHandler } from "../../lib/asyncHandler.js";
+import { prisma } from "../../lib/prisma.js";
+import { requireIdentity } from "../../middleware/auth.js";
 
-const router = Router();
+export const onboardingRouter = Router();
 
-/**
- * POST /onboarding
- * Creates a company for the authenticated user.
- */
-router.post("/", async (req, res) => {
-  try {
-    console.log("[API] Onboarding request received");
+function generateSlug(name: string) {
+  const base = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 50);
+  return base || "company";
+}
 
-    const { companyName } = req.body;
+async function findAvailableSlug(name: string) {
+  const base = generateSlug(name);
+  let slug = base;
+  let suffix = 1;
 
-    if (!companyName || typeof companyName !== "string") {
-      return res.status(400).json({
-        error: "Company name is required",
-      });
-    }
-
-    console.log("[API] Fetching user session…");
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser(req.headers.authorization?.replace("Bearer ", ""));
-
-    if (userError) {
-      console.error("[API] Supabase user error:", userError);
-      return res.status(401).json({ error: "Authentication failed" });
-    }
-
-    if (!user) {
-      console.log("[API] No user found");
-      return res.status(401).json({ error: "You must be signed in" });
-    }
-
-    console.log("[API] Inserting company…");
-
-    const { data, error: insertError } = await supabase
-      .from("companies")
-      .insert({
-        name: companyName.trim(),
-        owner_id: user.id,
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error("[API] Insert error:", insertError);
-
-      // Duplicate company name
-      if (insertError.code === "23505") {
-        return res.json({ ok: true, duplicate: true });
-      }
-
-      return res.status(500).json({
-        error: "Failed to create company",
-        details: insertError.message,
-      });
-    }
-
-    console.log("[API] Company created:", data);
-
-    return res.json({ ok: true, company: data });
-  } catch (err) {
-    console.error("[API] Unexpected error:", err);
-    return res.status(500).json({
-      error: "Unexpected server error",
-    });
+  while (await prisma.company.findUnique({ where: { slug } })) {
+    slug = `${base}-${suffix++}`;
   }
-});
 
-export default router;
+  return slug;
+}
+
+onboardingRouter.get(
+  "/me",
+  requireIdentity,
+  asyncHandler(async (req, res) => {
+    const membership = await prisma.companyMembership.findFirst({
+      where: { userId: res.locals.identity.id },
+      select: { id: true, companyId: true, role: true },
+    });
+
+    res.json({ membership });
+  })
+);
+
+onboardingRouter.post(
+  "/",
+  requireIdentity,
+  asyncHandler(async (req, res) => {
+    const { companyName } = req.body;
+    if (!companyName || typeof companyName !== "string") {
+      return res.status(400).json({ error: "Company name is required" });
+    }
+
+    const userId = res.locals.identity.id;
+    const existingMembership = await prisma.companyMembership.findFirst({ where: { userId } });
+    if (existingMembership) {
+      return res.status(409).json({ error: "User already has an active workspace", membership: existingMembership });
+    }
+
+    const slug = await findAvailableSlug(companyName);
+    const company = await prisma.company.create({
+      data: {
+        name: companyName.trim(),
+        slug,
+        ownerId: userId,
+        memberships: {
+          create: {
+            userId,
+            role: "COMPANY_ADMIN",
+          },
+        },
+      },
+    });
+
+    return res.status(201).json({ ok: true, company: { id: company.id, name: company.name, slug: company.slug } });
+  })
+);
