@@ -1,94 +1,75 @@
-import { useState } from "react";
-import { supabase } from "../../lib/supabase";
+import { Router } from "express";
+import { supabase } from "../../lib/supabase"; // adjust path if needed
 
-export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
-  const [companyName, setCompanyName] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+const router = Router();
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    console.log("[Onboarding] Submit clicked");
-    console.log("[Onboarding] Company name:", companyName);
+/**
+ * POST /onboarding
+ * Creates a company for the authenticated user.
+ */
+router.post("/", async (req, res) => {
+  try {
+    console.log("[API] Onboarding request received");
 
-    setBusy(true);
-    setError("");
+    const { companyName } = req.body;
 
-    try {
-      console.log("[Onboarding] Getting user...");
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      console.log("[Onboarding] User data:", userData);
-      console.log("[Onboarding] User error:", userError);
-
-      const userId = userData.user?.id;
-      if (!userId) {
-        setError("You must be signed in to create a workspace.");
-        setBusy(false);
-        return;
-      }
-
-      console.log("[Onboarding] Inserting company...");
-      const { data, error: insertError } = await supabase
-        .from("companies")
-        .insert({ name: companyName.trim(), owner_id: userId })
-        .select()
-        .single();
-
-      console.log("[Onboarding] Insert data:", data);
-      console.log("[Onboarding] Insert error:", insertError);
-
-      if (insertError) {
-        if (insertError.code === "23505") {
-          console.log("[Onboarding] Duplicate — proceeding anyway");
-          onComplete();
-          return;
-        }
-        throw insertError;
-      }
-
-      console.log("[Onboarding] Success — calling onComplete");
-      onComplete();
-    } catch (err: any) {
-      console.error("[Onboarding] Caught error:", err);
-      setError(err?.message || "We couldn't create your workspace. Please try again.");
-    } finally {
-      setBusy(false);
+    if (!companyName || typeof companyName !== "string") {
+      return res.status(400).json({
+        error: "Company name is required",
+      });
     }
-  }
 
-  return (
-    <main className="auth-page">
-      <section className="auth-card">
-        <div className="brand auth-brand">
-          <span className="brand-mark">F</span>
-          <span>FleetOS</span>
-        </div>
-        <p className="eyebrow">One last step</p>
-        <h1>Name your company</h1>
-        <p className="subtle">This creates a private FleetOS workspace for your team.</p>
-        <form onSubmit={submit}>
-          <label>
-            Company name
-            <input
-              autoFocus
-              required
-              value={companyName}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                console.log("[Onboarding] Input changed:", e.target.value);
-                setCompanyName(e.target.value);
-              }}
-              placeholder="e.g. Northstar Haulage"
-            />
-          </label>
-          {error && <p className="form-message error">{error}</p>}
-          <button
-            type="submit"
-            className="primary-button auth-submit"
-          >
-            {busy ? "Creating workspace…" : "Create workspace"}
-          </button>
-        </form>
-      </section>
-    </main>
-  );
-}
+    console.log("[API] Fetching user session…");
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser(req.headers.authorization?.replace("Bearer ", ""));
+
+    if (userError) {
+      console.error("[API] Supabase user error:", userError);
+      return res.status(401).json({ error: "Authentication failed" });
+    }
+
+    if (!user) {
+      console.log("[API] No user found");
+      return res.status(401).json({ error: "You must be signed in" });
+    }
+
+    console.log("[API] Inserting company…");
+
+    const { data, error: insertError } = await supabase
+      .from("companies")
+      .insert({
+        name: companyName.trim(),
+        owner_id: user.id,
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error("[API] Insert error:", insertError);
+
+      // Duplicate company name
+      if (insertError.code === "23505") {
+        return res.json({ ok: true, duplicate: true });
+      }
+
+      return res.status(500).json({
+        error: "Failed to create company",
+        details: insertError.message,
+      });
+    }
+
+    console.log("[API] Company created:", data);
+
+    return res.json({ ok: true, company: data });
+  } catch (err) {
+    console.error("[API] Unexpected error:", err);
+    return res.status(500).json({
+      error: "Unexpected server error",
+    });
+  }
+});
+
+export default router;

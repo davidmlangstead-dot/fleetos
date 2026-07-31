@@ -5,41 +5,15 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
   const [companyName, setCompanyName] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [debug, setDebug] = useState<string[]>([]);
-
-  function log(msg: string) {
-    console.log(msg);
-    setDebug((prev) => [...prev, msg]);
-  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    log("[1] Button clicked");
     setBusy(true);
     setError("");
 
     try {
-      log("[2] Checking Supabase config...");
-      const url = import.meta.env.VITE_SUPABASE_URL;
-      const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      if (!url || !key) {
-        log("[ERROR] Missing env vars — URL=" + url + " Key=" + (key ? "set" : "missing"));
-        setError("App is not configured. VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are missing in Vercel.");
-        setBusy(false);
-        return;
-      }
-      log("[3] Env vars OK");
-
-      log("[4] Getting user...");
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) {
-        log("[ERROR] getUser failed: " + userError.message);
-        setError(userError.message);
-        setBusy(false);
-        return;
-      }
+      const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
-      log("[5] User ID: " + (userId || "null"));
 
       if (!userId) {
         setError("You must be signed in to create a workspace.");
@@ -47,28 +21,27 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
         return;
       }
 
-      log("[6] Inserting company...");
-      const { data, error: insertError } = await supabase
+      const { error: insertError } = await supabase
         .from("companies")
         .insert({ name: companyName.trim(), owner_id: userId })
         .select()
         .single();
 
-      log("[7] Insert result: " + (insertError ? "ERROR " + insertError.code : "OK"));
-
       if (insertError) {
         if (insertError.code === "23505") {
-          log("[8] Duplicate company — proceeding");
-          onComplete();
-          return;
+          // Already exists — just proceed
+        } else {
+          throw insertError;
         }
-        throw insertError;
       }
 
-      log("[8] Success — redirecting");
-      onComplete();
+      // Call the parent's callback if it exists
+      onComplete?.();
+
+      // Force actual navigation — this fixes the stuck onboarding issue
+      window.location.href = "/";
     } catch (err: any) {
-      log("[ERROR] Caught: " + (err?.message || String(err)));
+      console.error("Onboarding error:", err);
       setError(err?.message || "We couldn't create your workspace. Please try again.");
     } finally {
       setBusy(false);
@@ -101,14 +74,6 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
             {busy ? "Creating workspace…" : "Create workspace"}
           </button>
         </form>
-
-        {debug.length > 0 && (
-          <div style={{ marginTop: 16, padding: 12, background: "#f5f5f5", borderRadius: 6, fontSize: 12, fontFamily: "monospace", maxHeight: 200, overflow: "auto" }}>
-            {debug.map((d, i) => (
-              <div key={i} style={{ marginBottom: 4 }}>{d}</div>
-            ))}
-          </div>
-        )}
       </section>
     </main>
   );
