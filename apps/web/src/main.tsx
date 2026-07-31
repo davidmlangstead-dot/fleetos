@@ -20,13 +20,7 @@ function FleetOSApp() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return setState("signed-out");
 
-    // Bypass flag for users who already created via debug version
-    if (localStorage.getItem("fleetos_onboarding_done") === "1") {
-      return setState("ready");
-    }
-
     try {
-      // Query Supabase directly — no backend API needed
       const { data, error } = await supabase
         .from("companies")
         .select("id")
@@ -34,15 +28,9 @@ function FleetOSApp() {
         .maybeSingle();
 
       if (error) throw error;
-
-      if (data) {
-        setState("ready");
-      } else {
-        setState("onboarding");
-      }
+      setState(data ? "ready" : "onboarding");
     } catch (err) {
       console.error("Company check failed:", err);
-      // If the table doesn't exist yet, assume onboarding needed
       setState("onboarding");
     }
   };
@@ -56,14 +44,7 @@ function FleetOSApp() {
   if (state === "loading") return <main className="loading-page">Loading FleetOS…</main>;
   if (state === "signed-out") return <AuthPage />;
   if (state === "onboarding")
-    return (
-      <OnboardingPage
-        onComplete={() => {
-          localStorage.setItem("fleetos_onboarding_done", "1");
-          void check();
-        }}
-      />
-    );
+    return <OnboardingPage onComplete={() => void check()} />;
   return <RouterProvider router={router} />;
 }
 
