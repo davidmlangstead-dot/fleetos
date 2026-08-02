@@ -1,9 +1,9 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import { DashboardPage } from "./modules/dashboard/DashboardPage";
-import { VehiclesPage } from "./pages/VehiclesPage";
-import { JobsPage } from "./pages/JobsPage";
-import { DriversPage } from "./pages/DriversPage";
+import { VehiclesPage } from "./modules/vehicles/VehiclesPage";
+import { JobsPage } from "./modules/jobs/JobsPage";
+import { DriversPage } from "./modules/drivers/DriversPage";
 import { ListPage } from "./modules/shared/ListPage";
 
 export const router = createBrowserRouter([

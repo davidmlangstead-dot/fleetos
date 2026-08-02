@@ -1,38 +1,40 @@
 ﻿import { Router } from "express";
-import { supabase } from "../../lib/supabase";
+import { prisma } from "../../lib/prisma.js";
+import { asyncHandler } from "../../lib/asyncHandler.js";
+import { requireAuth } from "../../middleware/auth.js";
+
+function slugify(name: string) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
+}
 
 export const onboardingRouter = Router();
+onboardingRouter.use(requireAuth);
 
-onboardingRouter.post("/company", async (req, res) => {
-  try {
+onboardingRouter.post(
+  "/company",
+  asyncHandler(async (req, res) => {
     const { companyName } = req.body;
     if (!companyName || typeof companyName !== "string") {
       return res.status(400).json({ error: "Company name is required" });
     }
 
-    const authHeader = req.headers.authorization?.replace("Bearer ", "");
-    const { data: { user }, error: userError } = await supabase.auth.getUser(authHeader);
+    const existing = await prisma.company.findFirst({
+      where: { ownerId: req.user!.id },
+    });
 
-    if (userError || !user) {
-      return res.status(401).json({ error: "Authentication failed" });
+    if (existing) {
+      return res.status(409).json({ ok: true, duplicate: true, company: existing });
     }
 
-    const { data, error: insertError } = await supabase
-      .from("companies")
-      .insert({ name: companyName.trim(), owner_id: user.id })
-      .select()
-      .single();
+    const company = await prisma.company.create({
+      data: {
+        name: companyName.trim(),
+        slug: slugify(companyName),
+        vatNumber: "",
+        ownerId: req.user!.id,
+      },
+    });
 
-    if (insertError) {
-      if (insertError.code === "23505") {
-        return res.status(409).json({ ok: true, duplicate: true });
-      }
-      return res.status(500).json({ error: insertError.message });
-    }
-
-    return res.status(201).json({ ok: true, company: data });
-  } catch (err) {
-    console.error("[API] Onboarding error:", err);
-    return res.status(500).json({ error: "Unexpected server error" });
-  }
-});
+    res.status(201).json({ ok: true, company });
+  })
+);
