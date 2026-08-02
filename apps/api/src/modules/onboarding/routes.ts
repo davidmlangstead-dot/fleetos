@@ -25,6 +25,8 @@ onboardingRouter.post(
     }
 
     const ownerId = res.locals.identity.id;
+    console.log("Onboarding ownerId:", ownerId);
+console.log("Onboarding company:", companyName);
 
     const existing = await prisma.company.findFirst({
       where: { ownerId },
@@ -37,7 +39,7 @@ onboardingRouter.post(
         company: existing,
       });
     }
-
+console.log("Creating company...");
     const company = await prisma.company.create({
       data: {
         name: companyName.trim(),
