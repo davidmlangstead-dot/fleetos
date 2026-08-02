@@ -12,7 +12,7 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
     setError("");
 
     try {
-      await api("/onboarding", {
+      await api("/onboarding/company", {
         method: "POST",
         body: JSON.stringify({ companyName: companyName.trim() }),
       });
