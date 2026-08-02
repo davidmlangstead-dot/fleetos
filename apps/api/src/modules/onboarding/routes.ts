@@ -1,14 +1,14 @@
 ﻿import { Router } from "express";
 import { prisma } from "../../lib/prisma.js";
 import { asyncHandler } from "../../lib/asyncHandler.js";
-import { requireAuth } from "../../middleware/auth.js";
+import { requireIdentity } from "../../middleware/auth.js";
 
 function slugify(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
 }
 
 export const onboardingRouter = Router();
-onboardingRouter.use(requireAuth);
+onboardingRouter.use(requireIdentity);
 
 onboardingRouter.post(
   "/company",
@@ -31,7 +31,7 @@ onboardingRouter.post(
         name: companyName.trim(),
         slug: slugify(companyName),
         vatNumber: "",
-        ownerId: req.user!.id,
+        ownerId: res.locals.identity.id,
       },
     });
 
