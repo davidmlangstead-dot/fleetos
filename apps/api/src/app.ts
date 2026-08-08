@@ -11,9 +11,21 @@ import { vehiclesRouter } from "./modules/vehicles/routes.js";
 
 export const app = express();
 
+const allowedOrigins = new Set([
+  config.CORS_ORIGIN,
+  "https://fleetos-orpin-one.vercel.app",
+  "https://fleetos-davidmlangstead-dots-projects.vercel.app",
+  "https://fleetos-git-main-davidmlangstead-dots-projects.vercel.app",
+]);
+
 app.use(
   cors({
-    origin: config.CORS_ORIGIN,
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.has(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error("Origin not allowed by FleetOS API"));
+    },
   })
 );
 
