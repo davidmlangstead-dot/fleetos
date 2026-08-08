@@ -1,21 +1,16 @@
-﻿import { supabase } from "./supabase";
+import { supabase } from "./supabase";
 
 const apiUrl = import.meta.env.VITE_API_URL as string | undefined;
 
+const configuredApiUrl = apiUrl?.trim().replace(/\/$/, "");
 const baseUrl =
-  apiUrl
-    ? `${apiUrl.replace(/\/$/, "")}/api`
+  configuredApiUrl
+    ? `${configuredApiUrl}/api`
     : import.meta.env.DEV
       ? "http://localhost:3001/api"
-      : undefined;
+      : "https://fleetos-1.onrender.com/api";
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
-  if (!baseUrl) {
-    throw new Error(
-      "VITE_API_URL is required in production. Set VITE_API_URL to your hosted FleetOS API in Vercel."
-    );
-  }
-
   const {
     data: { session },
   } = await supabase.auth.getSession();
