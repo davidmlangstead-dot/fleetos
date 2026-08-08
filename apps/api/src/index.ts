@@ -1,8 +1,7 @@
-import express from "express";
+import { app } from "./app.js";
 
-const app = express();
-app.use(express.json());
+const port = Number(process.env.PORT ?? 3001);
 
-app.get("/health", (_req, res) => res.send("FleetOS API Online"));
-
-app.listen(3001, () => console.log("FleetOS API running on port 3001"));
+app.listen(port, "0.0.0.0", () => {
+  console.log(`FleetOS API running on port ${port}`);
+});
