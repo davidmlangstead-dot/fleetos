@@ -11,9 +11,16 @@ const baseUrl =
       : "https://fleetos-1.onrender.com/api";
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const {
+  // On mobile, Supabase can still be restoring the persisted session when
+  // the first protected API call is made. Refresh once before sending it.
+  let {
     data: { session },
   } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    const refreshed = await supabase.auth.refreshSession();
+    session = refreshed.data.session ?? null;
+  }
 
   const response = await fetch(`${baseUrl}${path}`, {
     ...options,
