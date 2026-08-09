@@ -1,47 +1,66 @@
-import cors from "cors";
+﻿import cors from "cors";
 import express from "express";
 
 import { config } from "./config.js";
-import { errorHandler } from "./middleware/errors.js";
 
 import { dashboardRouter } from "./modules/dashboard/routes.js";
+import { vehiclesRouter } from "./modules/vehicles/routes.js";
 import { jobsRouter } from "./modules/jobs/routes.js";
 import { onboardingRouter } from "./modules/onboarding/routes.js";
-import { vehiclesRouter } from "./modules/vehicles/routes.js";
 
 export const app = express();
 
 const allowedOrigins = new Set([
   config.CORS_ORIGIN,
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
   "https://fleetos-orpin-one.vercel.app",
   "https://fleetos-davidmlangstead-dots-projects.vercel.app",
   "https://fleetos-git-main-davidmlangstead-dots-projects.vercel.app",
-  "http://localhost:5173",
-  "http://localhost:5174",
-  "http://127.0.0.1:5173",
-  "http://127.0.0.1:5174",
 ]);
-
-function isAllowedOrigin(origin: string) {
-  return (
-    allowedOrigins.has(origin) ||
-    /^http:\/\/localhost:\d+$/.test(origin) ||
-    /^http:\/\/127\.0\.0\.1:\d+$/.test(origin)
-  );
-}
 
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || isAllowedOrigin(origin)) {
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.has(origin)) {
+        return callback(null, true);
+      }
+
+      if (/^http:\/\/localhost:\d+$/.test(origin)) {
+        return callback(null, true);
+      }
+
+      if (/^http:\/\/127\.0\.0\.1:\d+$/.test(origin)) {
         return callback(null, true);
       }
 
       console.warn(`CORS blocked origin: ${origin}`);
-      return callback(new Error("Origin not allowed by FleetOS API"));
+
+      return callback(
+        new Error("Origin not allowed by FleetOS API")
+      );
     },
-    methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+
+    credentials: true,
+
+    methods: [
+      "GET",
+      "HEAD",
+      "PUT",
+      "PATCH",
+      "POST",
+      "DELETE",
+      "OPTIONS",
+    ],
+
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+    ],
   })
 );
 
@@ -50,8 +69,7 @@ app.use(express.json({ limit: "10mb" }));
 app.get("/", (_req, res) => {
   res.json({
     name: "FleetOS API",
-    version: "0.1.0",
-    status: "running",
+    status: "ok",
   });
 });
 
@@ -66,14 +84,7 @@ app.get("/health", (_req, res) => {
 app.get("/api", (_req, res) => {
   res.json({
     name: "FleetOS API",
-    status: "running",
-    endpoints: {
-      dashboard: "/api/dashboard",
-      vehicles: "/api/vehicles",
-      jobs: "/api/jobs",
-      onboarding: "/api/onboarding",
-      health: "/health",
-    },
+    status: "ok",
   });
 });
 
@@ -88,4 +99,26 @@ app.use((_req, res) => {
   });
 });
 
-app.use(errorHandler);
+app.use(
+  (
+    error: unknown,
+    _req: express.Request,
+    res: express.Response,
+    _next: express.NextFunction
+  ) => {
+    console.error("FleetOS API error:", error);
+
+    if (res.headersSent) {
+      return;
+    }
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Something went wrong";
+
+    res.status(500).json({
+      error: message,
+    });
+  }
+);
