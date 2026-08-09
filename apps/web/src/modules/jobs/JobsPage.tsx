@@ -1,76 +1,17 @@
 import { useEffect, useState } from "react";
 import { Search, Plus } from "lucide-react";
-import { supabase } from "../../lib/supabase";
+import { api } from "../../lib/api";
 
-interface JobRow {
-  id: string;
-  reference: string;
-  customer_name: string;
-  collection_address: string;
-  delivery_address: string;
-  status: string;
-  collection_date_time: string;
-}
+interface JobRow { id: string; reference: string; customerName: string; collectionAddress: string; deliveryAddress: string; status: string; scheduledAt: string; }
 
 export function JobsPage() {
-  const [jobs, setJobs] = useState<JobRow[]>([]);
-  const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function load() {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const companyId = sessionData.session?.user.id;
-      if (!companyId) return;
-      const { data } = await supabase.from("jobs").select("*").eq("company_id", companyId).order("collection_date_time", { ascending: false }).limit(50);
-      setJobs(data ?? []);
-      setLoading(false);
-    }
-    void load();
-  }, []);
-
-  const filtered = jobs.filter(j =>
-    j.reference?.toLowerCase().includes(search.toLowerCase()) ||
-    j.customer_name?.toLowerCase().includes(search.toLowerCase())
-  );
-
-  return (
-    <section className="page">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">Fleet operations</p>
-          <h1>Jobs</h1>
-          <p className="subtle">Track collections and deliveries.</p>
-        </div>
-        <button className="primary-button"><Plus size={18} /> Create job</button>
-      </div>
-      <section className="panel">
-        <div className="search" style={{ padding: 16 }}>
-          <Search size={19} />
-          <input placeholder="Search jobs…" value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-        {loading && <p className="empty-line" style={{ padding: 24 }}>Loading jobs…</p>}
-        {!loading && filtered.length === 0 && (
-          <div className="empty-state">
-            <h2>No jobs yet</h2>
-            <p>Create your first delivery or collection job.</p>
-            <button className="primary-button"><Plus size={18} /> Create job</button>
-          </div>
-        )}
-        {!loading && filtered.length > 0 && (
-          <div className="job-list">
-            {filtered.map(job => (
-              <div className="job-row" key={job.id}>
-                <div>
-                  <strong>{job.reference || "—"}</strong>
-                  <p>{job.customer_name} · {job.collection_address} → {job.delivery_address}</p>
-                </div>
-                <span className={`status ${job.status === "COMPLETED" ? "success" : "warning"}`}>{job.status}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-    </section>
-  );
+  const [jobs, setJobs] = useState<JobRow[]>([]); const [search, setSearch] = useState(""); const [loading, setLoading] = useState(true); const [showForm, setShowForm] = useState(false); const [reference, setReference] = useState(""); const [customerName, setCustomerName] = useState(""); const [collectionAddress, setCollectionAddress] = useState(""); const [deliveryAddress, setDeliveryAddress] = useState(""); const [scheduledAt, setScheduledAt] = useState(""); const [error, setError] = useState<string | null>(null); const [busy, setBusy] = useState(false);
+  async function load() { try { setError(null); setLoading(true); setJobs(await api<JobRow[]>("/jobs")); } catch (err) { setError(err instanceof Error ? err.message : "Unable to load jobs"); } finally { setLoading(false); } }
+  useEffect(() => { void load(); }, []);
+  async function create(e: React.FormEvent) { e.preventDefault(); setBusy(true); setError(null); try { await api("/jobs", { method: "POST", body: JSON.stringify({ reference: reference.trim(), customerName: customerName.trim(), collectionAddress: collectionAddress.trim(), deliveryAddress: deliveryAddress.trim(), scheduledAt: new Date(scheduledAt).toISOString() }) }); setReference(""); setCustomerName(""); setCollectionAddress(""); setDeliveryAddress(""); setScheduledAt(""); setShowForm(false); await load(); } catch (err) { setError(err instanceof Error ? err.message : "Unable to create job"); } finally { setBusy(false); } }
+  const filtered = jobs.filter(j => `${j.reference} ${j.customerName}`.toLowerCase().includes(search.toLowerCase()));
+  return <section className="page"><div className="page-heading"><div><p className="eyebrow">Fleet operations</p><h1>Jobs</h1><p className="subtle">Track collections and deliveries.</p></div><button className="primary-button" onClick={() => setShowForm(true)}><Plus size={18} /> Create job</button></div>
+    {error && <p role="alert" className="subtle">{error}</p>}
+    {showForm && <section className="panel" style={{ marginBottom: 24 }}><div className="panel-heading"><h2>Create job</h2></div><form onSubmit={create} style={{ display: "grid", gap: 12, padding: 16 }}><label>Reference<input required value={reference} onChange={e => setReference(e.target.value)} /></label><label>Customer<input required value={customerName} onChange={e => setCustomerName(e.target.value)} /></label><label>Collection address<input required value={collectionAddress} onChange={e => setCollectionAddress(e.target.value)} /></label><label>Delivery address<input required value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} /></label><label>Scheduled date/time<input required type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)} /></label><div style={{ display: "flex", gap: 8 }}><button className="primary-button" disabled={busy} type="submit">{busy ? "Creating…" : "Create job"}</button><button type="button" className="switch-mode" onClick={() => setShowForm(false)}>Cancel</button></div></form></section>}
+    <section className="panel"><div className="search" style={{ padding: 16 }}><Search size={19} /><input placeholder="Search jobs…" value={search} onChange={e => setSearch(e.target.value)} /></div>{loading ? <p className="empty-line" style={{ padding: 24 }}>Loading jobs…</p> : filtered.length === 0 ? <div className="empty-state"><h2>No jobs yet</h2><p>Create your first delivery or collection job.</p><button className="primary-button" onClick={() => setShowForm(true)}><Plus size={18} /> Create job</button></div> : <div className="job-list">{filtered.map(job => <div className="job-row" key={job.id}><div><strong>{job.reference || "—"}</strong><p>{job.customerName} · {job.collectionAddress} → {job.deliveryAddress}</p></div><span className={`status ${job.status === "COMPLETED" ? "success" : "warning"}`}>{job.status}</span></div>)}</div>}</section></section>;
 }
