@@ -1,4 +1,4 @@
-﻿import cors from "cors";
+import cors from "cors";
 import express from "express";
 import { config } from "./config.js";
 import { dashboardRouter } from "./modules/dashboard/routes.js";
@@ -9,8 +9,14 @@ import { jobsRouter } from "./modules/jobs/routes.js";
 import { onboardingRouter } from "./modules/onboarding/routes.js";
 
 export const app = express();
-const allowedOrigins = new Set([config.CORS_ORIGIN, "http://localhost:5173", "http://127.0.0.1:5173", "https://fleetos-orpin-one.vercel.app", "https://fleetos-davidmlangstead-dots-projects.vercel.app", "https://fleetos-git-main-davidmlangstead-dots-projects.vercel.app"]);
-function isAllowedOrigin(origin: string) { if (allowedOrigins.has(origin)) return true; if (/^https:\/\/fleetos(?:-[a-z0-9]+)*-davidmlangstead-dots-projects\.vercel\.app$/i.test(origin)) return true; if (/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) return true; return false; }
+const configuredOrigins = [config.CORS_ORIGIN].filter(Boolean);
+function isAllowedOrigin(origin: string) {
+  if (configuredOrigins.includes(origin)) return true;
+  if (/^https:\/\/fleetos(?:-[a-z0-9]+)*-davidmlangstead-dots-projects\.vercel\.app$/i.test(origin)) return true;
+  if (/^https:\/\/fleetos-[a-z0-9-]+\.vercel\.app$/i.test(origin)) return true;
+  if (/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) return true;
+  return false;
+}
 app.use(cors({ origin(origin, callback) { if (!origin || isAllowedOrigin(origin)) return callback(null, true); console.warn(`CORS blocked origin: ${origin}`); return callback(new Error("Origin not allowed by FleetOS API")); }, credentials: true, methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"], allowedHeaders: ["Content-Type", "Authorization"] }));
 app.use(express.json({ limit: "10mb" }));
 app.get("/", (_req, res) => res.json({ name: "FleetOS API", status: "ok" }));
