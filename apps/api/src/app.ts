@@ -19,30 +19,42 @@ const allowedOrigins = new Set([
   "https://fleetos-git-main-davidmlangstead-dots-projects.vercel.app",
 ]);
 
+function isAllowedOrigin(origin: string) {
+  if (allowedOrigins.has(origin)) {
+    return true;
+  }
+
+  // Vercel creates unique deployment URLs for production/preview builds.
+  // Allow only FleetOS deployment URLs, not arbitrary *.vercel.app sites.
+  if (
+    /^https:\/\/fleetos(?:-[a-z0-9]+)*-davidmlangstead-dots-projects\.vercel\.app$/i.test(
+      origin
+    )
+  ) {
+    return true;
+  }
+
+  if (/^http:\/\/localhost:\d+$/.test(origin)) {
+    return true;
+  }
+
+  if (/^http:\/\/127\.0\.0\.1:\d+$/.test(origin)) {
+    return true;
+  }
+
+  return false;
+}
+
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin) {
-        return callback(null, true);
-      }
-
-      if (allowedOrigins.has(origin)) {
-        return callback(null, true);
-      }
-
-      if (/^http:\/\/localhost:\d+$/.test(origin)) {
-        return callback(null, true);
-      }
-
-      if (/^http:\/\/127\.0\.0\.1:\d+$/.test(origin)) {
+      if (!origin || isAllowedOrigin(origin)) {
         return callback(null, true);
       }
 
       console.warn(`CORS blocked origin: ${origin}`);
 
-      return callback(
-        new Error("Origin not allowed by FleetOS API")
-      );
+      return callback(new Error("Origin not allowed by FleetOS API"));
     },
 
     credentials: true,
