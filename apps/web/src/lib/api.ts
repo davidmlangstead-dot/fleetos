@@ -2,17 +2,28 @@ import { supabase } from "./supabase";
 
 const apiUrl = import.meta.env.VITE_API_URL as string | undefined;
 
-const configuredApiUrl = apiUrl?.trim().replace(/\/$/, "");
-const baseUrl =
-  configuredApiUrl
-    ? `${configuredApiUrl}/api`
-    : import.meta.env.DEV
-      ? "http://localhost:3001/api"
-      : "https://fleetos-1.onrender.com/api";
+function getBaseUrl() {
+  const configured = apiUrl?.trim().replace(/\/+$/, "");
 
-export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
-  // On mobile, Supabase can still be restoring the persisted session when
-  // the first protected API call is made. Refresh once before sending it.
+  if (configured) {
+    return configured.endsWith("/api")
+      ? configured
+      : `${configured}/api`;
+  }
+
+  if (import.meta.env.DEV) {
+    return "http://localhost:3001/api";
+  }
+
+  return "https://fleetos-1.onrender.com/api";
+}
+
+const baseUrl = getBaseUrl();
+
+export async function api<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
   let {
     data: { session },
   } = await supabase.auth.getSession();
@@ -22,18 +33,23 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
     session = refreshed.data.session ?? null;
   }
 
-  const response = await fetch(`${baseUrl}${path}`, {
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+
+  const response = await fetch(`${baseUrl}${cleanPath}`, {
     ...options,
     headers: {
       "content-type": "application/json",
       ...options.headers,
       ...(session?.access_token
-        ? { authorization: `Bearer ${session.access_token}` }
+        ? {
+            authorization: `Bearer ${session.access_token}`,
+          }
         : {}),
     },
   });
 
   const text = await response.text();
+
   let payload: unknown = null;
 
   if (text) {
@@ -47,10 +63,11 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   if (!response.ok) {
     const error = new Error(
       (payload as { error?: string } | undefined)?.error ??
-        `Request failed: ${response.status}`
+        `Request failed: ${response.status}`,
     );
 
     (error as Error & { status?: number }).status = response.status;
+
     throw error;
   }
 
