@@ -7,8 +7,6 @@ datasource db {
   url      = env("DIRECT_URL")
 }
 
-// ─── Enums ─────────────────────────────────────────────
-
 enum Role {
   DRIVER
   WORKSHOP_TECHNICIAN
@@ -66,20 +64,17 @@ enum DocumentType {
   OTHER
 }
 
-// ─── Models ────────────────────────────────────────────
-
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  firstName     String?
-  lastName      String?
-  phone         String?
-  avatarUrl     String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  memberships   CompanyMembership[]
-  ownedCompanies Company[] @relation("CompanyOwner")
+  id             String             @id @default(cuid())
+  email          String             @unique
+  firstName      String?
+  lastName       String?
+  phone          String?
+  avatarUrl      String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  memberships    CompanyMembership[]
+  ownedCompanies Company[]          @relation("CompanyOwner")
 }
 
 model Company {
@@ -93,7 +88,6 @@ model Company {
   ownerId         String
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
-
   owner           User               @relation("CompanyOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   memberships     CompanyMembership[]
   vehicles        Vehicle[]
@@ -102,9 +96,7 @@ model Company {
   defects         Defect[]
   complianceItems ComplianceItem[]
   documents       Document[]
-
   @@index([ownerId])
-  @@index([slug])
 }
 
 model CompanyMembership {
@@ -114,110 +106,103 @@ model CompanyMembership {
   role      Role     @default(OFFICE_STAFF)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
   @@unique([userId, companyId])
   @@index([companyId])
   @@index([userId])
 }
 
 model Vehicle {
-  id              String        @id @default(cuid())
-  companyId       String
-  registration    String
-  make            String?
-  model           String?
-  year            Int?
-  type            VehicleType   @default(TRUCK)
-  status          VehicleStatus @default(ACTIVE)
-  vin             String?
-  motDue          DateTime?
-  taxDue          DateTime?
-  insuranceDue    DateTime?
+  id                  String        @id @default(cuid())
+  companyId           String
+  registration        String
+  fleetNumber         String?
+  make                String?
+  model               String?
+  year                Int?
+  type                VehicleType   @default(TRUCK)
+  status              VehicleStatus @default(ACTIVE)
+  vin                 String?
+  motDue              DateTime?
+  taxDue              DateTime?
+  insuranceDue        DateTime?
   tachoCalibrationDue DateTime?
-  mileage         Int?
-  fuelType        String?
-  colour          String?
-  depot           String?
-  notes           String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-
-  company         Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  jobs            Job[]
-  defects         Defect[]
-  complianceItems ComplianceItem[]
-  documents       Document[]
-
+  mileage             Int?
+  fuelType            String?
+  colour              String?
+  depot               String?
+  notes               String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  company             Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  jobs                Job[]
+  defects             Defect[]
+  complianceItems     ComplianceItem[]
+  documents           Document[]
   @@unique([companyId, registration])
   @@index([companyId])
   @@index([status])
 }
 
 model Driver {
-  id              String   @id @default(cuid())
-  companyId       String
-  firstName       String
-  lastName        String
-  email           String?
-  phone           String?
-  licenceNumber   String?
-  licenceExpiry   DateTime?
-  cpcExpiry       DateTime?
-  dcpcExpiry      DateTime?
-  tachoCardNumber String?
-  tachoCardExpiry DateTime?
-  medicalDue      DateTime?
-  dateOfBirth     DateTime?
-  address         String?
-  postcode        String?
+  id               String   @id @default(cuid())
+  companyId        String
+  firstName        String
+  lastName         String
+  email            String?
+  phone            String?
+  licenceNumber    String?
+  licenceExpiry    DateTime?
+  cpcExpiry        DateTime?
+  dcpcExpiry       DateTime?
+  tachoCardNumber  String?
+  tachoCardExpiry  DateTime?
+  medicalDue       DateTime?
+  dateOfBirth      DateTime?
+  address          String?
+  postcode         String?
   emergencyContact String?
-  emergencyPhone  String?
-  startDate       DateTime?
-  leftDate        DateTime?
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  jobs            Job[]
-  documents       Document[]
-  defects         Defect[] @relation("ReportedByDriver")
-
+  emergencyPhone   String?
+  startDate        DateTime?
+  leftDate         DateTime?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  jobs             Job[]
+  documents        Document[]
+  defects          Defect[] @relation("ReportedByDriver")
   @@index([companyId])
   @@index([isActive])
 }
 
 model Job {
-  id              String    @id @default(cuid())
-  companyId       String
-  vehicleId       String?
-  driverId        String?
-  jobNumber       String?
-  customerName    String
-  collectionAddress   String?
-  collectionPostcode  String?
-  deliveryAddress     String?
-  deliveryPostcode    String?
-  collectionDateTime  DateTime?
-  deliveryDateTime    DateTime?
-  status          JobStatus @default(PLANNED)
-  instructions    String?
-  podUrl          String?
-  invoiceUrl      String?
-  rate            Decimal?  @db.Decimal(10, 2)
-  weightKg        Decimal?  @db.Decimal(10, 2)
-  pallets         Int?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  vehicle         Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
-  driver          Driver?   @relation(fields: [driverId], references: [id], onDelete: SetNull)
-  documents       Document[]
-
+  id                 String    @id @default(cuid())
+  companyId          String
+  vehicleId          String?
+  driverId           String?
+  jobNumber          String?
+  customerName       String
+  collectionAddress  String?
+  collectionPostcode String?
+  deliveryAddress    String?
+  deliveryPostcode   String?
+  collectionDateTime DateTime?
+  deliveryDateTime   DateTime?
+  status             JobStatus @default(PLANNED)
+  instructions       String?
+  podUrl             String?
+  invoiceUrl         String?
+  rate               Decimal?  @db.Decimal(10, 2)
+  weightKg           Decimal?  @db.Decimal(10, 2)
+  pallets            Int?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  company            Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vehicle            Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  driver             Driver?   @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  documents          Document[]
   @@index([companyId])
   @@index([vehicleId])
   @@index([driverId])
@@ -232,17 +217,15 @@ model Defect {
   title           String
   description     String?
   status          DefectStatus @default(OPEN)
-  severity        String?      // minor, major, critical
+  severity        String?
   resolvedAt      DateTime?
   resolutionNotes String?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
-
   company         Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   vehicle         Vehicle?     @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
   reportedBy      Driver?      @relation("ReportedByDriver", fields: [reportedById], references: [id], onDelete: SetNull)
   documents       Document[]
-
   @@index([companyId])
   @@index([vehicleId])
   @@index([status])
@@ -261,11 +244,9 @@ model ComplianceItem {
   reminderDays    Int?             @default(7)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
-
   company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   vehicle         Vehicle?         @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
   documents       Document[]
-
   @@index([companyId])
   @@index([vehicleId])
   @@index([status])
@@ -273,31 +254,32 @@ model ComplianceItem {
 }
 
 model Document {
-  id              String       @id @default(cuid())
-  companyId       String
-  vehicleId       String?
-  driverId        String?
-  jobId           String?
-  defectId        String?
-  complianceId    String?
-  type            DocumentType @default(OTHER)
-  name            String
-  fileUrl         String
-  fileSize        Int?
-  mimeType        String?
-  uploadedById    String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-
-  company         Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  vehicle         Vehicle?     @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
-  driver          Driver?      @relation(fields: [driverId], references: [id], onDelete: SetNull)
-  job             Job?         @relation(fields: [jobId], references: [id], onDelete: SetNull)
-  defect          Defect?      @relation(fields: [defectId], references: [id], onDelete: SetNull)
-  compliance      ComplianceItem? @relation(fields: [complianceId], references: [id], onDelete: SetNull)
-
+  id           String       @id @default(cuid())
+  companyId    String
+  vehicleId    String?
+  driverId     String?
+  jobId        String?
+  defectId     String?
+  complianceId String?
+  type         DocumentType @default(OTHER)
+  name         String
+  fileUrl      String
+  fileSize     Int?
+  mimeType     String?
+  uploadedById String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  company      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle?     @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  driver       Driver?      @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  job          Job?         @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  defect       Defect?      @relation(fields: [defectId], references: [id], onDelete: SetNull)
+  compliance   ComplianceItem? @relation(fields: [complianceId], references: [id], onDelete: SetNull)
   @@index([companyId])
   @@index([type])
   @@index([vehicleId])
   @@index([driverId])
+  @@index([jobId])
+  @@index([defectId])
+  @@index([complianceId])
 }
