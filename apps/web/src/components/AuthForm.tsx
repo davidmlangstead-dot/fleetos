@@ -19,24 +19,39 @@ export function AuthForm({ onSuccess, defaultMode = "login" }: AuthFormProps) {
     setBusy(true);
     setMessage("");
 
-    const result =
+    let result =
       mode === "login"
         ? await supabase.auth.signInWithPassword({ email, password })
         : await supabase.auth.signUp({ email, password });
 
-    setBusy(false);
-
     if (result.error) {
+      setBusy(false);
       setMessage(result.error.message);
       return;
     }
 
     if (mode === "signup" && !result.data.session) {
-      setMessage("Check your email to confirm your account, then sign in.");
-    } else {
-      setMessage("Signed in successfully.");
-      onSuccess?.();
+      // Supabase can return no session when an existing account is already
+      // confirmed. In that case, the user object tells us we can safely sign
+      // in with the password supplied above instead of asking for email again.
+      if (result.data.user?.email_confirmed_at) {
+        result = await supabase.auth.signInWithPassword({ email, password });
+
+        if (result.error) {
+          setBusy(false);
+          setMessage(result.error.message);
+          return;
+        }
+      } else {
+        setBusy(false);
+        setMessage("Check your email to confirm your account, then sign in.");
+        return;
+      }
     }
+
+    setBusy(false);
+    setMessage("Signed in successfully.");
+    onSuccess?.();
   }
 
   return (
