@@ -1,7 +1,7 @@
 import type { RequestHandler } from "express";
 import { Prisma } from "@prisma/client";
 import { createClient } from "@supabase/supabase-js";
-import { config } from "../config.js";
+import { config, SUPABASE_AUTH_KEY } from "../config.js";
 import { prisma } from "../lib/prisma.js";
 
 async function ensureUser(identity: { id: string; email: string }) {
@@ -10,9 +10,6 @@ async function ensureUser(identity: { id: string; email: string }) {
   });
   if (existingById) return existingById;
 
-  // A local FleetOS user may already exist for this verified Supabase email
-  // (for example after an account/session was recreated). Reuse that user
-  // instead of trying to insert a duplicate email and crashing the request.
   const existingByEmail = await prisma.user.findUnique({
     where: { email: identity.email },
   });
@@ -23,7 +20,6 @@ async function ensureUser(identity: { id: string; email: string }) {
       data: { id: identity.id, email: identity.email },
     });
   } catch (error) {
-    // Protect against two first requests racing to create the same user.
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       const createdByAnotherRequest = await prisma.user.findUnique({
         where: { email: identity.email },
@@ -40,7 +36,12 @@ export const requireIdentity: RequestHandler = async (req, res, next) => {
     return res.status(401).json({ error: "Unauthenticated" });
   }
 
-  const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY);
+  // Prefer the server-only service-role key when configured, falling back to
+  // the publishable/anon key for environments that don't provide one.
+  // getUser(token) still validates the caller's bearer token with Supabase.
+  const supabase = createClient(config.SUPABASE_URL, SUPABASE_AUTH_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data.user?.email) {
     return res.status(401).json({ error: "Invalid session" });
@@ -51,9 +52,6 @@ export const requireIdentity: RequestHandler = async (req, res, next) => {
     email: data.user.email,
   });
 
-  // Use the FleetOS user ID for downstream company ownership/membership
-  // lookups. This is the existing local user when the email was already
-  // present, and the Supabase ID for newly created users.
   res.locals.identity = { id: user.id, email: user.email };
   next();
 };
