@@ -1,5 +1,4 @@
 import type { RequestHandler } from "express";
-import { Prisma } from "@prisma/client";
 import { createClient } from "@supabase/supabase-js";
 import { config, SUPABASE_AUTH_KEY } from "../config.js";
 import { prisma } from "../lib/prisma.js";
@@ -13,8 +12,15 @@ async function ensureUser(identity: { id: string; email: string }) {
 
   try {
     return await prisma.user.create({ data: { id: identity.id, email: identity.email } });
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+  } catch (error: unknown) {
+    // Avoid relying on a Prisma runtime class export that differs between
+    // generated-client versions. The unique-constraint code is stable.
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code?: unknown }).code === "P2002"
+    ) {
       const createdByAnotherRequest = await prisma.user.findUnique({ where: { email: identity.email } });
       if (createdByAnotherRequest) return createdByAnotherRequest;
     }
