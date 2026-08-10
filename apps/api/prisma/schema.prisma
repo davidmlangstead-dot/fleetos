@@ -52,6 +52,23 @@ enum ComplianceStatus {
   DUE_SOON
   OVERDUE
   RESOLVED
+  BLOCKED
+  NOT_APPLICABLE
+}
+
+enum ComplianceSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum ComplianceSource {
+  DVSA
+  TRAFFIC_COMMISSIONER
+  RHA
+  FORS
+  CLOCS
+  COMPANY_POLICY
 }
 
 enum DocumentType {
@@ -95,7 +112,9 @@ model Company {
   jobs            Job[]
   defects         Defect[]
   complianceItems ComplianceItem[]
+  complianceRules ComplianceRule[]
   documents       Document[]
+  auditEvents     AuditEvent[]
   @@index([ownerId])
 }
 
@@ -173,6 +192,7 @@ model Driver {
   jobs             Job[]
   documents        Document[]
   defects          Defect[] @relation("ReportedByDriver")
+  complianceItems  ComplianceItem[]
   @@index([companyId])
   @@index([isActive])
 }
@@ -231,24 +251,56 @@ model Defect {
   @@index([status])
 }
 
+model ComplianceRule {
+  id             String           @id @default(cuid())
+  companyId      String
+  key            String
+  title          String
+  description    String?
+  source         ComplianceSource
+  sourceUrl      String?
+  ruleVersion    String
+  effectiveFrom  DateTime
+  effectiveTo    DateTime?
+  severity       ComplianceSeverity @default(WARNING)
+  appliesTo      String
+  intervalDays   Int?
+  reminderDays   Int?             @default(30)
+  active         Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  company        Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  complianceItems ComplianceItem[]
+  @@unique([companyId, key, ruleVersion])
+  @@index([companyId, active])
+  @@index([source])
+}
+
 model ComplianceItem {
-  id              String           @id @default(cuid())
+  id              String             @id @default(cuid())
   companyId       String
   vehicleId       String?
   driverId        String?
+  ruleId          String?
   title           String
   description     String?
   dueDate         DateTime
   completedDate   DateTime?
-  status          ComplianceStatus @default(ACTIVE)
-  reminderDays    Int?             @default(7)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  vehicle         Vehicle?         @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  status          ComplianceStatus   @default(ACTIVE)
+  severity        ComplianceSeverity @default(WARNING)
+  reminderDays    Int?               @default(7)
+  evidenceRequired Boolean            @default(false)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  company         Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vehicle         Vehicle?            @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  driver          Driver?             @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  rule            ComplianceRule?     @relation(fields: [ruleId], references: [id], onDelete: SetNull)
   documents       Document[]
   @@index([companyId])
   @@index([vehicleId])
+  @@index([driverId])
+  @@index([ruleId])
   @@index([status])
   @@index([dueDate])
 }
@@ -282,4 +334,22 @@ model Document {
   @@index([jobId])
   @@index([defectId])
   @@index([complianceId])
+}
+
+model AuditEvent {
+  id          String   @id @default(cuid())
+  companyId   String
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String?
+  summary     String
+  beforeJson  Json?
+  afterJson   Json?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  @@index([companyId, createdAt])
+  @@index([companyId, entityType, entityId])
+  @@index([actorUserId])
 }
