@@ -1,0 +1,53 @@
+{
+  "version": "0.1.0",
+  "jurisdiction": "GB",
+  "productBoundary": "compliance-support-not-legal-certification",
+  "authorities": [
+    "UK legislation",
+    "DVSA",
+    "Traffic Commissioner",
+    "FORS",
+    "CLOCS",
+    "RHA"
+  ],
+  "domains": [
+    "operator_licence",
+    "operating_centres",
+    "transport_manager",
+    "vehicles",
+    "trailers",
+    "roadworthiness",
+    "safety_inspections",
+    "defects",
+    "maintenance",
+    "brake_testing",
+    "mot_testing",
+    "tachograph",
+    "drivers_hours",
+    "working_time",
+    "driver_licence",
+    "driver_cpc",
+    "driver_training",
+    "daily_walkaround",
+    "insurance",
+    "tax",
+    "documents_and_evidence",
+    "audit_history"
+  ],
+  "statuses": [
+    "GREEN",
+    "AMBER",
+    "RED",
+    "BLOCKED",
+    "NOT_APPLICABLE"
+  ],
+  "ruleRequirements": [
+    "versioned",
+    "sourceAuthority",
+    "effectiveDate",
+    "reviewDate",
+    "applicability",
+    "reason",
+    "evidenceReference"
+  ]
+}
