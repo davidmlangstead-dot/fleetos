@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Bell, ClipboardList, Gauge, Menu, MessageCircle, ShieldCheck, Truck, Users, Wrench } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
-import { supabase } from "../lib/supabase";
+import { api } from "../lib/api";
 
 const nav = [
   ["/", "Today", Gauge],
@@ -17,22 +17,18 @@ export function AppShell() {
   const [company, setCompany] = useState<{ name: string } | null>(null);
 
   useEffect(() => {
-    async function loadCompany() {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const userId = sessionData.session?.user.id;
-      if (!userId) return;
-      const { data } = await supabase
-        .from("companies")
-        .select("name")
-        .eq("owner_id", userId)
-        .maybeSingle();
-      if (data) setCompany(data);
-    }
-    void loadCompany();
+    void api<{ name: string }>("/company")
+      .then(setCompany)
+      .catch((error) => console.error("FleetOS company load failed:", error));
   }, []);
 
-  const companyName = company?.name ?? "Your Company";
-  const initials = companyName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+  const companyName = company?.name ?? "Your company";
+  const initials = companyName
+    .split(" ")
+    .map((word) => word[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div className="app-shell">
@@ -43,7 +39,12 @@ export function AppShell() {
         </div>
         <nav>
           {nav.map(([to, label, Icon]) => (
-            <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}>
+            <NavLink
+              key={to}
+              to={to}
+              end={to === "/"}
+              className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
+            >
               <Icon size={20} />
               <span>{label}</span>
             </NavLink>
@@ -53,7 +54,7 @@ export function AppShell() {
           <div className="company-dot">{initials}</div>
           <div>
             <strong>{companyName}</strong>
-            <small>Transport Manager</small>
+            <small>Company workspace</small>
           </div>
         </div>
       </aside>
@@ -62,15 +63,12 @@ export function AppShell() {
           <button className="mobile-menu" aria-label="Open navigation">
             <Menu />
           </button>
-          <div className="presence">
-            <span className="online-dot" />
-            All systems operational
-          </div>
+          <div className="presence">FleetOS workspace</div>
           <div className="top-actions">
             <button className="icon-button" aria-label="Notifications">
               <Bell size={20} />
             </button>
-            <button className="avatar">DM</button>
+            <button className="avatar" aria-label="Account">DM</button>
           </div>
         </header>
         <Outlet />
