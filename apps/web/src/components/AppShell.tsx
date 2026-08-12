@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Bell, Building2, ClipboardList, Gauge, History, MapPin, Menu, MessageCircle, ShieldCheck, Truck, Users, Wrench, UserRound, Plus, Clock3, Stethoscope } from "lucide-react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { api, ACTIVE_WORKSPACE_KEY } from "../lib/api";
 
 type Role = "DRIVER" | "WORKSHOP_TECHNICIAN" | "TRANSPORT_PLANNER" | "TRANSPORT_MANAGER" | "OFFICE_STAFF" | "FINANCE" | "COMPANY_ADMIN" | "PLATFORM_ADMIN";
@@ -45,7 +45,14 @@ const roleLabels: Record<Role,string> = {
   COMPANY_ADMIN: "Company admin", PLATFORM_ADMIN: "Platform admin",
 };
 
+function routeRoles(pathname: string) {
+  if (pathname.startsWith("/registers/")) return registerUsers;
+  const exact = nav.find(([path]) => path === pathname);
+  return exact?.[3] ?? null;
+}
+
 export function AppShell() {
+  const location = useLocation();
   const [company, setCompany] = useState<{ id: string; name: string } | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const activeWorkspace = useMemo(() => workspaces.find((item) => item.id === company?.id) ?? null, [workspaces, company]);
@@ -72,6 +79,8 @@ export function AppShell() {
   const companyName = company?.name ?? "FleetOS";
   const initials = companyName.split(" ").map((word) => word[0]).join("").slice(0, 2).toUpperCase();
   const role = activeWorkspace?.role;
+  const allowedRoles = routeRoles(location.pathname);
+  const accessDenied = !!role && !!allowedRoles && !allowedRoles.includes(role);
 
   return <div className="app-shell"><aside className="sidebar">
     <div className="brand"><span className="brand-mark">F</span><span>FleetOS</span></div>
@@ -81,5 +90,5 @@ export function AppShell() {
     </div>
     <nav>{visibleNav.map(([to, label, Icon]) => <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}><Icon size={20} /><span>{label}</span></NavLink>)}</nav>
     <div className="sidebar-bottom"><div className="company-dot">{initials}</div><div><strong>{companyName}</strong><small>{role ? roleLabels[role] : "Company workspace"}</small></div></div>
-  </aside><main><header className="topbar"><button className="mobile-menu" aria-label="Open navigation"><Menu /></button><div className="presence">{companyName}{role ? ` · ${roleLabels[role]}` : ""}</div><div className="top-actions"><button className="icon-button" aria-label="Notifications"><Bell size={20} /></button><button className="avatar" aria-label="Account">{initials || "FO"}</button></div></header><Outlet /></main></div>;
+  </aside><main><header className="topbar"><button className="mobile-menu" aria-label="Open navigation"><Menu /></button><div className="presence">{companyName}{role ? ` · ${roleLabels[role]}` : ""}</div><div className="top-actions"><button className="icon-button" aria-label="Notifications"><Bell size={20} /></button><button className="avatar" aria-label="Account">{initials || "FO"}</button></div></header>{accessDenied ? <main className="loading-page"><div><h1>Access denied</h1><p>Your role does not have access to this FleetOS area.</p><button onClick={() => { window.location.href = role === "DRIVER" ? "/driver" : "/"; }}>Return to your dashboard</button></div></main> : <Outlet />}</main></div>;
 }
