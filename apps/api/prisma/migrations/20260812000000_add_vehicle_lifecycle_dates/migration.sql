@@ -1,0 +1,3 @@
+ALTER TABLE "Vehicle"
+  ADD COLUMN IF NOT EXISTS "firstRegisteredAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "acquiredAt" TIMESTAMP(3);

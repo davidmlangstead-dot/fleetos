@@ -1,119 +1,53 @@
 import { useEffect, useState } from "react";
 import { Search, Plus, Trash2 } from "lucide-react";
-import { supabase } from "../../lib/supabase";
+import { api } from "../../lib/api";
+import { VehicleWizard } from "./VehicleWizard";
 
-interface Vehicle {
+type Vehicle = {
   id: string;
   registration: string;
-  fleet_number?: string;
-  vin?: string;
+  fleetNumber?: string | null;
+  vin?: string | null;
   type: string;
   status: string;
-}
+  make?: string | null;
+  model?: string | null;
+  motDue?: string | null;
+  insuranceDue?: string | null;
+};
 
 export function VehiclesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [search, setSearch] = useState("");
-  const [showForm, setShowForm] = useState(false);
-  const [reg, setReg] = useState("");
-  const [fleet, setFleet] = useState("");
-  const [type, setType] = useState("TRUCK");
-  const [busy, setBusy] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const companyId = sessionData.session?.user.id;
-    if (!companyId) return;
-    const { data } = await supabase.from("vehicles").select("*").eq("company_id", companyId).order("registration");
-    setVehicles(data ?? []);
+    try {
+      setError(null);
+      setVehicles(await api<Vehicle[]>("/vehicles"));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load vehicles.");
+    }
   }
 
   useEffect(() => { void load(); }, []);
 
-  async function addVehicle(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    const { data: sessionData } = await supabase.auth.getSession();
-    const companyId = sessionData.session?.user.id;
-    if (!companyId) return;
-    await supabase.from("vehicles").insert({
-      company_id: companyId,
-      registration: reg.trim().toUpperCase(),
-      fleet_number: fleet.trim() || null,
-      type,
-      status: "ACTIVE",
-    });
-    setReg(""); setFleet(""); setType("TRUCK"); setShowForm(false);
-    setBusy(false);
-    void load();
-  }
-
-  async function remove(id: string) {
-    await supabase.from("vehicles").delete().eq("id", id);
-    void load();
-  }
-
-  const filtered = vehicles.filter(v => v.registration.toLowerCase().includes(search.toLowerCase()));
+  const filtered = vehicles.filter((v) => `${v.registration} ${v.make ?? ""} ${v.model ?? ""}`.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <section className="page">
       <div className="page-heading">
-        <div>
-          <p className="eyebrow">Fleet operations</p>
-          <h1>Vehicles</h1>
-          <p className="subtle">Manage your fleet register.</p>
-        </div>
-        <button className="primary-button" onClick={() => setShowForm(true)}><Plus size={18} /> Add vehicle</button>
+        <div><p className="eyebrow">Fleet operations</p><h1>Vehicles</h1><p className="subtle">Your live vehicle register. Only recorded information is shown.</p></div>
+        <button className="primary-button" onClick={() => setShowWizard(true)}><Plus size={18} /> Add vehicle</button>
       </div>
-
-      {showForm && (
-        <section className="panel" style={{ marginBottom: 24 }}>
-          <div className="panel-heading"><h2>Add vehicle</h2></div>
-          <form onSubmit={addVehicle} style={{ display: "grid", gap: 12, padding: 16 }}>
-            <label>Registration<input required value={reg} onChange={e => setReg(e.target.value)} placeholder="AB12 CDE" /></label>
-            <label>Fleet number<input value={fleet} onChange={e => setFleet(e.target.value)} placeholder="Optional" /></label>
-            <label>Type
-              <select value={type} onChange={e => setType(e.target.value)}>
-                <option value="TRUCK">Truck</option>
-                <option value="VAN">Van</option>
-                <option value="TRAILER">Trailer</option>
-                <option value="CAR">Car</option>
-                <option value="OTHER">Other</option>
-              </select>
-            </label>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button className="primary-button" disabled={busy} type="submit">{busy ? "Saving…" : "Save vehicle"}</button>
-              <button type="button" className="switch-mode" onClick={() => setShowForm(false)}>Cancel</button>
-            </div>
-          </form>
-        </section>
-      )}
-
-      <section className="panel">
-        <div className="search" style={{ padding: 16 }}>
-          <Search size={19} />
-          <input placeholder="Search vehicles…" value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-        {filtered.length === 0 ? (
-          <div className="empty-state">
-            <h2>No vehicles yet</h2>
-            <p>Add your first vehicle to build your fleet register.</p>
-            <button className="primary-button" onClick={() => setShowForm(true)}><Plus size={18} /> Add vehicle</button>
-          </div>
-        ) : (
-          <div className="job-list">
-            {filtered.map(v => (
-              <div className="job-row" key={v.id} style={{ justifyContent: "space-between" }}>
-                <div>
-                  <strong>{v.registration}</strong>
-                  <p>{v.type}{v.fleet_number ? ` · Fleet ${v.fleet_number}` : ""}</p>
-                </div>
-                <button className="icon-button" onClick={() => remove(v.id)} title="Delete"><Trash2 size={16} /></button>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      {error && <p role="alert" className="form-message error">{error}</p>}
+      {showWizard && <VehicleWizard onCancel={() => setShowWizard(false)} onComplete={() => { setShowWizard(false); void load(); }} />}
+      {!showWizard && <section className="panel">
+        <div className="search" style={{ padding: 16 }}><Search size={19} /><input placeholder="Search vehicles…" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+        {filtered.length === 0 ? <div className="empty-state"><h2>No vehicles recorded</h2><p>There is no vehicle data to display yet.</p><button className="primary-button" onClick={() => setShowWizard(true)}><Plus size={18} /> Add your first vehicle</button></div> :
+          <div className="job-list">{filtered.map((v) => <div className="job-row" key={v.id} style={{ justifyContent: "space-between" }}><div><strong>{v.registration}</strong><p>{v.type} · {v.make || "Make not recorded"} {v.model || ""}{v.fleetNumber ? ` · Fleet ${v.fleetNumber}` : ""}</p></div><button className="icon-button" title="Delete" disabled><Trash2 size={16} /></button></div>)}</div>}
+      </section>}
     </section>
   );
 }
