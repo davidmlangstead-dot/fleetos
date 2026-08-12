@@ -5,7 +5,7 @@ import { asyncHandler } from "../../lib/asyncHandler.js";
 import { writeAuditEvent } from "../../lib/audit.js";
 import { requireAuth, requireRoles } from "../../middleware/auth.js";
 
-const modules = ["TRAINING","INCIDENT","INFRINGEMENT","PCN","TOOLBOX_TALK","FUEL","TYRE","EQUIPMENT","COST","SUPPLIER","INSURANCE_CLAIM"] as const;
+const modules = ["TRAINING","INCIDENT","INFRINGEMENT","PCN","TOOLBOX_TALK","FUEL","TYRE","EQUIPMENT","COST","SUPPLIER","INSURANCE_CLAIM","SERVICE_HISTORY","PARTS_STOCK","DRIVER_SCORECARD"] as const;
 type Module = typeof modules[number];
 const moduleSet = new Set<string>(modules);
 
@@ -15,7 +15,7 @@ const workshopRoles = new Set(["WORKSHOP_TECHNICIAN","TRANSPORT_PLANNER","TRANSP
 const financeRoles = new Set(["FINANCE","TRANSPORT_MANAGER","OFFICE_STAFF","COMPANY_ADMIN","PLATFORM_ADMIN"]);
 
 function canUse(role: string, module: Module) {
-  if (["FUEL","TYRE","EQUIPMENT"].includes(module)) return workshopRoles.has(role);
+  if (["FUEL","TYRE","EQUIPMENT","SERVICE_HISTORY","PARTS_STOCK"].includes(module)) return workshopRoles.has(role);
   if (["COST","SUPPLIER","INSURANCE_CLAIM"].includes(module)) return financeRoles.has(role) || managementRoles.has(role);
   return managementRoles.has(role);
 }
