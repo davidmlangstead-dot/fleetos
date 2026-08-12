@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { asyncHandler } from "../../lib/asyncHandler.js";
 import { prisma } from "../../lib/prisma.js";
+import { writeAuditEvent } from "../../lib/audit.js";
 import { requireAuth, requireRoles } from "../../middleware/auth.js";
 
 const dateField = z.string().date().optional();
@@ -53,5 +54,6 @@ vehiclesRouter.post("/", requireRoles("TRANSPORT_PLANNER", "TRANSPORT_MANAGER", 
       tachoCalibrationDue: tachoCalibrationDue ? new Date(tachoCalibrationDue) : undefined,
     },
   });
+  await writeAuditEvent({ companyId: req.user!.companyId, actorUserId: req.user!.id, actorEmail: req.user!.email, action: "CREATE", entityType: "VEHICLE", entityId: vehicle.id, summary: `Created vehicle ${vehicle.registration}`, metadata: { type: vehicle.type } });
   res.status(201).json(vehicle);
 }));
