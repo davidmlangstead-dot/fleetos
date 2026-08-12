@@ -14,19 +14,24 @@ async function linkAuthIdentity(userId: string, authUserId: string) {
   await prisma.$executeRaw`UPDATE "User" SET "authUserId" = ${authUserId}::uuid WHERE id = ${userId} AND ("authUserId" IS NULL OR "authUserId" = ${authUserId}::uuid)`;
 }
 
+async function syncIdentityEmail<T extends { id: string; email: string }>(user: T, identity: Identity) {
+  if (user.email.toLowerCase() === identity.email.toLowerCase()) return user;
+  return prisma.user.update({ where: { id: user.id }, data: { email: identity.email } });
+}
+
 async function ensureUser(identity: Identity) {
   const linked = await prisma.$queryRaw<{ id: string }[]>`
     SELECT id FROM "User" WHERE "authUserId" = ${identity.id}::uuid LIMIT 1
   `;
   if (linked[0]) {
     const user = await prisma.user.findUnique({ where: { id: linked[0].id } });
-    if (user) return user;
+    if (user) return syncIdentityEmail(user, identity);
   }
 
   const existingById = await prisma.user.findUnique({ where: { id: identity.id } });
   if (existingById) {
     await linkAuthIdentity(existingById.id, identity.id);
-    return existingById;
+    return syncIdentityEmail(existingById, identity);
   }
 
   const existingByEmail = await prisma.user.findUnique({ where: { email: identity.email } });
