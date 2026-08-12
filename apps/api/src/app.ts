@@ -17,6 +17,7 @@ import { documentsRouter } from "./modules/documents/routes.js";
 import { reportsRouter } from "./modules/reports/routes.js";
 import { marketplaceRouter } from "./modules/marketplace/routes.js";
 import { medicRouter } from "./modules/medic/routes.js";
+import { notificationsRouter } from "./modules/notifications/routes.js";
 
 export const app = express();
 const configuredOrigins = [config.CORS_ORIGIN].filter(Boolean);
@@ -59,5 +60,6 @@ app.use("/api/documents", sensitiveRateLimit, documentsRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/marketplace", marketplaceRouter);
 app.use("/api/medic", sensitiveRateLimit, medicRouter);
+app.use("/api/notifications", notificationsRouter);
 app.use((_req, res) => res.status(404).json({ error: "Route not found" }));
 app.use(errorHandler);
