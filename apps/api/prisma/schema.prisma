@@ -78,24 +78,32 @@ model User {
 }
 
 model Company {
-  id              String            @id @default(cuid())
-  name            String
-  slug            String            @unique
-  vatNumber       String?
-  address         String?
-  postcode        String?
-  phone           String?
-  ownerId         String
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  owner           User              @relation("CompanyOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  memberships     CompanyMembership[]
-  vehicles        Vehicle[]
-  drivers         Driver[]
-  jobs            Job[]
-  defects         Defect[]
-  complianceItems ComplianceItem[]
-  documents       Document[]
+  id                    String            @id @default(cuid())
+  name                  String
+  slug                  String            @unique
+  vatNumber             String?
+  address               String?
+  postcode              String?
+  phone                 String?
+  industries            String[]          @default([])
+  teamSize              String?
+  operatorLicenceNumber String?
+  operatorLicenceType   String?
+  complianceSchemes     String[]          @default([])
+  homeDepotName         String?
+  countryCode           String            @default("GB")
+  usesHgv               Boolean           @default(false)
+  ownerId               String
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  owner                 User              @relation("CompanyOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  memberships           CompanyMembership[]
+  vehicles              Vehicle[]
+  drivers               Driver[]
+  jobs                  Job[]
+  defects               Defect[]
+  complianceItems       ComplianceItem[]
+  documents             Document[]
 
   @@index([ownerId])
 }
@@ -121,11 +129,11 @@ model Vehicle {
   registration         String
   fleetNumber          String?
   make                 String?
-  model                String?
+  model                 String?
   year                 Int?
   type                 VehicleType     @default(TRUCK)
   status               VehicleStatus   @default(ACTIVE)
-  vin                  String?
+  vin                   String?
   firstRegisteredAt    DateTime?
   acquiredAt           DateTime?
   motDue               DateTime?
