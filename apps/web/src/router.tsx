@@ -10,6 +10,8 @@ import { HoursBoardPage } from "./modules/operations/HoursBoardPage";
 import { WorkshopPage } from "./modules/workshop/WorkshopPage";
 import { ComplianceGuardianPage } from "./modules/compliance/ComplianceGuardianPage";
 import { CompanySettingsPage } from "./modules/company/CompanySettingsPage";
+import { DepotsPage } from "./modules/organisation/DepotsPage";
+import { AuditPage } from "./modules/organisation/AuditPage";
 import { ListPage } from "./modules/shared/ListPage";
 
 export const router = createBrowserRouter([{ element: <AppShell />, children: [
@@ -22,7 +24,9 @@ export const router = createBrowserRouter([{ element: <AppShell />, children: [
   { path: "/personal", element: <PersonalPage /> },
   { path: "/workshop", element: <WorkshopPage /> },
   { path: "/compliance", element: <ComplianceGuardianPage /> },
+  { path: "/organisation/depots", element: <DepotsPage /> },
   { path: "/settings/company", element: <CompanySettingsPage /> },
+  { path: "/settings/audit", element: <AuditPage /> },
   { path: "/messages", element: <ListPage title="Messages" description="Conversations connected to your work." action="New message" /> },
   { path: "*", element: <Navigate to="/" replace /> },
 ]}]);
