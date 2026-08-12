@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { asyncHandler } from "../../lib/asyncHandler.js";
 import { prisma } from "../../lib/prisma.js";
-import { requireAuth } from "../../middleware/auth.js";
+import { requireAuth, requireRoles } from "../../middleware/auth.js";
 
 const dateField = z.string().date().optional();
 const createVehicle = z.object({
@@ -36,7 +36,7 @@ const createVehicle = z.object({
 export const vehiclesRouter = Router();
 vehiclesRouter.use(requireAuth);
 vehiclesRouter.get("/", asyncHandler(async (req, res) => res.json(await prisma.vehicle.findMany({ where: { companyId: req.user!.companyId }, orderBy: { registration: "asc" }, take: 100 }))));
-vehiclesRouter.post("/", asyncHandler(async (req, res) => {
+vehiclesRouter.post("/", requireRoles("TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"), asyncHandler(async (req, res) => {
   const input = createVehicle.parse(req.body);
   const { firstRegisteredAt, acquiredAt, motDue, taxDue, insuranceDue, tachoCalibrationDue, ...rest } = input;
   const vehicle = await prisma.vehicle.create({
