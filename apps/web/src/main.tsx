@@ -80,3 +80,9 @@ function FleetOSApp() {
 createRoot(document.getElementById("root")!).render(
   <StrictMode><QueryClientProvider client={client}><FleetOSApp /></QueryClientProvider></StrictMode>,
 );
+
+if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register("/sw.js").catch((error) => console.error("FleetOS service worker registration failed", error));
+  });
+}
