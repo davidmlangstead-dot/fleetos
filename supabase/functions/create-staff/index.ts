@@ -32,38 +32,50 @@ Deno.serve(async (req) => {
     const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const callerClient = createClient(url, anon, { global: { headers: { Authorization: auth } } });
-    const { data: { user: caller } } = await callerClient.auth.getUser();
-    if (!caller) return json({ error: "Unauthorised" }, 401);
-
-    const admin = createClient(url, service);
-    const { data: memberships } = await admin
-      .from("CompanyMembership")
-      .select("companyId,role")
-      .eq("userId", caller.id);
-
-    const membership = memberships?.find((m: any) =>
-      ["COMPANY_ADMIN", "TRANSPORT_MANAGER", "PLATFORM_ADMIN"].includes(m.role)
-    );
-    if (!membership) return json({ error: "You do not have permission to add staff" }, 403);
+    const { data: { user: caller }, error: callerError } = await callerClient.auth.getUser();
+    if (callerError || !caller?.email) return json({ error: "Unauthorised" }, 401);
 
     const body = await req.json();
     const {
-      firstName, lastName, email, phone, personType, accessRole, startDate, dateOfBirth,
+      companyId, firstName, lastName, email, phone, personType, accessRole, startDate, dateOfBirth,
       address, postcode, emergencyContact, emergencyPhone, licenceNumber, licenceExpiry,
       cpcExpiry, tachoCardNumber, tachoCardExpiry, medicalDue, inviteAccount, onboardingKey,
     } = body;
 
+    if (typeof companyId !== "string" || !companyId.trim()) return json({ error: "Active company workspace is required" }, 400);
     if (!firstName?.trim() || !lastName?.trim() || !personType || !accessRole) {
       return json({ error: "Name, person type and access role are required" }, 400);
     }
     if (!roleMap[accessRole]) return json({ error: "Invalid access role" }, 400);
     if (inviteAccount && !email?.trim()) return json({ error: "Email is required to create an account" }, 400);
 
+    const admin = createClient(url, service, { auth: { autoRefreshToken: false, persistSession: false } });
+
+    const { data: appUser, error: appUserError } = await admin
+      .from("User")
+      .select("id,email")
+      .ilike("email", caller.email)
+      .maybeSingle();
+    if (appUserError) return json({ error: "Could not resolve FleetOS identity" }, 500);
+
+    const candidateUserIds = [...new Set([caller.id, appUser?.id].filter(Boolean) as string[])];
+    const { data: memberships, error: membershipLookupError } = await admin
+      .from("CompanyMembership")
+      .select("companyId,role,userId")
+      .eq("companyId", companyId)
+      .in("userId", candidateUserIds);
+    if (membershipLookupError) return json({ error: "Could not verify company permission" }, 500);
+
+    const membership = memberships?.find((m: any) =>
+      ["COMPANY_ADMIN", "TRANSPORT_MANAGER", "PLATFORM_ADMIN"].includes(m.role)
+    );
+    if (!membership) return json({ error: "You do not have permission to add staff to this company" }, 403);
+
     if (onboardingKey) {
       const { data: existing } = await admin
         .from("Person")
         .select("*")
-        .eq("companyId", membership.companyId)
+        .eq("companyId", companyId)
         .eq("onboardingKey", onboardingKey)
         .maybeSingle();
       if (existing) return json({ ok: true, person: existing, invited: !!existing.userId, resumed: true }, 200);
@@ -72,7 +84,7 @@ Deno.serve(async (req) => {
     const { data: person, error: personError } = await admin
       .from("Person")
       .insert({
-        companyId: membership.companyId,
+        companyId,
         userId: null,
         onboardingKey: onboardingKey || null,
         firstName: firstName.trim(),
@@ -92,43 +104,72 @@ Deno.serve(async (req) => {
       .select()
       .single();
 
-    if (personError) return json({ error: personError.message }, 500);
+    if (personError) return json({ error: personError.message }, 400);
 
-    let userId: string | null = null;
+    let linkedUserId: string | null = null;
     let invited = false;
+    let inviteWarning: string | null = null;
 
     try {
       if (inviteAccount) {
-        const { data, error } = await admin.auth.admin.inviteUserByEmail(email.trim(), {
-          data: { firstName: firstName.trim(), lastName: lastName.trim(), personType, accessRole },
-        });
-        if (error) throw error;
+        const normalizedEmail = email.trim().toLowerCase();
+        const { data: existingFleetUser } = await admin
+          .from("User")
+          .select("id,email")
+          .ilike("email", normalizedEmail)
+          .maybeSingle();
 
-        userId = data.user?.id ?? null;
-        invited = !!userId;
+        if (existingFleetUser?.id) {
+          linkedUserId = existingFleetUser.id;
+        } else {
+          const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(normalizedEmail, {
+            data: { firstName: firstName.trim(), lastName: lastName.trim(), personType, accessRole },
+          });
 
-        if (userId) {
+          if (inviteError) {
+            const { data: usersPage, error: listError } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+            if (listError) throw inviteError;
+            const existingAuth = usersPage.users.find((u) => u.email?.toLowerCase() === normalizedEmail);
+            if (!existingAuth) inviteWarning = inviteError.message;
+            else linkedUserId = existingAuth.id;
+          } else {
+            linkedUserId = inviteData.user?.id ?? null;
+            invited = !!linkedUserId;
+          }
+        }
+
+        if (linkedUserId) {
           const { error: userError } = await admin.from("User").upsert({
-            id: userId,
-            email: email.trim(),
+            id: linkedUserId,
+            email: normalizedEmail,
             firstName: firstName.trim(),
             lastName: lastName.trim(),
             phone: phone?.trim() || null,
             updatedAt: new Date().toISOString(),
-          });
+          }, { onConflict: "email" });
           if (userError) throw userError;
 
-          const { error: membershipError } = await admin.from("CompanyMembership").insert({
-            userId,
-            companyId: membership.companyId,
-            role: roleMap[accessRole],
-          });
-          if (membershipError) throw membershipError;
+          const { data: existingMembership } = await admin
+            .from("CompanyMembership")
+            .select("id,role")
+            .eq("userId", linkedUserId)
+            .eq("companyId", companyId)
+            .maybeSingle();
+
+          if (!existingMembership) {
+            const { error: membershipError } = await admin.from("CompanyMembership").insert({
+              userId: linkedUserId,
+              companyId,
+              role: roleMap[accessRole],
+            });
+            if (membershipError) throw membershipError;
+          }
 
           const { error: personUserError } = await admin
             .from("Person")
-            .update({ userId })
-            .eq("id", person.id);
+            .update({ userId: linkedUserId })
+            .eq("id", person.id)
+            .eq("companyId", companyId);
           if (personUserError) throw personUserError;
         }
       }
@@ -136,7 +177,7 @@ Deno.serve(async (req) => {
       if (personType === "DRIVER") {
         const { error: driverError } = await admin.from("Driver").insert({
           id: person.id,
-          companyId: membership.companyId,
+          companyId,
           firstName: firstName.trim(),
           lastName: lastName.trim(),
           email: email?.trim() || null,
@@ -158,18 +199,14 @@ Deno.serve(async (req) => {
         if (driverError) throw driverError;
       }
     } catch (error) {
-      if (userId) {
-        await admin.from("CompanyMembership").delete().eq("userId", userId).eq("companyId", membership.companyId);
-        await admin.from("User").delete().eq("id", userId);
-        await admin.auth.admin.deleteUser(userId);
-      }
-      await admin.from("Driver").delete().eq("id", person.id);
-      await admin.from("Person").delete().eq("id", person.id);
+      await admin.from("Driver").delete().eq("id", person.id).eq("companyId", companyId);
+      await admin.from("Person").delete().eq("id", person.id).eq("companyId", companyId);
       return json({ error: error instanceof Error ? error.message : "Could not create staff record" }, 400);
     }
 
-    return json({ ok: true, person: { ...person, userId }, invited }, 201);
+    return json({ ok: true, person: { ...person, userId: linkedUserId }, invited, inviteWarning }, 201);
   } catch (e) {
-    return json({ error: e instanceof Error ? e.message : "Unexpected error" }, 500);
+    console.error("create-staff failed", e);
+    return json({ error: "Unexpected error creating staff record" }, 500);
   }
 });
