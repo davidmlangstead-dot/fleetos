@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bell, Building2, ClipboardList, Gauge, History, MapPin, Menu, MessageCircle, ShieldCheck, Truck, Users, Wrench, UserRound, Plus, Clock3 } from "lucide-react";
+import { Bell, Building2, ClipboardList, Gauge, History, MapPin, Menu, MessageCircle, ShieldCheck, Truck, Users, Wrench, UserRound, Plus, Clock3, Stethoscope } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 import { api, ACTIVE_WORKSPACE_KEY } from "../lib/api";
 
@@ -35,6 +35,7 @@ const nav: readonly NavItem[] = [
   ["/organisation/depots", "Depots & Sites", MapPin, companyManagers],
   ["/settings/company", "Company Settings", Building2, companyManagers],
   ["/settings/audit", "Audit Trail", History, companyManagers],
+  ["/settings/medic", "FleetOS Medic", Stethoscope, companyManagers],
   ["/messages", "Messages", MessageCircle, everyone],
 ] as const;
 
