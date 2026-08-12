@@ -15,6 +15,7 @@ function getBaseUrl() {
 }
 
 const baseUrl = getBaseUrl();
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   let { data: { session } } = await supabase.auth.getSession();
@@ -25,15 +26,34 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
 
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   const workspaceId = localStorage.getItem(ACTIVE_WORKSPACE_KEY);
-  const response = await fetch(`${baseUrl}${cleanPath}`, {
-    ...options,
-    headers: {
-      "content-type": "application/json",
-      ...options.headers,
-      ...(session?.access_token ? { authorization: `Bearer ${session.access_token}` } : {}),
-      ...(workspaceId ? { "x-company-id": workspaceId } : {}),
-    },
-  });
+  const method = (options.method ?? "GET").toUpperCase();
+  const canMedicRetry = method === "GET" || method === "HEAD";
+
+  async function requestOnce() {
+    return fetch(`${baseUrl}${cleanPath}`, {
+      ...options,
+      headers: {
+        "content-type": "application/json",
+        ...options.headers,
+        ...(session?.access_token ? { authorization: `Bearer ${session.access_token}` } : {}),
+        ...(workspaceId ? { "x-company-id": workspaceId } : {}),
+      },
+    });
+  }
+
+  let response: Response;
+  try {
+    response = await requestOnce();
+  } catch (firstError) {
+    if (!canMedicRetry) throw firstError;
+    await sleep(500);
+    response = await requestOnce();
+  }
+
+  if (canMedicRetry && [502, 503, 504].includes(response.status)) {
+    await sleep(650);
+    response = await requestOnce();
+  }
 
   const text = await response.text();
   let payload: unknown = null;
