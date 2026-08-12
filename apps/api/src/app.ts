@@ -5,6 +5,7 @@ import { config } from "./config.js";
 import { errorHandler } from "./middleware/errors.js";
 import { companyRouter } from "./modules/company/routes.js";
 import { dashboardRouter } from "./modules/dashboard/routes.js";
+import { driversRouter } from "./modules/drivers/routes.js";
 import { vehiclesRouter } from "./modules/vehicles/routes.js";
 import { jobsRouter } from "./modules/jobs/routes.js";
 import { operationsRouter } from "./modules/operations/routes.js";
@@ -38,6 +39,7 @@ app.get("/health", (_req, res) => res.json({ status: "ok", timestamp: new Date()
 app.get("/api", (_req, res) => res.json({ name: "FleetOS API", status: "ok" }));
 app.use("/api/company", companyRouter);
 app.use("/api/dashboard", dashboardRouter);
+app.use("/api/drivers", driversRouter);
 app.use("/api/vehicles", vehiclesRouter);
 app.use("/api/jobs", jobsRouter);
 app.use("/api/operations", operationsRouter);
