@@ -1,8 +1,11 @@
 import { useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
-export function AuthPage() {
-  const [mode, setMode] = useState<"login" | "signup">("login");
+type Props = { initialMode?: "login" | "signup"; onBack?: () => void };
+
+export function AuthPage({ initialMode = "login", onBack }: Props) {
+  const [mode, setMode] = useState<"login" | "signup">(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -35,10 +38,11 @@ export function AuthPage() {
   return (
     <main className="auth-page">
       <section className="auth-card">
+        {onBack && <button className="switch-mode" onClick={onBack} style={{ marginBottom: 18 }}><ArrowLeft size={16}/> Back to FleetOS</button>}
         <div className="brand auth-brand"><span className="brand-mark">F</span><span>FleetOS</span></div>
         <p className="eyebrow">Transport operations, made simpler</p>
-        <h1>{mode === "login" ? "Welcome back" : "Start your FleetOS workspace"}</h1>
-        <p className="subtle">{mode === "login" ? "Sign in to get back to your operation." : "Create the first account for your company."}</p>
+        <h1>{mode === "login" ? "Welcome back" : "Create your FleetOS account"}</h1>
+        <p className="subtle">{mode === "login" ? "Sign in to get back to your operation." : "Create your account first. FleetOS will then guide you through one-time company setup."}</p>
         <form onSubmit={submit}>
           <label>Email<input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.co.uk" /></label>
           <label>Password<input type="password" required minLength={8} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" /></label>
