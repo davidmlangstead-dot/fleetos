@@ -27,6 +27,16 @@ const hoursReaders = requireRoles("TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFF
 export const operationsRouter = Router();
 operationsRouter.use(requireAuth);
 
+operationsRouter.get("/vehicles/available", asyncHandler(async (req, res) => {
+  const vehicles = await prisma.vehicle.findMany({
+    where: { companyId: req.user!.companyId, status: "ACTIVE" },
+    select: { id: true, registration: true, type: true },
+    orderBy: { registration: "asc" },
+    take: 250,
+  });
+  res.json(vehicles);
+}));
+
 operationsRouter.get("/defects", operationsReaders, asyncHandler(async (req, res) => {
   const defects = await prisma.defect.findMany({ where: { companyId: req.user!.companyId }, include: { vehicle: { select: { id: true, registration: true } }, reportedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: "desc" }, take: 200 });
   res.json(defects);
