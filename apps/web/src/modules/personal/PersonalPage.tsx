@@ -1,5 +1,6 @@
 import { FormEvent, useMemo, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, UserPlus } from "lucide-react";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabase";
 
 const personTypes = [
@@ -55,7 +56,20 @@ export function PersonalPage() {
       body: form,
     });
     setBusy(false);
-    if (fnError || data?.error) return setError(data?.error ?? fnError?.message ?? "Could not create staff record.");
+
+    if (fnError) {
+      if (fnError instanceof FunctionsHttpError) {
+        try {
+          const body = await fnError.context.json();
+          return setError(body?.error ?? fnError.message ?? "Could not create staff record.");
+        } catch {
+          return setError(fnError.message ?? "Could not create staff record.");
+        }
+      }
+      return setError(fnError.message ?? "Could not create staff record.");
+    }
+
+    if (data?.error) return setError(data.error);
     setSaved(true);
   }
 
@@ -65,7 +79,7 @@ export function PersonalPage() {
         <div className="company-dot" style={{ margin: "0 auto 16px" }}><Check /></div>
         <h1>Person added</h1>
         <p>{form.firstName} {form.lastName} is now in the company people records.</p>
-        <p className="subtle">{form.inviteAccount ? "An account invitation has been sent." : "No app account was created."}</p>
+        <p className="subtle">{form.inviteAccount ? "An account invitation has been sent or the existing account has been linked." : "No app account was created."}</p>
         <button className="primary-button" onClick={() => window.location.reload()}>Add another person</button>
       </div>
     </section>
@@ -93,7 +107,7 @@ export function PersonalPage() {
 
         {step === 3 && <section className="panel"><div className="panel-heading"><div><h2>{selectedType?.[1]} rules</h2><p className="subtle">These fields are driven by the selected person type.</p></div></div><div style={{ display:"grid", gap:14, padding:16 }}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><label>Date of birth<input type="date" value={form.dateOfBirth} onChange={e=>update("dateOfBirth",e.target.value)} /></label><label>Employment start date<input type="date" value={form.startDate} onChange={e=>update("startDate",e.target.value)} /></label></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><label>Address<input value={form.address} onChange={e=>update("address",e.target.value)} /></label><label>Postcode<input value={form.postcode} onChange={e=>update("postcode",e.target.value)} /></label></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><label>Emergency contact<input value={form.emergencyContact} onChange={e=>update("emergencyContact",e.target.value)} /></label><label>Emergency phone<input value={form.emergencyPhone} onChange={e=>update("emergencyPhone",e.target.value)} /></label></div>{isDriver && <div className="panel" style={{padding:14}}><h3>Driver requirements</h3><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}><label>Licence number<input value={form.licenceNumber} onChange={e=>update("licenceNumber",e.target.value)} /></label><label>Licence expiry<input type="date" value={form.licenceExpiry} onChange={e=>update("licenceExpiry",e.target.value)} /></label><label>CPC expiry<input type="date" value={form.cpcExpiry} onChange={e=>update("cpcExpiry",e.target.value)} /></label><label>Tacho card number<input value={form.tachoCardNumber} onChange={e=>update("tachoCardNumber",e.target.value)} /></label><label>Tacho card expiry<input type="date" value={form.tachoCardExpiry} onChange={e=>update("tachoCardExpiry",e.target.value)} /></label><label>Medical due<input type="date" value={form.medicalDue} onChange={e=>update("medicalDue",e.target.value)} /></label></div></div>}<label>Access role<select value={form.accessRole} onChange={e=>update("accessRole",e.target.value)}>{accessRoles.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label></div></section>}
 
-        {step === 4 && <section className="panel"><div className="panel-heading"><div><h2>Review & create</h2><p className="subtle">Check the record before FleetOS creates it.</p></div></div><div style={{display:"grid",gap:10,padding:16}}><p><strong>{form.firstName} {form.lastName}</strong> · {personTypes.find(([v])=>v===form.personType)?.[1]}</p><p>Access: <strong>{accessRoles.find(([v])=>v===form.accessRole)?.[1]}</strong></p><p>{form.email || "No email"} · {form.phone || "No phone"}</p><p>{form.inviteAccount ? "FleetOS account: invitation will be sent" : "FleetOS account: not created"}</p>{isDriver && <p>Driver compliance: licence, CPC, tacho and medical fields enabled.</p>}<div className="panel" style={{padding:14}}><strong>Tenant safety</strong><p className="subtle">This person will be attached only to the current company workspace. Access is controlled by their company membership role.</p></div></div></section>}
+        {step === 4 && <section className="panel"><div className="panel-heading"><div><h2>Review & create</h2><p className="subtle">Check the record before FleetOS creates it.</p></div></div><div style={{display:"grid",gap:10,padding:16}}><p><strong>{form.firstName} {form.lastName}</strong> · {personTypes.find(([v])=>v===form.personType)?.[1]}</p><p>Access: <strong>{accessRoles.find(([v])=>v===form.accessRole)?.[1]}</strong></p><p>{form.email || "No email"} · {form.phone || "No phone"}</p><p>{form.inviteAccount ? "FleetOS account: invitation will be sent or an existing account linked" : "FleetOS account: not created"}</p>{isDriver && <p>Driver compliance: licence, CPC, tacho and medical fields enabled.</p>}<div className="panel" style={{padding:14}}><strong>Tenant safety</strong><p className="subtle">This person will be attached only to the current company workspace. Access is controlled by their company membership role.</p></div></div></section>}
 
         <div style={{display:"flex",justifyContent:"space-between",marginTop:18}}><button type="button" className="switch-mode" disabled={step===1||busy} onClick={()=>setStep(s=>s-1)}><ChevronLeft size={17}/> Back</button>{step<4?<button type="button" className="primary-button" onClick={next}>Next <ChevronRight size={17}/></button>:<button type="submit" className="primary-button" disabled={busy}><UserPlus size={17}/>{busy?" Creating…":" Create person"}</button>}</div>
       </form>
