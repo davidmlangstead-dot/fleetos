@@ -8,6 +8,9 @@ export const companyRouter = Router();
 function slugify(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 45) || "fleet";
 }
+function clean(value: unknown, max: number) {
+  return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
 
 companyRouter.get("/workspaces", requireIdentity, asyncHandler(async (_req, res) => {
   const memberships = await prisma.companyMembership.findMany({
@@ -19,7 +22,10 @@ companyRouter.get("/workspaces", requireIdentity, asyncHandler(async (_req, res)
 }));
 
 companyRouter.post("/workspaces", requireIdentity, asyncHandler(async (req, res) => {
-  const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+  const name = clean(req.body?.name, 120);
+  const address = clean(req.body?.address, 240);
+  const postcode = clean(req.body?.postcode, 20);
+  const phone = clean(req.body?.phone, 40);
   if (!name) return res.status(400).json({ error: "Company name is required" });
 
   const ownerId = res.locals.identity.id;
@@ -28,7 +34,7 @@ companyRouter.post("/workspaces", requireIdentity, asyncHandler(async (req, res)
   for (let i = 2; await prisma.company.findUnique({ where: { slug } }); i += 1) slug = `${base}-${i}`.slice(0, 50);
 
   const company = await prisma.$transaction(async (tx) => {
-    const created = await tx.company.create({ data: { name, slug, ownerId } });
+    const created = await tx.company.create({ data: { name, slug, ownerId, address: address || null, postcode: postcode || null, phone: phone || null } });
     await tx.companyMembership.create({ data: { userId: ownerId, companyId: created.id, role: "COMPANY_ADMIN" } });
     return created;
   });
