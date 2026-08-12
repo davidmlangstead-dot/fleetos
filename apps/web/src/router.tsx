@@ -13,7 +13,7 @@ import { CompanySettingsPage } from "./modules/company/CompanySettingsPage";
 import { DepotsPage } from "./modules/organisation/DepotsPage";
 import { AuditPage } from "./modules/organisation/AuditPage";
 import { RegistersHubPage, RegisterModulePage } from "./modules/registers/RegisterPages";
-import { ListPage } from "./modules/shared/ListPage";
+import { MessagesPage } from "./modules/messages/MessagesPage";
 
 export const router = createBrowserRouter([{ element: <AppShell />, children: [
   { path: "/", element: <DashboardPageClean /> },
@@ -30,6 +30,6 @@ export const router = createBrowserRouter([{ element: <AppShell />, children: [
   { path: "/organisation/depots", element: <DepotsPage /> },
   { path: "/settings/company", element: <CompanySettingsPage /> },
   { path: "/settings/audit", element: <AuditPage /> },
-  { path: "/messages", element: <ListPage title="Messages" description="Conversations connected to your work." action="New message" /> },
+  { path: "/messages", element: <MessagesPage /> },
   { path: "*", element: <Navigate to="/" replace /> },
 ]}]);
