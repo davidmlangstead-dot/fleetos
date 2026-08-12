@@ -1,13 +1,14 @@
 import { Router } from "express";
 import { prisma } from "../../lib/prisma.js";
 import { asyncHandler } from "../../lib/asyncHandler.js";
-import { requireAuth } from "../../middleware/auth.js";
+import { requireAuth, requireRoles } from "../../middleware/auth.js";
 
 export const dashboardRouter = Router();
 dashboardRouter.use(requireAuth);
 
 dashboardRouter.get(
   "/",
+  requireRoles("WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"),
   asyncHandler(async (req, res) => {
     const companyId = req.user!.companyId;
     const [vehicles, activeJobs, overdueCompliance, openDefects, jobs] = await Promise.all([
