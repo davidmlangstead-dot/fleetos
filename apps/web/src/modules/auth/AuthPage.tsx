@@ -17,8 +17,8 @@ export function AuthPage({ initialMode = "login", onBack }: Props) {
     setMessage("");
 
     const result = mode === "login"
-      ? await supabase.auth.signInWithPassword({ email, password })
-      : await supabase.auth.signUp({ email, password });
+      ? await supabase.auth.signInWithPassword({ email: email.trim(), password })
+      : await supabase.auth.signUp({ email: email.trim(), password });
 
     setBusy(false);
 
@@ -28,7 +28,7 @@ export function AuthPage({ initialMode = "login", onBack }: Props) {
     }
 
     if (mode === "signup" && !result.data.session) {
-      setMessage("Check your email to confirm your account, then sign in.");
+      setMessage("If this is a new email address, check your inbox to confirm it. If you already have a FleetOS account, choose Sign in below — Supabase may not send another signup email for an existing account.");
       return;
     }
 
@@ -42,10 +42,10 @@ export function AuthPage({ initialMode = "login", onBack }: Props) {
         <div className="brand auth-brand"><span className="brand-mark">F</span><span>FleetOS</span></div>
         <p className="eyebrow">Transport operations, made simpler</p>
         <h1>{mode === "login" ? "Welcome back" : "Create your FleetOS account"}</h1>
-        <p className="subtle">{mode === "login" ? "Sign in to get back to your operation." : "Create your account first. FleetOS will then guide you through one-time company setup."}</p>
+        <p className="subtle">{mode === "login" ? "Existing account? Enter your email and password — no email link is required." : "Only use Create account for a brand-new email. Existing FleetOS users should use Sign in."}</p>
         <form onSubmit={submit}>
-          <label>Email<input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.co.uk" /></label>
-          <label>Password<input type="password" required minLength={8} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" /></label>
+          <label>Email<input type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.co.uk" /></label>
+          <label>Password<input type="password" required minLength={8} autoComplete={mode === "login" ? "current-password" : "new-password"} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" /></label>
           {message && <p className="form-message">{message}</p>}
           <button className="primary-button auth-submit" disabled={busy}>{busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}</button>
         </form>
