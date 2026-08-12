@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bell, ClipboardList, Gauge, Menu, MessageCircle, ShieldCheck, Truck, Users, Wrench, UserRound, Plus, Clock3 } from "lucide-react";
+import { Bell, Building2, ClipboardList, Gauge, Menu, MessageCircle, ShieldCheck, Truck, Users, Wrench, UserRound, Plus, Clock3 } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 import { api, ACTIVE_WORKSPACE_KEY } from "../lib/api";
 
@@ -11,6 +11,7 @@ const management: readonly Role[] = ["TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "
 const workshop: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const vehicleReaders: readonly Role[] = ["WORKSHOP_TECHNICIAN", ...management];
 const peopleManagers: readonly Role[] = ["TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
+const companyManagers: readonly Role[] = ["TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const everyone: readonly Role[] = ["DRIVER", "WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 
 const nav: readonly NavItem[] = [
@@ -23,6 +24,7 @@ const nav: readonly NavItem[] = [
   ["/personal", "Personal", UserRound, peopleManagers],
   ["/workshop", "Workshop", Wrench, workshop],
   ["/compliance", "Compliance", ShieldCheck, vehicleReaders],
+  ["/settings/company", "Company Settings", Building2, companyManagers],
   ["/messages", "Messages", MessageCircle, everyone],
 ] as const;
 
