@@ -14,6 +14,7 @@ import { registersRouter } from "./modules/registers/routes.js";
 import { messagesRouter } from "./modules/messages/routes.js";
 import { documentsRouter } from "./modules/documents/routes.js";
 import { reportsRouter } from "./modules/reports/routes.js";
+import { marketplaceRouter } from "./modules/marketplace/routes.js";
 
 export const app = express();
 const configuredOrigins = [config.CORS_ORIGIN].filter(Boolean);
@@ -53,5 +54,6 @@ app.use("/api/registers", registersRouter);
 app.use("/api/messages", messagesRouter);
 app.use("/api/documents", documentsRouter);
 app.use("/api/reports", reportsRouter);
+app.use("/api/marketplace", marketplaceRouter);
 app.use((_req, res) => res.status(404).json({ error: "Route not found" }));
 app.use(errorHandler);
