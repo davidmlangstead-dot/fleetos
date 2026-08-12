@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { asyncHandler } from "../../lib/asyncHandler.js";
 import { prisma } from "../../lib/prisma.js";
+import { writeAuditEvent } from "../../lib/audit.js";
 import { requireAuth, requireRoles } from "../../middleware/auth.js";
 
 const createJob = z.object({
@@ -53,6 +54,7 @@ jobsRouter.post(
       },
     });
 
+    await writeAuditEvent({ companyId: req.user!.companyId, actorUserId: req.user!.id, actorEmail: req.user!.email, action: "CREATE", entityType: "JOB", entityId: job.id, summary: `Created job ${job.jobNumber ?? job.id}`, metadata: { customerName: job.customerName } });
     res.status(201).json({
       ...job,
       reference: job.jobNumber,
