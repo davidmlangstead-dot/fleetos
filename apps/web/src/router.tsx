@@ -9,6 +9,7 @@ import { DriverCockpitPage } from "./modules/driver/DriverCockpitPage";
 import { HoursBoardPage } from "./modules/operations/HoursBoardPage";
 import { WorkshopPage } from "./modules/workshop/WorkshopPage";
 import { ComplianceGuardianPage } from "./modules/compliance/ComplianceGuardianPage";
+import { CompanySettingsPage } from "./modules/company/CompanySettingsPage";
 import { ListPage } from "./modules/shared/ListPage";
 
 export const router = createBrowserRouter([{ element: <AppShell />, children: [
@@ -21,6 +22,7 @@ export const router = createBrowserRouter([{ element: <AppShell />, children: [
   { path: "/personal", element: <PersonalPage /> },
   { path: "/workshop", element: <WorkshopPage /> },
   { path: "/compliance", element: <ComplianceGuardianPage /> },
+  { path: "/settings/company", element: <CompanySettingsPage /> },
   { path: "/messages", element: <ListPage title="Messages" description="Conversations connected to your work." action="New message" /> },
   { path: "*", element: <Navigate to="/" replace /> },
 ]}]);
