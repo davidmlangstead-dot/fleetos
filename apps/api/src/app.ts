@@ -11,6 +11,7 @@ import { jobsRouter } from "./modules/jobs/routes.js";
 import { operationsRouter } from "./modules/operations/routes.js";
 import { organisationRouter } from "./modules/organisation/routes.js";
 import { registersRouter } from "./modules/registers/routes.js";
+import { messagesRouter } from "./modules/messages/routes.js";
 
 export const app = express();
 const configuredOrigins = [config.CORS_ORIGIN].filter(Boolean);
@@ -47,5 +48,6 @@ app.use("/api/jobs", jobsRouter);
 app.use("/api/operations", operationsRouter);
 app.use("/api/organisation", organisationRouter);
 app.use("/api/registers", registersRouter);
+app.use("/api/messages", messagesRouter);
 app.use((_req, res) => res.status(404).json({ error: "Route not found" }));
 app.use(errorHandler);
