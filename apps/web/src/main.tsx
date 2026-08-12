@@ -6,28 +6,29 @@ import { router } from "./router";
 import { supabase } from "./lib/supabase";
 import { api, ACTIVE_WORKSPACE_KEY } from "./lib/api";
 import { AuthPage } from "./modules/auth/AuthPage";
+import { LandingPage } from "./modules/landing/LandingPage";
+import { OnboardingPage } from "./modules/onboarding/OnboardingPage";
 import "./styles.css";
 
 const client = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1 } } });
-type AppState = "loading" | "signed-out" | "ready" | "error";
+type AppState = "loading" | "landing" | "auth" | "onboarding" | "ready" | "error";
 type Workspace = { id: string; name: string; slug: string; role: string };
 
 function FleetOSApp() {
   const [state, setState] = useState<AppState>("loading");
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [error, setError] = useState("");
 
   async function resolveWorkspace() {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setState("signed-out"); return; }
+    if (!session) { setState("landing"); return; }
 
     try {
-      let workspaces = await api<Workspace[]>("/company/workspaces");
+      const workspaces = await api<Workspace[]>("/company/workspaces");
       if (!workspaces.length) {
-        const created = await api<Workspace>("/company/workspaces", {
-          method: "POST",
-          body: JSON.stringify({ name: "My Fleet" }),
-        });
-        workspaces = [created];
+        setError("");
+        setState("onboarding");
+        return;
       }
 
       const selected = localStorage.getItem(ACTIVE_WORKSPACE_KEY);
@@ -59,7 +60,7 @@ function FleetOSApp() {
     void resolveWorkspace().then(() => { if (!mounted) return; });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
-      if (event === "SIGNED_OUT") setState("signed-out");
+      if (event === "SIGNED_OUT") setState("landing");
       else if (event === "SIGNED_IN" && session) {
         setState("loading");
         void resolveWorkspace();
@@ -69,7 +70,9 @@ function FleetOSApp() {
   }, []);
 
   if (state === "loading") return <main className="loading-page">Opening FleetOS…</main>;
-  if (state === "signed-out") return <AuthPage />;
+  if (state === "landing") return <LandingPage onLogin={() => { setAuthMode("login"); setState("auth"); }} onSignup={() => { setAuthMode("signup"); setState("auth"); }} />;
+  if (state === "auth") return <AuthPage initialMode={authMode} onBack={() => setState("landing")} />;
+  if (state === "onboarding") return <OnboardingPage onComplete={(workspace) => { localStorage.setItem(ACTIVE_WORKSPACE_KEY, workspace.id); setState("ready"); }} />;
   if (state === "error") return <main className="loading-page"><div><h1>We couldn't open your workspace</h1><p>{error}</p><button onClick={() => { setState("loading"); void resolveWorkspace(); }}>Try again</button><button onClick={() => void supabase.auth.signOut()} style={{ marginLeft: 8 }}>Sign out</button></div></main>;
   return <RouterProvider router={router} />;
 }
