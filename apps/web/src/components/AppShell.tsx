@@ -13,6 +13,7 @@ const vehicleReaders: readonly Role[] = ["WORKSHOP_TECHNICIAN", ...management];
 const peopleManagers: readonly Role[] = ["TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const companyManagers: readonly Role[] = ["TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const registerUsers: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
+const documentUsers: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const everyone: readonly Role[] = ["DRIVER", "WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 
 const nav: readonly NavItem[] = [
@@ -25,6 +26,7 @@ const nav: readonly NavItem[] = [
   ["/personal", "Personal", UserRound, peopleManagers],
   ["/workshop", "Workshop", Wrench, workshop],
   ["/compliance", "Compliance", ShieldCheck, vehicleReaders],
+  ["/documents", "Documents", ClipboardList, documentUsers],
   ["/registers", "Registers", ClipboardList, registerUsers],
   ["/organisation/depots", "Depots & Sites", MapPin, companyManagers],
   ["/settings/company", "Company Settings", Building2, companyManagers],
