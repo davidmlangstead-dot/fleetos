@@ -1,38 +1,42 @@
 import { useEffect, useState } from "react";
 import { Search, Plus } from "lucide-react";
-import { supabase } from "../../lib/supabase";
+import { api } from "../../lib/api";
 
-interface JobRow {
+type JobRow = {
   id: string;
-  reference: string;
-  customer_name: string;
-  collection_address: string;
-  delivery_address: string;
+  reference?: string | null;
+  jobNumber?: string | null;
+  customerName?: string | null;
+  collectionAddress?: string | null;
+  deliveryAddress?: string | null;
   status: string;
-  collection_date_time: string;
-}
+  scheduledAt?: string | null;
+};
 
 export function JobsPage() {
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     async function load() {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const companyId = sessionData.session?.user.id;
-      if (!companyId) return;
-      const { data } = await supabase.from("jobs").select("*").eq("company_id", companyId).order("collection_date_time", { ascending: false }).limit(50);
-      setJobs(data ?? []);
-      setLoading(false);
+      try {
+        setJobs(await api<JobRow[]>("/jobs"));
+        setError("");
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not load jobs");
+      } finally {
+        setLoading(false);
+      }
     }
     void load();
   }, []);
 
-  const filtered = jobs.filter(j =>
-    j.reference?.toLowerCase().includes(search.toLowerCase()) ||
-    j.customer_name?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = jobs.filter((job) => {
+    const reference = job.reference ?? job.jobNumber ?? "";
+    return reference.toLowerCase().includes(search.toLowerCase()) || (job.customerName ?? "").toLowerCase().includes(search.toLowerCase());
+  });
 
   return (
     <section className="page">
@@ -40,14 +44,15 @@ export function JobsPage() {
         <div>
           <p className="eyebrow">Fleet operations</p>
           <h1>Jobs</h1>
-          <p className="subtle">Track collections and deliveries.</p>
+          <p className="subtle">Track collections and deliveries in the active company workspace.</p>
         </div>
         <button className="primary-button"><Plus size={18} /> Create job</button>
       </div>
+      {error && <div className="panel" style={{ padding: 14, marginBottom: 16, color: "#991b1b" }}>{error}</div>}
       <section className="panel">
         <div className="search" style={{ padding: 16 }}>
           <Search size={19} />
-          <input placeholder="Search jobs…" value={search} onChange={e => setSearch(e.target.value)} />
+          <input placeholder="Search jobs…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         {loading && <p className="empty-line" style={{ padding: 24 }}>Loading jobs…</p>}
         {!loading && filtered.length === 0 && (
@@ -59,13 +64,13 @@ export function JobsPage() {
         )}
         {!loading && filtered.length > 0 && (
           <div className="job-list">
-            {filtered.map(job => (
+            {filtered.map((job) => (
               <div className="job-row" key={job.id}>
                 <div>
-                  <strong>{job.reference || "—"}</strong>
-                  <p>{job.customer_name} · {job.collection_address} → {job.delivery_address}</p>
+                  <strong>{job.reference ?? job.jobNumber ?? "—"}</strong>
+                  <p>{job.customerName || "No customer"} · {job.collectionAddress || "Collection not set"} → {job.deliveryAddress || "Delivery not set"}</p>
                 </div>
-                <span className={`status ${job.status === "COMPLETED" ? "success" : "warning"}`}>{job.status}</span>
+                <span className={`status ${job.status === "DELIVERED" ? "success" : "warning"}`}>{job.status}</span>
               </div>
             ))}
           </div>
