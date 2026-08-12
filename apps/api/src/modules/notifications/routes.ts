@@ -21,34 +21,45 @@ type MedicRow = {
   createdAt: Date;
 };
 
+const complianceRoles = new Set(["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
+const defectRoles = new Set(["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
+const medicRoles = new Set(["TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
+
 export const notificationsRouter = Router();
 notificationsRouter.use(requireAuth);
 
 notificationsRouter.get("/", asyncHandler(async (req, res) => {
   const companyId = req.user!.companyId;
+  const role = req.user!.role;
   const now = new Date();
   const soon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
   const [compliance, defects, medic] = await Promise.all([
-    prisma.complianceItem.findMany({
-      where: { companyId, status: { not: "RESOLVED" }, dueDate: { lte: soon } },
-      select: { id: true, title: true, dueDate: true, description: true },
-      orderBy: { dueDate: "asc" },
-      take: 20,
-    }),
-    prisma.defect.findMany({
-      where: { companyId, status: { not: "RESOLVED" } },
-      select: { id: true, title: true, severity: true, createdAt: true, vehicle: { select: { registration: true } } },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-    }),
-    prisma.$queryRaw<MedicRow[]>`
-      SELECT id::text, severity, summary, detail, "createdAt"
-      FROM "MedicIncident"
-      WHERE "companyId" = ${companyId} AND status <> 'RESOLVED'
-      ORDER BY "createdAt" DESC
-      LIMIT 20
-    `,
+    complianceRoles.has(role)
+      ? prisma.complianceItem.findMany({
+          where: { companyId, status: { not: "RESOLVED" }, dueDate: { lte: soon } },
+          select: { id: true, title: true, dueDate: true, description: true },
+          orderBy: { dueDate: "asc" },
+          take: 20,
+        })
+      : Promise.resolve([]),
+    defectRoles.has(role)
+      ? prisma.defect.findMany({
+          where: { companyId, status: { not: "RESOLVED" } },
+          select: { id: true, title: true, severity: true, createdAt: true, vehicle: { select: { registration: true } } },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+        })
+      : Promise.resolve([]),
+    medicRoles.has(role)
+      ? prisma.$queryRaw<MedicRow[]>`
+          SELECT id::text, severity, summary, detail, "createdAt"
+          FROM "MedicIncident"
+          WHERE "companyId" = ${companyId} AND status <> 'RESOLVED'
+          ORDER BY "createdAt" DESC
+          LIMIT 20
+        `
+      : Promise.resolve([] as MedicRow[]),
   ]);
 
   const alerts: Alert[] = [];
