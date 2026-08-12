@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { asyncHandler } from "../../lib/asyncHandler.js";
 import { prisma } from "../../lib/prisma.js";
-import { requireAuth } from "../../middleware/auth.js";
+import { requireAuth, requireRoles } from "../../middleware/auth.js";
 
 const createJob = z.object({
   reference: z.string().min(1),
@@ -12,11 +12,15 @@ const createJob = z.object({
   scheduledAt: z.coerce.date(),
 });
 
+const jobReaders = requireRoles("TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN");
+const jobWriters = requireRoles("TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN");
+
 export const jobsRouter = Router();
 jobsRouter.use(requireAuth);
 
 jobsRouter.get(
   "/",
+  jobReaders,
   asyncHandler(async (req, res) => {
     const jobs = await prisma.job.findMany({
       where: { companyId: req.user!.companyId },
@@ -35,6 +39,7 @@ jobsRouter.get(
 
 jobsRouter.post(
   "/",
+  jobWriters,
   asyncHandler(async (req, res) => {
     const input = createJob.parse(req.body);
     const job = await prisma.job.create({
