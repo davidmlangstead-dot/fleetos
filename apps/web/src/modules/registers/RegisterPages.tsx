@@ -14,6 +14,9 @@ const moduleConfig = {
   COST: ["Costs", "Operational costs and financial references by company."],
   SUPPLIER: ["Suppliers", "Supplier records, services and review actions."],
   INSURANCE_CLAIM: ["Insurance Claims", "Claims, references, incident links and outcomes."],
+  SERVICE_HISTORY: ["Service History", "PMI, servicing, repairs and maintenance evidence by vehicle."],
+  PARTS_STOCK: ["Parts & Stock", "Parts, stock references, replenishment actions and costs."],
+  DRIVER_SCORECARD: ["Driver Scorecards", "Driver reviews, coaching actions and operational performance notes."],
 } as const;
 
 type Module = keyof typeof moduleConfig;
@@ -44,7 +47,7 @@ export function RegisterModulePage() {
   const [busy,setBusy] = useState(false);
   const [error,setError] = useState("");
   const [form,setForm] = useState({title:"",reference:"",status:"OPEN",occurredAt:"",dueAt:"",amount:"",subjectLabel:"",notes:""});
-  const hasAmount = useMemo(() => ["FUEL","COST","PCN","INSURANCE_CLAIM","TYRE","EQUIPMENT","SUPPLIER"].includes(module),[module]);
+  const hasAmount = useMemo(() => ["FUEL","COST","PCN","INSURANCE_CLAIM","TYRE","EQUIPMENT","SUPPLIER","SERVICE_HISTORY","PARTS_STOCK"].includes(module),[module]);
 
   async function load() {
     if (!config) return;
