@@ -12,6 +12,7 @@ import { ComplianceGuardianPage } from "./modules/compliance/ComplianceGuardianP
 import { CompanySettingsPage } from "./modules/company/CompanySettingsPage";
 import { DepotsPage } from "./modules/organisation/DepotsPage";
 import { AuditPage } from "./modules/organisation/AuditPage";
+import { RegistersHubPage, RegisterModulePage } from "./modules/registers/RegisterPages";
 import { ListPage } from "./modules/shared/ListPage";
 
 export const router = createBrowserRouter([{ element: <AppShell />, children: [
@@ -24,6 +25,8 @@ export const router = createBrowserRouter([{ element: <AppShell />, children: [
   { path: "/personal", element: <PersonalPage /> },
   { path: "/workshop", element: <WorkshopPage /> },
   { path: "/compliance", element: <ComplianceGuardianPage /> },
+  { path: "/registers", element: <RegistersHubPage /> },
+  { path: "/registers/:module", element: <RegisterModulePage /> },
   { path: "/organisation/depots", element: <DepotsPage /> },
   { path: "/settings/company", element: <CompanySettingsPage /> },
   { path: "/settings/audit", element: <AuditPage /> },
