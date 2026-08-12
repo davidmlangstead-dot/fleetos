@@ -17,6 +17,7 @@ import { MessagesPage } from "./modules/messages/MessagesPage";
 import { DocumentsPage } from "./modules/documents/DocumentsPage";
 import { ReportsPage } from "./modules/reports/ReportsPage";
 import { MarketplacePage } from "./modules/marketplace/MarketplacePage";
+import { MedicPage } from "./modules/medic/MedicPage";
 
 export const router = createBrowserRouter([{ element: <AppShell />, children: [
   { path: "/", element: <DashboardPageClean /> },
@@ -36,6 +37,7 @@ export const router = createBrowserRouter([{ element: <AppShell />, children: [
   { path: "/organisation/depots", element: <DepotsPage /> },
   { path: "/settings/company", element: <CompanySettingsPage /> },
   { path: "/settings/audit", element: <AuditPage /> },
+  { path: "/settings/medic", element: <MedicPage /> },
   { path: "/messages", element: <MessagesPage /> },
   { path: "*", element: <Navigate to="/" replace /> },
 ]}]);
