@@ -4,12 +4,35 @@ import { prisma } from "../../lib/prisma.js";
 import { asyncHandler } from "../../lib/asyncHandler.js";
 import { requireIdentity } from "../../middleware/auth.js";
 
-function slugify(name: string) { return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50); }
-function cleanString(value: unknown) { return typeof value === "string" ? value.trim() : ""; }
+function slugify(name: string) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
+}
+
+function cleanString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 const vehicleTypes = ["TRUCK", "VAN", "TRAILER", "CAR", "OTHER"] as const;
 
 export const onboardingRouter = Router();
 onboardingRouter.use(requireIdentity);
+
+onboardingRouter.get("/status", asyncHandler(async (_req, res) => {
+  const ownerId = res.locals.identity.id;
+  const rows = await prisma.$queryRaw<Array<{ id: string; onboardingComplete: boolean }>>`
+    SELECT "id", "onboardingComplete"
+    FROM "Company"
+    WHERE "ownerId" = ${ownerId}
+    ORDER BY "createdAt" ASC
+    LIMIT 1
+  `;
+
+  if (!rows.length) {
+    return res.status(404).json({ exists: false, complete: false });
+  }
+
+  return res.json({ exists: true, complete: rows[0].onboardingComplete });
+}));
 
 onboardingRouter.post("/company", asyncHandler(async (req, res) => {
   const companyName = cleanString(req.body?.companyName);
@@ -23,7 +46,7 @@ onboardingRouter.post("/company", asyncHandler(async (req, res) => {
       update: { role: "COMPANY_ADMIN" },
       create: { userId: ownerId, companyId: existing.id, role: "COMPANY_ADMIN" },
     });
-    return res.status(409).json({ ok: true, duplicate: true, company: existing });
+    return res.status(200).json({ ok: true, resumed: true, company: existing });
   }
 
   const baseSlug = slugify(companyName) || "company";
@@ -50,7 +73,9 @@ onboardingRouter.post("/company", asyncHandler(async (req, res) => {
     await tx.companyMembership.create({ data: { userId: ownerId, companyId: company.id, role: "COMPANY_ADMIN" } });
 
     for (const v of vehicles) {
-      if (v.acquiredAt && v.firstRegisteredAt && v.acquiredAt < v.firstRegisteredAt) throw new Error(`Acquired date cannot be before first registration for ${v.registration}.`);
+      if (v.acquiredAt && v.firstRegisteredAt && v.acquiredAt < v.firstRegisteredAt) {
+        throw new Error(`Acquired date cannot be before first registration for ${v.registration}.`);
+      }
       await tx.vehicle.create({ data: {
         companyId: company.id,
         registration: v.registration,
@@ -68,4 +93,19 @@ onboardingRouter.post("/company", asyncHandler(async (req, res) => {
   });
 
   return res.status(201).json({ ok: true, company: result, vehicleCount: vehicles.length });
+}));
+
+onboardingRouter.post("/complete", asyncHandler(async (_req, res) => {
+  const ownerId = res.locals.identity.id;
+  const changed = await prisma.$executeRaw`
+    UPDATE "Company"
+    SET "onboardingComplete" = true, "updatedAt" = CURRENT_TIMESTAMP
+    WHERE "ownerId" = ${ownerId}
+  `;
+
+  if (!changed) {
+    return res.status(404).json({ error: "Company not found" });
+  }
+
+  return res.json({ ok: true });
 }));
