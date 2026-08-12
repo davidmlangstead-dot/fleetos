@@ -1,12 +1,16 @@
 import { supabase } from "./supabase";
 
-const apiUrl = import.meta.env.VITE_API_URL as string | undefined;
 export const ACTIVE_WORKSPACE_KEY = "fleetos.activeWorkspaceId";
 
 function getBaseUrl() {
-  const configured = apiUrl?.trim().replace(/\/+$/, "");
-  if (configured) return configured.endsWith("/api") ? configured : `${configured}/api`;
-  if (import.meta.env.DEV) return "http://localhost:3001/api";
+  if (import.meta.env.DEV) {
+    const configured = (import.meta.env.VITE_API_URL as string | undefined)?.trim().replace(/\/+$/, "");
+    if (configured) return configured.endsWith("/api") ? configured : `${configured}/api`;
+    return "http://localhost:3001/api";
+  }
+
+  // Production has one canonical API target. Do not allow stale Vercel env values
+  // to silently point a new frontend deployment at an old backend.
   return "https://fleetos-1.onrender.com/api";
 }
 
