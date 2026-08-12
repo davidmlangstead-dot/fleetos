@@ -1,0 +1,28 @@
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Coffee, Gauge, TimerReset, Wrench } from "lucide-react";
+import { api } from "../../lib/api";
+
+type Activity = "DRIVING" | "OTHER_WORK" | "POA" | "BREAK_REST";
+type Hours = { driver: { firstName: string; lastName: string }; current: { activity: Activity; startedAt: string } | null; totals: Record<Activity, number> };
+type Vehicle = { id: string; registration: string };
+
+const labels: Record<Activity,string> = { DRIVING: "Driving", OTHER_WORK: "Other work", POA: "POA", BREAK_REST: "Break / rest" };
+const actions: Array<[Activity,string,typeof Gauge]> = [["DRIVING","Driving",Gauge],["OTHER_WORK","Other work",Wrench],["POA","POA",TimerReset],["BREAK_REST","Break / rest",Coffee]];
+const fmt = (mins:number) => `${Math.floor(mins/60)}h ${String(mins%60).padStart(2,"0")}m`;
+
+export function DriverCockpitPage() {
+  const [hours,setHours] = useState<Hours|null>(null); const [vehicles,setVehicles]=useState<Vehicle[]>([]); const [error,setError]=useState(""); const [busy,setBusy]=useState(false);
+  const [defect,setDefect]=useState({vehicleId:"",title:"",description:"",severity:"MEDIUM"});
+  async function load(){ setError(""); try { const [h,v]=await Promise.all([api<Hours>("/operations/driver-hours/me"),api<Vehicle[]>("/vehicles")]); setHours(h); setVehicles(v); } catch(e){ setError(e instanceof Error?e.message:"Could not load driver cockpit"); } }
+  useEffect(()=>{ void load(); },[]);
+  async function setActivity(activity:Activity){ setBusy(true); try{ await api("/operations/driver-hours/me",{method:"POST",body:JSON.stringify({activity})}); await load(); }catch(e){setError(e instanceof Error?e.message:"Could not update activity");}finally{setBusy(false);} }
+  async function reportDefect(){ if(!defect.title.trim()) return setError("Describe the defect first."); setBusy(true); try{ await api("/operations/defects",{method:"POST",body:JSON.stringify(defect)}); setDefect({vehicleId:"",title:"",description:"",severity:"MEDIUM"}); setError(""); alert("Defect sent to the workshop queue."); }catch(e){setError(e instanceof Error?e.message:"Could not report defect");}finally{setBusy(false);} }
+  const driving = hours?.totals.DRIVING ?? 0;
+  const currentMinutes = useMemo(()=> hours?.current ? Math.floor((Date.now()-new Date(hours.current.startedAt).getTime())/60000) : 0,[hours]);
+  return <section className="page"><div className="page-heading"><div><p className="eyebrow">Driver today</p><h1>{hours ? `${hours.driver.firstName}'s cockpit` : "Driver cockpit"}</h1><p className="subtle">Jobs, hours and vehicle issues in one driver-first screen.</p></div><div className="presence">{hours?.current ? labels[hours.current.activity] : "No activity selected"}</div></div>
+    {error&&<div className="panel" style={{padding:14,marginBottom:16,color:"#991b1b"}}>{error}</div>}
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:14,marginBottom:18}}><div className="panel" style={{padding:18}}><span className="subtle">Driving today</span><h2>{fmt(driving)}</h2></div><div className="panel" style={{padding:18}}><span className="subtle">Current activity</span><h2>{hours?.current?labels[hours.current.activity]:"Not set"}</h2><small>{hours?.current?`${fmt(currentMinutes)} current session`:"Choose below"}</small></div><div className="panel" style={{padding:18}}><span className="subtle">Companion status</span><h2>{driving>=270?"Check break":"Tracking"}</h2><small>This assists the driver; it does not replace an approved tachograph.</small></div></div>
+    <section className="panel" style={{marginBottom:18}}><div className="panel-heading"><div><h2>Tacho companion</h2><p className="subtle">Set your current activity. FleetOS shares the live state with authorised office users.</p></div></div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,padding:16}}>{actions.map(([value,label,Icon])=><button key={value} disabled={busy} className={hours?.current?.activity===value?"primary-button":"secondary-button"} style={{justifyContent:"center",minHeight:54}} onClick={()=>void setActivity(value)}><Icon size={18}/>{label}</button>)}</div>{driving>=240&&<div style={{padding:"0 16px 16px",display:"flex",gap:10,alignItems:"center",color:"#92400e"}}><AlertTriangle size={18}/>Approaching 4½ hours recorded driving today. Confirm the applicable legal break requirement against the tachograph/rules for this duty.</div>}</section>
+    <section className="panel"><div className="panel-heading"><div><h2>Report a vehicle defect</h2><p className="subtle">One report goes straight into the shared workshop queue.</p></div></div><div style={{display:"grid",gap:12,padding:16}}><label>Vehicle<select value={defect.vehicleId} onChange={e=>setDefect({...defect,vehicleId:e.target.value})}><option value="">Choose vehicle…</option>{vehicles.map(v=><option key={v.id} value={v.id}>{v.registration}</option>)}</select></label><label>Defect<input value={defect.title} onChange={e=>setDefect({...defect,title:e.target.value})} placeholder="e.g. Nearside brake light not working"/></label><label>Details<textarea value={defect.description} onChange={e=>setDefect({...defect,description:e.target.value})}/></label><label>Severity<select value={defect.severity} onChange={e=>setDefect({...defect,severity:e.target.value})}><option>LOW</option><option>MEDIUM</option><option>HIGH</option><option>SAFETY_CRITICAL</option></select></label><button className="primary-button" disabled={busy} onClick={()=>void reportDefect()}>Send to workshop</button></div></section>
+  </section>;
+}
