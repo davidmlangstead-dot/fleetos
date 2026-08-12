@@ -10,7 +10,6 @@ import "./styles.css";
 
 const client = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1 } } });
 type AppState = "loading" | "signed-out" | "ready" | "error";
-
 type Workspace = { id: string; name: string; slug: string; role: string };
 
 function FleetOSApp() {
@@ -32,9 +31,16 @@ function FleetOSApp() {
       }
 
       const selected = localStorage.getItem(ACTIVE_WORKSPACE_KEY);
-      if (!selected || !workspaces.some((w) => w.id === selected)) {
-        localStorage.setItem(ACTIVE_WORKSPACE_KEY, workspaces[0].id);
+      let active = workspaces.find((w) => w.id === selected);
+      if (!active) {
+        active = workspaces[0];
+        localStorage.setItem(ACTIVE_WORKSPACE_KEY, active.id);
       }
+
+      if (active.role === "DRIVER" && window.location.pathname === "/") {
+        window.history.replaceState(null, "", "/driver");
+      }
+
       setError("");
       setState("ready");
     } catch (err) {
