@@ -48,8 +48,6 @@ function FleetOSApp() {
 
   useEffect(() => {
     void check();
-    const { data } = supabase.auth.onAuthStateChange(() => void check());
-    return () => data.subscription.unsubscribe();
   }, []);
 
   if (state === "loading") return <main className="loading-page">Loading FleetOS…</main>;
