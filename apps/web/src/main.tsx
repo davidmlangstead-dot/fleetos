@@ -18,14 +18,21 @@ function FleetOSApp() {
   async function resolveWorkspace() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setState("signed-out"); return; }
+
     try {
-      await api("/company");
-      setState("ready");
+      const status = await api<{ exists: boolean; complete: boolean }>("/onboarding/status");
+      setState(status.complete ? "ready" : "onboarding");
     } catch (err) {
       const status = err instanceof Error && "status" in err ? (err as Error & { status?: number }).status : undefined;
-      if (status === 401) { await supabase.auth.signOut(); setState("signed-out"); }
-      else if (status === 403 || status === 404) setState("onboarding");
-      else { console.error("FleetOS workspace check failed", err); setState("onboarding"); }
+      if (status === 401) {
+        await supabase.auth.signOut();
+        setState("signed-out");
+      } else if (status === 404) {
+        setState("onboarding");
+      } else {
+        console.error("FleetOS workspace check failed", err);
+        setState("onboarding");
+      }
     }
   }
 
@@ -46,4 +53,10 @@ function FleetOSApp() {
   return <RouterProvider router={router} />;
 }
 
-createRoot(document.getElementById("root")!).render(<StrictMode><QueryClientProvider client={client}><FleetOSApp /></QueryClientProvider></StrictMode>);
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <QueryClientProvider client={client}>
+      <FleetOSApp />
+    </QueryClientProvider>
+  </StrictMode>,
+);
