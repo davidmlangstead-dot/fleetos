@@ -15,6 +15,7 @@ import { AuditPage } from "./modules/organisation/AuditPage";
 import { RegistersHubPage, RegisterModulePage } from "./modules/registers/RegisterPages";
 import { MessagesPage } from "./modules/messages/MessagesPage";
 import { DocumentsPage } from "./modules/documents/DocumentsPage";
+import { ReportsPage } from "./modules/reports/ReportsPage";
 
 export const router = createBrowserRouter([{ element: <AppShell />, children: [
   { path: "/", element: <DashboardPageClean /> },
@@ -29,6 +30,7 @@ export const router = createBrowserRouter([{ element: <AppShell />, children: [
   { path: "/documents", element: <DocumentsPage /> },
   { path: "/registers", element: <RegistersHubPage /> },
   { path: "/registers/:module", element: <RegisterModulePage /> },
+  { path: "/reports", element: <ReportsPage /> },
   { path: "/organisation/depots", element: <DepotsPage /> },
   { path: "/settings/company", element: <CompanySettingsPage /> },
   { path: "/settings/audit", element: <AuditPage /> },
