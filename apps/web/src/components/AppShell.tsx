@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { Bell, ClipboardList, Gauge, Menu, MessageCircle, ShieldCheck, Truck, Users, Wrench, UserRound, Plus, Clock3, SteeringWheel } from "lucide-react";
+import { Bell, ClipboardList, Gauge, Menu, MessageCircle, ShieldCheck, Truck, Users, Wrench, UserRound, Plus, Clock3 } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 import { api, ACTIVE_WORKSPACE_KEY } from "../lib/api";
 
 const nav = [
-  ["/", "Today", Gauge], ["/driver", "Driver Today", SteeringWheel], ["/hours", "Hours Board", Clock3],
+  ["/", "Today", Gauge], ["/driver", "Driver Today", Gauge], ["/hours", "Hours Board", Clock3],
   ["/jobs", "Jobs", ClipboardList], ["/vehicles", "Vehicles", Truck], ["/drivers", "Drivers", Users],
   ["/personal", "Personal", UserRound], ["/workshop", "Workshop", Wrench], ["/compliance", "Compliance", ShieldCheck],
   ["/messages", "Messages", MessageCircle],
