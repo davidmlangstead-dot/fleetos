@@ -35,17 +35,16 @@ function FleetOSApp() {
       if (!selected || !workspaces.some((w) => w.id === selected)) {
         localStorage.setItem(ACTIVE_WORKSPACE_KEY, workspaces[0].id);
       }
+      setError("");
       setState("ready");
     } catch (err) {
+      console.error("FleetOS workspace bootstrap failed", err);
       const status = err instanceof Error && "status" in err ? (err as Error & { status?: number }).status : undefined;
-      if (status === 401) {
-        await supabase.auth.signOut();
-        setState("signed-out");
-      } else {
-        console.error("FleetOS workspace bootstrap failed", err);
-        setError(err instanceof Error ? err.message : "Unable to open your workspace");
-        setState("error");
-      }
+      const message = status === 401
+        ? "Your FleetOS session is signed in, but the workspace API rejected the request. Try again — your login has been kept active."
+        : err instanceof Error ? err.message : "Unable to open your workspace";
+      setError(message);
+      setState("error");
     }
   }
 
@@ -55,14 +54,17 @@ function FleetOSApp() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
       if (event === "SIGNED_OUT") setState("signed-out");
-      else if (event === "SIGNED_IN" && session) void resolveWorkspace();
+      else if (event === "SIGNED_IN" && session) {
+        setState("loading");
+        void resolveWorkspace();
+      }
     });
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
   if (state === "loading") return <main className="loading-page">Opening FleetOS…</main>;
   if (state === "signed-out") return <AuthPage />;
-  if (state === "error") return <main className="loading-page"><div><h1>We couldn't open FleetOS</h1><p>{error}</p><button onClick={() => { setState("loading"); void resolveWorkspace(); }}>Try again</button></div></main>;
+  if (state === "error") return <main className="loading-page"><div><h1>We couldn't open your workspace</h1><p>{error}</p><button onClick={() => { setState("loading"); void resolveWorkspace(); }}>Try again</button><button onClick={() => void supabase.auth.signOut()} style={{ marginLeft: 8 }}>Sign out</button></div></main>;
   return <RouterProvider router={router} />;
 }
 
