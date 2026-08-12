@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { asyncHandler } from "../../lib/asyncHandler.js";
 import { prisma } from "../../lib/prisma.js";
-import { requireAuth } from "../../middleware/auth.js";
+import { requireAuth, requireRoles } from "../../middleware/auth.js";
 
 const activities = ["DRIVING", "OTHER_WORK", "POA", "BREAK_REST"] as const;
 type Activity = typeof activities[number];
@@ -20,10 +20,14 @@ async function currentDriver(companyId: string, email: string) {
   return prisma.driver.findFirst({ where: { companyId, email }, select: { id: true, firstName: true, lastName: true } });
 }
 
+const operationsReaders = requireRoles("WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN");
+const operationsManagers = requireRoles("WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN");
+const hoursReaders = requireRoles("TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN");
+
 export const operationsRouter = Router();
 operationsRouter.use(requireAuth);
 
-operationsRouter.get("/defects", asyncHandler(async (req, res) => {
+operationsRouter.get("/defects", operationsReaders, asyncHandler(async (req, res) => {
   const defects = await prisma.defect.findMany({ where: { companyId: req.user!.companyId }, include: { vehicle: { select: { id: true, registration: true } }, reportedBy: { select: { id: true, firstName: true, lastName: true } } }, orderBy: { createdAt: "desc" }, take: 200 });
   res.json(defects);
 }));
@@ -43,7 +47,7 @@ operationsRouter.post("/defects", asyncHandler(async (req, res) => {
   res.status(201).json(defect);
 }));
 
-operationsRouter.patch("/defects/:id", asyncHandler(async (req, res) => {
+operationsRouter.patch("/defects/:id", operationsManagers, asyncHandler(async (req, res) => {
   const existing = await prisma.defect.findFirst({ where: { id: req.params.id, companyId: req.user!.companyId } });
   if (!existing) return res.status(404).json({ error: "Defect not found" });
   const allowed = ["OPEN", "IN_PROGRESS", "RESOLVED"];
@@ -74,14 +78,14 @@ operationsRouter.post("/driver-hours/me", asyncHandler(async (req, res) => {
   res.status(201).json({ ok: true, activity, startedAt: now });
 }));
 
-operationsRouter.get("/driver-hours", asyncHandler(async (req, res) => {
+operationsRouter.get("/driver-hours", hoursReaders, asyncHandler(async (req, res) => {
   const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
   const drivers = await prisma.driver.findMany({ where: { companyId: req.user!.companyId, isActive: true }, select: { id: true, firstName: true, lastName: true, email: true }, orderBy: [{ lastName: "asc" }, { firstName: "asc" }] });
   const rows = await prisma.$queryRaw<ActivityRow[]>`SELECT id, "driverId", activity, "startedAt", "endedAt" FROM "DriverActivity" WHERE "companyId" = ${req.user!.companyId} AND "startedAt" >= ${dayStart} ORDER BY "startedAt" ASC`;
   res.json(drivers.map((driver) => { const own = rows.filter((r) => r.driverId === driver.id); return { ...driver, current: currentOpen(own), totals: summarize(own) }; }));
 }));
 
-operationsRouter.get("/guardian", asyncHandler(async (req, res) => {
+operationsRouter.get("/guardian", operationsReaders, asyncHandler(async (req, res) => {
   const now = new Date(); const soon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
   const [vehicles, drivers, items, openDefects] = await Promise.all([
     prisma.vehicle.findMany({ where: { companyId: req.user!.companyId, status: "ACTIVE" }, select: { registration: true, motDue: true, taxDue: true, insuranceDue: true, tachoCalibrationDue: true } }),
