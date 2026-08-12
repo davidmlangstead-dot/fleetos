@@ -4,19 +4,48 @@ import { createClient } from "@supabase/supabase-js";
 import { config, SUPABASE_AUTH_KEY } from "../config.js";
 import { prisma } from "../lib/prisma.js";
 
-async function ensureUser(identity: { id: string; email: string }) {
+type Identity = { id: string; email: string };
+
+async function linkAuthIdentity(userId: string, authUserId: string) {
+  const existing = await prisma.$queryRaw<{ authUserId: string | null }[]>`
+    SELECT "authUserId"::text AS "authUserId" FROM "User" WHERE id = ${userId} LIMIT 1
+  `;
+  if (existing[0]?.authUserId && existing[0].authUserId !== authUserId) throw new Error("FleetOS account is linked to a different authentication identity");
+  await prisma.$executeRaw`UPDATE "User" SET "authUserId" = ${authUserId}::uuid WHERE id = ${userId} AND ("authUserId" IS NULL OR "authUserId" = ${authUserId}::uuid)`;
+}
+
+async function ensureUser(identity: Identity) {
+  const linked = await prisma.$queryRaw<{ id: string }[]>`
+    SELECT id FROM "User" WHERE "authUserId" = ${identity.id}::uuid LIMIT 1
+  `;
+  if (linked[0]) {
+    const user = await prisma.user.findUnique({ where: { id: linked[0].id } });
+    if (user) return user;
+  }
+
   const existingById = await prisma.user.findUnique({ where: { id: identity.id } });
-  if (existingById) return existingById;
+  if (existingById) {
+    await linkAuthIdentity(existingById.id, identity.id);
+    return existingById;
+  }
 
   const existingByEmail = await prisma.user.findUnique({ where: { email: identity.email } });
-  if (existingByEmail) return existingByEmail;
+  if (existingByEmail) {
+    await linkAuthIdentity(existingByEmail.id, identity.id);
+    return existingByEmail;
+  }
 
   try {
-    return await prisma.user.create({ data: { id: identity.id, email: identity.email } });
+    const created = await prisma.user.create({ data: { id: identity.id, email: identity.email } });
+    await linkAuthIdentity(created.id, identity.id);
+    return created;
   } catch (error: unknown) {
     if (typeof error === "object" && error !== null && "code" in error && (error as { code?: unknown }).code === "P2002") {
       const createdByAnotherRequest = await prisma.user.findUnique({ where: { email: identity.email } });
-      if (createdByAnotherRequest) return createdByAnotherRequest;
+      if (createdByAnotherRequest) {
+        await linkAuthIdentity(createdByAnotherRequest.id, identity.id);
+        return createdByAnotherRequest;
+      }
     }
     throw error;
   }
