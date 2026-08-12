@@ -7,6 +7,7 @@ import { dashboardRouter } from "./modules/dashboard/routes.js";
 import { vehiclesRouter } from "./modules/vehicles/routes.js";
 import { jobsRouter } from "./modules/jobs/routes.js";
 import { onboardingRouter } from "./modules/onboarding/routes.js";
+import { operationsRouter } from "./modules/operations/routes.js";
 
 export const app = express();
 
@@ -29,7 +30,7 @@ app.use(
     },
     credentials: true,
     methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-FleetOS-Company"],
   }),
 );
 
@@ -44,6 +45,7 @@ app.use("/api/dashboard", dashboardRouter);
 app.use("/api/vehicles", vehiclesRouter);
 app.use("/api/jobs", jobsRouter);
 app.use("/api/onboarding", onboardingRouter);
+app.use("/api/operations", operationsRouter);
 
 app.use((_req, res) => res.status(404).json({ error: "Route not found" }));
 
