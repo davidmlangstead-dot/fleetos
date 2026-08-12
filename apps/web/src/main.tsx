@@ -19,13 +19,29 @@ function FleetOSApp() {
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [error, setError] = useState("");
 
+  async function clearDeadLocalSession() {
+    localStorage.removeItem(ACTIVE_WORKSPACE_KEY);
+    await supabase.auth.signOut({ scope: "local" });
+    setError("");
+    setState("landing");
+  }
+
   async function resolveWorkspace() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setState("landing"); return; }
 
+    // A deleted/reset Supabase user can leave a cached JWT on the device until it expires.
+    // Validate the identity with Supabase before asking FleetOS API for tenant data.
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user) {
+      await clearDeadLocalSession();
+      return;
+    }
+
     try {
       const workspaces = await api<Workspace[]>("/company/workspaces");
       if (!workspaces.length) {
+        localStorage.removeItem(ACTIVE_WORKSPACE_KEY);
         setError("");
         setState("onboarding");
         return;
@@ -47,8 +63,17 @@ function FleetOSApp() {
     } catch (err) {
       console.error("FleetOS workspace bootstrap failed", err);
       const status = err instanceof Error && "status" in err ? (err as Error & { status?: number }).status : undefined;
+      if (status === 401) {
+        // Confirm whether the token itself is dead before clearing it. API/database failures
+        // must never silently log a valid user out.
+        const { data: verified, error: verifyError } = await supabase.auth.getUser();
+        if (verifyError || !verified.user) {
+          await clearDeadLocalSession();
+          return;
+        }
+      }
       const message = status === 401
-        ? "Your FleetOS session is signed in, but the workspace API rejected the request. Try again — your login has been kept active."
+        ? "FleetOS Medic: your login is valid, but the API rejected the workspace request. Your session has been kept active."
         : err instanceof Error ? err.message : "Unable to open your workspace";
       setError(message);
       setState("error");
@@ -69,11 +94,11 @@ function FleetOSApp() {
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
-  if (state === "loading") return <main className="loading-page">Opening FleetOS…</main>;
+  if (state === "loading") return <main className="loading-page">FleetOS Medic is checking your connection…</main>;
   if (state === "landing") return <LandingPage onLogin={() => { setAuthMode("login"); setState("auth"); }} onSignup={() => { setAuthMode("signup"); setState("auth"); }} />;
   if (state === "auth") return <AuthPage initialMode={authMode} onBack={() => setState("landing")} />;
   if (state === "onboarding") return <OnboardingPage onComplete={(workspace) => { localStorage.setItem(ACTIVE_WORKSPACE_KEY, workspace.id); setState("ready"); }} />;
-  if (state === "error") return <main className="loading-page"><div><h1>We couldn't open your workspace</h1><p>{error}</p><button onClick={() => { setState("loading"); void resolveWorkspace(); }}>Try again</button><button onClick={() => void supabase.auth.signOut()} style={{ marginLeft: 8 }}>Sign out</button></div></main>;
+  if (state === "error") return <main className="loading-page"><div><p className="eyebrow">FleetOS Medic</p><h1>We couldn't open your workspace</h1><p>{error}</p><button onClick={() => { setState("loading"); void resolveWorkspace(); }}>Run check again</button><button onClick={() => void supabase.auth.signOut()} style={{ marginLeft: 8 }}>Sign out</button></div></main>;
   return <RouterProvider router={router} />;
 }
 
