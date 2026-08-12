@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "../../lib/asyncHandler.js";
 import { prisma } from "../../lib/prisma.js";
+import { writeAuditEvent } from "../../lib/audit.js";
 import { requireAuth, requireIdentity, requireRoles } from "../../middleware/auth.js";
 
 export const companyRouter = Router();
@@ -59,6 +60,7 @@ companyRouter.post("/workspaces", requireIdentity, asyncHandler(async (req, res)
     await tx.companyMembership.create({ data: { userId: ownerId, companyId: created.id, role: "COMPANY_ADMIN" } });
     return created;
   });
+  await writeAuditEvent({ companyId: company.id, actorUserId: ownerId, actorEmail: res.locals.identity.email, action: "CREATE", entityType: "COMPANY", entityId: company.id, summary: `Created company workspace ${company.name}` });
   return res.status(201).json({ id: company.id, name: company.name, slug: company.slug, role: "COMPANY_ADMIN" });
 }));
 
@@ -86,5 +88,6 @@ companyRouter.patch("/", requireAuth, requireRoles("TRANSPORT_MANAGER", "COMPANY
       complianceSchemes: true, homeDepotName: true, countryCode: true, usesHgv: true,
     },
   });
+  await writeAuditEvent({ companyId: req.user!.companyId, actorUserId: req.user!.id, actorEmail: req.user!.email, action: "UPDATE", entityType: "COMPANY", entityId: company.id, summary: `Updated company settings for ${company.name}` });
   return res.json(company);
 }));
