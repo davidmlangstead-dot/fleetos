@@ -62,9 +62,15 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
     try {
       await api("/onboarding/company", { method: "POST", body: JSON.stringify({ companyName: companyName.trim(), industries: industriesSelected, role, teamSize, vehicles }) });
       for (const person of people) {
-        const { data, error: fnError } = await supabase.functions.invoke("create-staff", { body: person });
+        const onboardingKey = [
+          companyName.trim().toLowerCase(),
+          person.email.trim().toLowerCase() || `${person.firstName.trim().toLowerCase()}.${person.lastName.trim().toLowerCase()}`,
+          person.personType,
+        ].join("|");
+        const { data, error: fnError } = await supabase.functions.invoke("create-staff", { body: { ...person, onboardingKey } });
         if (fnError || data?.error) throw new Error(data?.error ?? fnError?.message ?? "Could not create a staff account.");
       }
+      await api("/onboarding/complete", { method: "POST" });
       onComplete();
     } catch (err) {
       setError(err instanceof Error ? err.message : "FleetOS could not finish setup.");
