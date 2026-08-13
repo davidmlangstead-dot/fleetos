@@ -2,7 +2,9 @@ import cors from "cors";
 import express from "express";
 
 import { config } from "./config.js";
+import { requireAuth } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/errors.js";
+import { idempotencyMiddleware } from "./middleware/idempotency.js";
 import { apiRateLimit, sensitiveRateLimit } from "./middleware/rateLimit.js";
 import { companyRouter } from "./modules/company/routes.js";
 import { dashboardRouter } from "./modules/dashboard/routes.js";
@@ -40,7 +42,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Company-Id"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Company-Id", "X-Idempotency-Key"],
 }));
 app.use(express.json({ limit: "2mb" }));
 app.get("/", (_req, res) => res.json({ name: "FleetOS API", status: "ok" }));
@@ -49,13 +51,13 @@ app.get("/api", (_req, res) => res.json({ name: "FleetOS API", status: "ok" }));
 app.use("/api", apiRateLimit);
 app.use("/api/company", sensitiveRateLimit, companyRouter);
 app.use("/api/dashboard", dashboardRouter);
-app.use("/api/drivers", sensitiveRateLimit, driversRouter);
-app.use("/api/vehicles", vehiclesRouter);
-app.use("/api/jobs", jobsRouter);
-app.use("/api/operations", operationsRouter);
+app.use("/api/drivers", sensitiveRateLimit, requireAuth, idempotencyMiddleware, driversRouter);
+app.use("/api/vehicles", requireAuth, idempotencyMiddleware, vehiclesRouter);
+app.use("/api/jobs", requireAuth, idempotencyMiddleware, jobsRouter);
+app.use("/api/operations", requireAuth, idempotencyMiddleware, operationsRouter);
 app.use("/api/organisation", sensitiveRateLimit, organisationRouter);
-app.use("/api/registers", registersRouter);
-app.use("/api/messages", messagesRouter);
+app.use("/api/registers", requireAuth, idempotencyMiddleware, registersRouter);
+app.use("/api/messages", requireAuth, idempotencyMiddleware, messagesRouter);
 app.use("/api/documents", sensitiveRateLimit, documentsRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/marketplace", marketplaceRouter);
@@ -63,3 +65,4 @@ app.use("/api/medic", sensitiveRateLimit, medicRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use((_req, res) => res.status(404).json({ error: "Route not found" }));
 app.use(errorHandler);
+

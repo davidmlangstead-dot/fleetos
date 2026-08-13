@@ -7,7 +7,9 @@
     "dev:api": "pnpm --filter @fleetros/api dev",
     "build": "pnpm -r build",
     "smoke": "node scripts/smoke.mjs",
-    "verify": "pnpm build && pnpm smoke",
+    "security": "node scripts/security-smoke.mjs && node scripts/tenant-attack.mjs",
+    "verify": "pnpm build && pnpm smoke && pnpm security",
     "db:gen": "pnpm --filter @fleetros/api prisma generate"
   }
 }
+

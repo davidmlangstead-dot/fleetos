@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "react-router-dom";
 import { router } from "./router";
 import { supabase } from "./lib/supabase";
-import { api, ACTIVE_WORKSPACE_KEY } from "./lib/api";
+import { api, ACTIVE_WORKSPACE_KEY, clearOfflineData, startOfflineSync } from "./lib/api";
 import { AuthPage } from "./modules/auth/AuthPage";
 import { LandingPage } from "./modules/landing/LandingPage";
 import { OnboardingPage } from "./modules/onboarding/OnboardingPage";
@@ -21,6 +21,7 @@ function FleetOSApp() {
 
   async function clearDeadLocalSession() {
     localStorage.removeItem(ACTIVE_WORKSPACE_KEY);
+    await clearOfflineData().catch(() => undefined);
     await supabase.auth.signOut({ scope: "local" });
     setError("");
     setState("landing");
@@ -30,12 +31,14 @@ function FleetOSApp() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setState("landing"); return; }
 
-    // A deleted/reset Supabase user can leave a cached JWT on the device until it expires.
-    // Validate the identity with Supabase before asking FleetOS API for tenant data.
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData.user) {
-      await clearDeadLocalSession();
-      return;
+    // Keep a valid cached session while offline. A remote identity check is only safe
+    // when a connection exists; otherwise it could incorrectly sign the driver out.
+    if (navigator.onLine) {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user) {
+        await clearDeadLocalSession();
+        return;
+      }
     }
 
     try {
@@ -63,7 +66,7 @@ function FleetOSApp() {
     } catch (err) {
       console.error("FleetOS workspace bootstrap failed", err);
       const status = err instanceof Error && "status" in err ? (err as Error & { status?: number }).status : undefined;
-      if (status === 401) {
+      if (status === 401 && navigator.onLine) {
         // Confirm whether the token itself is dead before clearing it. API/database failures
         // must never silently log a valid user out.
         const { data: verified, error: verifyError } = await supabase.auth.getUser();
@@ -72,9 +75,11 @@ function FleetOSApp() {
           return;
         }
       }
-      const message = status === 401
-        ? "FleetOS Medic: your login is valid, but the API rejected the workspace request. Your session has been kept active."
-        : err instanceof Error ? err.message : "Unable to open your workspace";
+      const message = !navigator.onLine
+        ? "You are offline and this device has not cached the selected workspace yet. Reconnect once, then FleetOS can open it offline."
+        : status === 401
+          ? "FleetOS Medic: your login is valid, but the API rejected the workspace request. Your session has been kept active."
+          : err instanceof Error ? err.message : "Unable to open your workspace";
       setError(message);
       setState("error");
     }
@@ -82,19 +87,22 @@ function FleetOSApp() {
 
   useEffect(() => {
     let mounted = true;
+    const stopSync = startOfflineSync();
     void resolveWorkspace().then(() => { if (!mounted) return; });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
-      if (event === "SIGNED_OUT") setState("landing");
-      else if (event === "SIGNED_IN" && session) {
+      if (event === "SIGNED_OUT") {
+        void clearOfflineData().catch(() => undefined);
+        setState("landing");
+      } else if (event === "SIGNED_IN" && session) {
         setState("loading");
         void resolveWorkspace();
       }
     });
-    return () => { mounted = false; subscription.unsubscribe(); };
+    return () => { mounted = false; stopSync(); subscription.unsubscribe(); };
   }, []);
 
-  if (state === "loading") return <main className="loading-page">FleetOS Medic is checking your connection…</main>;
+  if (state === "loading") return <main className="loading-page">FleetOS Medic is checking your connectionâ€¦</main>;
   if (state === "landing") return <LandingPage onLogin={() => { setAuthMode("login"); setState("auth"); }} onSignup={() => { setAuthMode("signup"); setState("auth"); }} />;
   if (state === "auth") return <AuthPage initialMode={authMode} onBack={() => setState("landing")} />;
   if (state === "onboarding") return <OnboardingPage onComplete={(workspace) => { localStorage.setItem(ACTIVE_WORKSPACE_KEY, workspace.id); setState("ready"); }} />;
@@ -111,3 +119,4 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
     void navigator.serviceWorker.register("/sw.js").catch((error) => console.error("FleetOS service worker registration failed", error));
   });
 }
+
