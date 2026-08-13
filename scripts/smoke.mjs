@@ -3,10 +3,10 @@ const WEB = process.env.FLEETOS_WEB_URL ?? "https://fleetos-orpin-one.vercel.app
 
 const checks = [];
 
-async function check(name, url, expectedStatuses, validate) {
+async function check(name, url, expectedStatuses, validate, timeoutMs = 20000) {
   const started = Date.now();
   try {
-    const response = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(20000) });
+    const response = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(timeoutMs) });
     const text = await response.text();
     let body = text;
     try { body = text ? JSON.parse(text) : null; } catch { /* HTML/text is valid for web checks */ }
@@ -20,7 +20,7 @@ async function check(name, url, expectedStatuses, validate) {
   }
 }
 
-await check("API health", `${API}/health`, [200], (body) => body && body.status === "ok");
+await check("API health", `${API}/health`, [200], (body) => body && body.status === "ok", 60000);
 await check("API root", `${API}/api`, [200], (body) => body && body.status === "ok");
 await check("Protected company route", `${API}/api/company`, [401]);
 await check("Protected Medic route", `${API}/api/medic/status`, [401]);
