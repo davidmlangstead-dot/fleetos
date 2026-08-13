@@ -48,13 +48,14 @@ export function VehicleWizard({ onComplete, onCancel }: { onComplete: () => void
     if (step === 0 && !form.type) return "Choose a vehicle type.";
     if (step === 1) {
       if (!form.registration.trim()) return "Registration is required.";
-      if (!form.firstRegisteredAt || !form.acquiredAt) return "First registration and acquired dates are required.";
-      if (dateError) return dateError;
       if (["TRUCK", "VAN"].includes(form.type) && (!form.make.trim() || !form.model.trim())) return "Make and model are required for this vehicle type.";
       if (["TRUCK", "TRAILER"].includes(form.type) && !form.vin.trim()) return "VIN/chassis number is required for this vehicle type.";
       if (form.type === "TRUCK" && !form.year) return "Year is required for an HGV / Truck.";
     }
-    if (step === 2 && dateError) return dateError;
+    if (step === 2) {
+      if (!form.firstRegisteredAt || !form.acquiredAt) return "First registration and acquired dates are required.";
+      if (dateError) return dateError;
+    }
     if (step === 3) {
       if (!form.motDue || !form.insuranceDue) return "MOT/test and insurance due dates are required before the vehicle can be saved.";
       if (requiresTachoCalibration(form.type) && !form.tachoCalibrationDue) return "Tacho calibration due date is required for an HGV / Truck record.";
