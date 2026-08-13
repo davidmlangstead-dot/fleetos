@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 
 import { config } from "./config.js";
+import { prisma } from "./lib/prisma.js";
 import { requireAuth } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/errors.js";
 import { idempotencyMiddleware } from "./middleware/idempotency.js";
@@ -29,17 +30,32 @@ const fixedOrigins = new Set([
   "https://fleetos-davidmlangstead-dots-projects.vercel.app",
   "https://fleetos-git-main-davidmlangstead-dots-projects.vercel.app",
 ]);
-function isAllowedOrigin(origin: string) {
+async function isAllowedOrigin(origin: string) {
   if (configuredOrigins.includes(origin) || fixedOrigins.has(origin)) return true;
   if (/^https:\/\/fleetos(?:-[a-z0-9]+)*-davidmlangstead-dots-projects\.vercel\.app$/i.test(origin)) return true;
   if (/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) return true;
-  return false;
+  try {
+    const url = new URL(origin);
+    if (url.protocol !== "https:" || url.port) return false;
+    const matches = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+      SELECT EXISTS(
+        SELECT 1 FROM "CompanyControl"
+        WHERE "customDomainVerified"=true AND lower("customDomain")=${url.hostname.toLowerCase()}
+      ) AS exists
+    `;
+    return matches[0]?.exists === true;
+  } catch {
+    return false;
+  }
 }
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || isAllowedOrigin(origin)) return callback(null, true);
-    console.warn(`CORS blocked origin: ${origin}`);
-    return callback(new Error("Origin not allowed by FleetOS API"));
+    if (!origin) return callback(null, true);
+    void isAllowedOrigin(origin).then((allowed) => {
+      if (allowed) return callback(null, true);
+      console.warn(`CORS blocked origin: ${origin}`);
+      return callback(new Error("Origin not allowed by FleetOS API"));
+    }).catch(() => callback(new Error("Origin not allowed by FleetOS API")));
   },
   credentials: true,
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],

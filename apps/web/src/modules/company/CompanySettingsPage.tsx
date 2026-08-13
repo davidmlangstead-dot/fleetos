@@ -1,6 +1,7 @@
-import { FormEvent, useEffect, useState } from "react";
-import { ArchiveRestore, Building2, Database, Download, Globe2, MailCheck, Receipt, Save, ShieldCheck, Trash2, UserCheck } from "lucide-react";
+import { CSSProperties, FormEvent, useEffect, useState } from "react";
+import { ArchiveRestore, Building2, Database, Download, Eye, Globe2, MailCheck, Palette, Receipt, Save, ShieldCheck, Trash2, UserCheck } from "lucide-react";
 import { api } from "../../lib/api";
+import { loadCurrentBranding, useBranding } from "../../lib/branding";
 
 type CompanyProfile = {
   id: string; name: string; slug: string; address: string | null; postcode: string | null; phone: string | null;
@@ -11,6 +12,10 @@ type Control = {
   subscriptionPlan: string; subscriptionStatus: string; billingEmail: string | null; seatLimit: number; retentionDays: number;
   privacyContactEmail: string | null; customDomain: string | null; customDomainVerified: boolean;
   emailSenderDomain: string | null; emailDomainVerified: boolean;
+  brandName: string | null; brandTagline: string | null; brandLogoUrl: string | null;
+  brandPrimaryColor: string; brandAccentColor: string; brandSidebarColor: string;
+  brandSupportEmail: string | null; brandSupportPhone: string | null;
+  showPoweredBy: boolean; marketplaceEnabled: boolean;
 };
 type Backup = { id: string; label: string; recordCounts: Record<string, number>; createdAt: string; expiresAt: string };
 type Governance = { id: string; type: string; status: string; subjectName: string; subjectEmail: string | null; notes: string | null; dueAt: string; completedAt: string | null; createdAt: string };
@@ -38,6 +43,7 @@ function Ready({ label, status, detail }: { label: string; status: string; detai
 }
 
 export function CompanySettingsPage() {
+  const { setBranding } = useBranding();
   const [form, setForm] = useState<CompanyProfile | null>(null);
   const [admin, setAdmin] = useState<Admin | null>(null);
   const [requestForm, setRequestForm] = useState({ type: "ACCESS", subjectName: "", subjectEmail: "", notes: "" });
@@ -72,11 +78,30 @@ export function CompanySettingsPage() {
           billingEmail: currentAdmin.control.billingEmail ?? "", privacyContactEmail: currentAdmin.control.privacyContactEmail ?? "",
           retentionDays: currentAdmin.control.retentionDays, customDomain: currentAdmin.control.customDomain ?? "",
           emailSenderDomain: currentAdmin.control.emailSenderDomain ?? "",
+          brandName: currentAdmin.control.brandName ?? "", brandTagline: currentAdmin.control.brandTagline ?? "",
+          brandLogoUrl: currentAdmin.control.brandLogoUrl ?? "", brandPrimaryColor: currentAdmin.control.brandPrimaryColor,
+          brandAccentColor: currentAdmin.control.brandAccentColor, brandSidebarColor: currentAdmin.control.brandSidebarColor,
+          brandSupportEmail: currentAdmin.control.brandSupportEmail ?? "", brandSupportPhone: currentAdmin.control.brandSupportPhone ?? "",
+          showPoweredBy: currentAdmin.control.showPoweredBy, marketplaceEnabled: currentAdmin.control.marketplaceEnabled,
         }) }),
       ]);
-      setForm(profile); setAdmin((current) => current ? ({ ...current, control }) : current); complete("Company and business controls saved.");
+      setForm(profile); setAdmin((current) => current ? ({ ...current, control }) : current);
+      setBranding(await loadCurrentBranding());
+      complete("Company, branding and business controls saved.");
     } catch (e) { fail(e, "Could not save company settings."); }
     finally { setBusy(false); }
+  }
+
+  async function copyBrandLink() {
+    const currentForm = form;
+    if (!currentForm) return;
+    const link = `${window.location.origin}/?company=${currentForm.slug}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      complete("Branded sign-in link copied.");
+    } catch {
+      window.prompt("Copy this branded sign-in link", link);
+    }
   }
 
   async function portableExport() {
@@ -149,6 +174,16 @@ export function CompanySettingsPage() {
     <div style={{display:"grid",gap:18}}>
       <section className="panel"><div className="panel-heading"><div><h2><Building2 size={19}/> Company</h2><p>Identity and operating centre.</p></div></div><div style={{display:"grid",gap:12,padding:16}}><label>Company name<input required value={form.name} onChange={e=>update("name",e.target.value)}/></label><label>Home depot / operating centre<input value={form.homeDepotName ?? ""} onChange={e=>update("homeDepotName",e.target.value)}/></label><label>Address<input value={form.address ?? ""} onChange={e=>update("address",e.target.value)}/></label><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}><label>Postcode<input value={form.postcode ?? ""} onChange={e=>update("postcode",e.target.value)}/></label><label>Phone<input value={form.phone ?? ""} onChange={e=>update("phone",e.target.value)}/></label></div></div></section>
 
+      <section className="panel"><div className="panel-heading"><div><h2><Palette size={19}/> White-label branding</h2><p>Give this company its own product identity without changing the shared secure platform.</p></div></div><div style={{display:"grid",gap:16,padding:16}}>
+        <div className="brand-preview" style={{"--preview-primary":admin.control.brandPrimaryColor,"--preview-accent":admin.control.brandAccentColor,"--preview-sidebar":admin.control.brandSidebarColor} as CSSProperties}><div className="brand-preview-sidebar"><div className="brand">{admin.control.brandLogoUrl?<img className="brand-logo" src={admin.control.brandLogoUrl} alt=""/>:<span className="brand-mark">{(admin.control.brandName||"FleetOS").split(/\s+/).map(word=>word[0]).join("").slice(0,2).toUpperCase()}</span>}<span>{admin.control.brandName||"FleetOS"}</span></div><small>{admin.control.showPoweredBy && (admin.control.brandName||"FleetOS")!=="FleetOS"?"Powered by FleetOS":"Secure operations platform"}</small></div><div><p className="eyebrow"><Eye size={14}/> Live preview</p><h2>{admin.control.brandTagline||"Transport operations, made simpler"}</h2><button type="button" className="brand-preview-button">Primary action</button></div></div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}><label>Product name<input maxLength={80} placeholder="e.g. Acme Operations" value={admin.control.brandName??""} onChange={e=>updateControl("brandName",e.target.value)}/></label><label>Short strapline<input maxLength={160} placeholder="Work, people and fleet in one place" value={admin.control.brandTagline??""} onChange={e=>updateControl("brandTagline",e.target.value)}/></label></div>
+        <label>Logo URL<input type="url" placeholder="https://yourcompany.co.uk/logo.png" value={admin.control.brandLogoUrl??""} onChange={e=>updateControl("brandLogoUrl",e.target.value)}/><span className="subtle">Use a public HTTPS PNG, JPG, WebP or SVG. If it cannot load, the product initials are shown safely.</span></label>
+        <div className="colour-grid"><label>Primary colour<input type="color" value={admin.control.brandPrimaryColor} onChange={e=>updateControl("brandPrimaryColor",e.target.value.toUpperCase())}/><input aria-label="Primary colour hex" value={admin.control.brandPrimaryColor} onChange={e=>updateControl("brandPrimaryColor",e.target.value.toUpperCase())}/></label><label>Accent colour<input type="color" value={admin.control.brandAccentColor} onChange={e=>updateControl("brandAccentColor",e.target.value.toUpperCase())}/><input aria-label="Accent colour hex" value={admin.control.brandAccentColor} onChange={e=>updateControl("brandAccentColor",e.target.value.toUpperCase())}/></label><label>Navigation colour<input type="color" value={admin.control.brandSidebarColor} onChange={e=>updateControl("brandSidebarColor",e.target.value.toUpperCase())}/><input aria-label="Navigation colour hex" value={admin.control.brandSidebarColor} onChange={e=>updateControl("brandSidebarColor",e.target.value.toUpperCase())}/></label></div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}><label>Support email<input type="email" placeholder="support@yourcompany.co.uk" value={admin.control.brandSupportEmail??""} onChange={e=>updateControl("brandSupportEmail",e.target.value)}/></label><label>Support phone<input maxLength={40} placeholder="Optional" value={admin.control.brandSupportPhone??""} onChange={e=>updateControl("brandSupportPhone",e.target.value)}/></label></div>
+        <div className="toggle-grid"><label><input type="checkbox" checked={admin.control.showPoweredBy} onChange={e=>updateControl("showPoweredBy",e.target.checked)}/> Show “Powered by FleetOS”</label><label><input type="checkbox" checked={admin.control.marketplaceEnabled} onChange={e=>updateControl("marketplaceEnabled",e.target.checked)}/> Show shared marketplace</label></div>
+        <div><strong>Branded sign-in link</strong><div className="copy-link"><code>{`${window.location.origin}/?company=${form.slug}`}</code><button type="button" onClick={()=>void copyBrandLink()}>Copy</button></div><p className="subtle">Use this link until the optional custom domain has been verified.</p></div>
+      </div></section>
+
       <section className="panel"><div className="panel-heading"><div><h2>Operation</h2><p>Used to tailor FleetOS around the work you actually do.</p></div></div><div style={{padding:16}}><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:10,marginBottom:16}}>{industries.map(([value,label])=><button type="button" key={value} className={form.industries.includes(value)?"primary-button":"secondary-button"} onClick={()=>toggle("industries",value)} style={{justifyContent:"center"}}>{label}</button>)}</div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}><label>Team size<select value={form.teamSize ?? ""} onChange={e=>update("teamSize",e.target.value)}><option value="">Not set</option>{["Just me","2â€“5","6â€“10","11â€“20","21â€“50","51â€“100","100+"].map(value=><option key={value}>{value}</option>)}</select></label><label>HGV operation<select value={form.usesHgv?"yes":"no"} onChange={e=>update("usesHgv",e.target.value==="yes")}><option value="no">No HGVs</option><option value="yes">We operate HGVs</option></select></label></div></div></section>
 
       <section className="panel"><div className="panel-heading"><div><h2><ShieldCheck size={19}/> Compliance profile</h2><p>Manage frameworks and operator-licence details without claiming accreditation.</p></div></div><div style={{display:"grid",gap:14,padding:16}}>{form.usesHgv && <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}><label>Operator licence number<input value={form.operatorLicenceNumber ?? ""} onChange={e=>update("operatorLicenceNumber",e.target.value)}/></label><label>Licence type<select value={form.operatorLicenceType ?? ""} onChange={e=>update("operatorLicenceType",e.target.value)}><option value="">Not set</option><option value="RESTRICTED">Restricted</option><option value="STANDARD_NATIONAL">Standard national</option><option value="STANDARD_INTERNATIONAL">Standard international</option></select></label></div>}<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:10}}>{schemes.map(([value,label])=><button type="button" key={value} className={form.complianceSchemes.includes(value)?"primary-button":"secondary-button"} onClick={()=>toggle("complianceSchemes",value)} style={{justifyContent:"center"}}>{label}</button>)}</div></div></section>
@@ -165,4 +200,5 @@ export function CompanySettingsPage() {
     </div>
   </section>;
 }
+
 

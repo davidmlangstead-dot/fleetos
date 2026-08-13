@@ -24,7 +24,16 @@ type ControlRow = {
   subscriptionPlan: string; subscriptionStatus: string; billingEmail: string | null; seatLimit: number;
   retentionDays: number; privacyContactEmail: string | null; customDomain: string | null;
   customDomainVerified: boolean; emailSenderDomain: string | null; emailDomainVerified: boolean;
+  brandName: string | null; brandTagline: string | null; brandLogoUrl: string | null;
+  brandPrimaryColor: string; brandAccentColor: string; brandSidebarColor: string;
+  brandSupportEmail: string | null; brandSupportPhone: string | null;
+  showPoweredBy: boolean; marketplaceEnabled: boolean;
 };
+
+type BrandingRow = Pick<ControlRow,
+  "brandName" | "brandTagline" | "brandLogoUrl" | "brandPrimaryColor" | "brandAccentColor" |
+  "brandSidebarColor" | "brandSupportEmail" | "brandSupportPhone" | "showPoweredBy" | "marketplaceEnabled"
+> & { slug: string };
 
 const controlUpdate = z.object({
   billingEmail: z.union([z.string().trim().email(), z.literal("")]).optional(),
@@ -37,6 +46,23 @@ const controlUpdate = z.object({
   seatLimit: z.number().int().min(1).max(10000).optional(),
   customDomainVerified: z.boolean().optional(),
   emailDomainVerified: z.boolean().optional(),
+  brandName: z.union([z.string().trim().min(2).max(80), z.literal("")]).optional(),
+  brandTagline: z.string().trim().max(160).optional(),
+  brandLogoUrl: z.union([
+    z.string().trim().url().max(2048).refine((value) => new URL(value).protocol === "https:", "Logo URL must use HTTPS"),
+    z.literal(""),
+  ]).optional(),
+  brandPrimaryColor: z.string().trim().regex(/^#[0-9a-f]{6}$/i).optional(),
+  brandAccentColor: z.string().trim().regex(/^#[0-9a-f]{6}$/i).optional(),
+  brandSidebarColor: z.string().trim().regex(/^#[0-9a-f]{6}$/i).optional(),
+  brandSupportEmail: z.union([z.string().trim().email(), z.literal("")]).optional(),
+  brandSupportPhone: z.string().trim().max(40).optional(),
+  showPoweredBy: z.boolean().optional(),
+  marketplaceEnabled: z.boolean().optional(),
+});
+const brandingLookup = z.object({
+  slug: z.string().trim().toLowerCase().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(50).optional(),
+  host: z.string().trim().toLowerCase().max(253).regex(/^[a-z0-9.-]+$/).optional(),
 });
 const governanceCreate = z.object({
   type: z.enum(["ACCESS", "ERASURE", "RECTIFICATION", "RESTRICTION"]),
@@ -80,10 +106,41 @@ async function ensureControl(companyId: string, email: string) {
   `;
   const rows = await prisma.$queryRaw<ControlRow[]>`
     SELECT "subscriptionPlan","subscriptionStatus","billingEmail","seatLimit","retentionDays","privacyContactEmail",
-      "customDomain","customDomainVerified","emailSenderDomain","emailDomainVerified"
+      "customDomain","customDomainVerified","emailSenderDomain","emailDomainVerified",
+      "brandName","brandTagline","brandLogoUrl","brandPrimaryColor","brandAccentColor","brandSidebarColor",
+      "brandSupportEmail","brandSupportPhone","showPoweredBy","marketplaceEnabled"
     FROM "CompanyControl" WHERE "companyId"=${companyId} LIMIT 1
   `;
   return rows[0];
+}
+
+function brandingPayload(row?: BrandingRow) {
+  return {
+    name: row?.brandName || "FleetOS",
+    tagline: row?.brandTagline || "Transport operations, made simpler",
+    logoUrl: row?.brandLogoUrl || null,
+    primaryColor: row?.brandPrimaryColor || "#197B58",
+    accentColor: row?.brandAccentColor || "#32C58B",
+    sidebarColor: row?.brandSidebarColor || "#0E1B2C",
+    supportEmail: row?.brandSupportEmail || null,
+    supportPhone: row?.brandSupportPhone || null,
+    showPoweredBy: row?.showPoweredBy ?? true,
+    marketplaceEnabled: row?.marketplaceEnabled ?? true,
+    companySlug: row?.slug || null,
+  };
+}
+
+async function brandingForCompany(companyId: string) {
+  const rows = await prisma.$queryRaw<BrandingRow[]>`
+    SELECT c.slug,cc."brandName",cc."brandTagline",cc."brandLogoUrl",cc."brandPrimaryColor",
+      cc."brandAccentColor",cc."brandSidebarColor",cc."brandSupportEmail",cc."brandSupportPhone",
+      cc."showPoweredBy",cc."marketplaceEnabled"
+    FROM "Company" c
+    LEFT JOIN "CompanyControl" cc ON cc."companyId"=c.id
+    WHERE c.id=${companyId}
+    LIMIT 1
+  `;
+  return brandingPayload(rows[0]);
 }
 
 async function buildSnapshot(companyId: string): Promise<Snapshot> {
@@ -101,6 +158,31 @@ async function buildSnapshot(companyId: string): Promise<Snapshot> {
 function recordCounts(snapshot: Snapshot) {
   return Object.fromEntries(Object.entries(snapshot.tables).map(([table, rows]) => [table, rows.length]));
 }
+
+companyRouter.get("/branding", asyncHandler(async (req, res) => {
+  const input = brandingLookup.parse(req.query);
+  const slug = input.slug || null;
+  const host = input.host?.replace(/\.$/, "") || null;
+  if (!slug && !host) return res.json(brandingPayload());
+
+  const rows = await prisma.$queryRaw<BrandingRow[]>`
+    SELECT c.slug,cc."brandName",cc."brandTagline",cc."brandLogoUrl",cc."brandPrimaryColor",
+      cc."brandAccentColor",cc."brandSidebarColor",cc."brandSupportEmail",cc."brandSupportPhone",
+      cc."showPoweredBy",cc."marketplaceEnabled"
+    FROM "Company" c
+    JOIN "CompanyControl" cc ON cc."companyId"=c.id
+    WHERE (${slug}::text IS NOT NULL AND c.slug=${slug})
+       OR (${host}::text IS NOT NULL AND cc."customDomainVerified"=true AND lower(cc."customDomain")=${host})
+    ORDER BY CASE WHEN c.slug=${slug} THEN 0 ELSE 1 END
+    LIMIT 1
+  `;
+  res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+  return res.json(brandingPayload(rows[0]));
+}));
+
+companyRouter.get("/branding/current", requireAuth, asyncHandler(async (req, res) => {
+  return res.json(await brandingForCompany(req.user!.companyId));
+}));
 
 companyRouter.get("/workspaces", requireIdentity, asyncHandler(async (_req, res) => {
   const memberships = await prisma.companyMembership.findMany({
@@ -186,6 +268,16 @@ companyRouter.patch("/admin", requireAuth, requireRoles(...managerRoles), asyncH
       "retentionDays"=COALESCE(${input.retentionDays ?? null},"retentionDays"),
       "customDomain"=CASE WHEN ${updateCustomDomain} THEN ${input.customDomain || null} ELSE "customDomain" END,
       "emailSenderDomain"=CASE WHEN ${updateSenderDomain} THEN ${input.emailSenderDomain || null} ELSE "emailSenderDomain" END,
+      "brandName"=CASE WHEN ${input.brandName !== undefined} THEN ${input.brandName || null} ELSE "brandName" END,
+      "brandTagline"=CASE WHEN ${input.brandTagline !== undefined} THEN ${input.brandTagline || null} ELSE "brandTagline" END,
+      "brandLogoUrl"=CASE WHEN ${input.brandLogoUrl !== undefined} THEN ${input.brandLogoUrl || null} ELSE "brandLogoUrl" END,
+      "brandPrimaryColor"=COALESCE(${input.brandPrimaryColor?.toUpperCase() ?? null},"brandPrimaryColor"),
+      "brandAccentColor"=COALESCE(${input.brandAccentColor?.toUpperCase() ?? null},"brandAccentColor"),
+      "brandSidebarColor"=COALESCE(${input.brandSidebarColor?.toUpperCase() ?? null},"brandSidebarColor"),
+      "brandSupportEmail"=CASE WHEN ${input.brandSupportEmail !== undefined} THEN ${input.brandSupportEmail || null} ELSE "brandSupportEmail" END,
+      "brandSupportPhone"=CASE WHEN ${input.brandSupportPhone !== undefined} THEN ${input.brandSupportPhone || null} ELSE "brandSupportPhone" END,
+      "showPoweredBy"=COALESCE(${input.showPoweredBy ?? null},"showPoweredBy"),
+      "marketplaceEnabled"=COALESCE(${input.marketplaceEnabled ?? null},"marketplaceEnabled"),
       "subscriptionPlan"=COALESCE(${platformFields.subscriptionPlan ?? null},"subscriptionPlan"),
       "subscriptionStatus"=COALESCE(${platformFields.subscriptionStatus ?? null},"subscriptionStatus"),
       "seatLimit"=COALESCE(${platformFields.seatLimit ?? null},"seatLimit"),
@@ -194,7 +286,9 @@ companyRouter.patch("/admin", requireAuth, requireRoles(...managerRoles), asyncH
       "updatedAt"=NOW()
     WHERE "companyId"=${req.user!.companyId}
     RETURNING "subscriptionPlan","subscriptionStatus","billingEmail","seatLimit","retentionDays","privacyContactEmail",
-      "customDomain","customDomainVerified","emailSenderDomain","emailDomainVerified"
+      "customDomain","customDomainVerified","emailSenderDomain","emailDomainVerified",
+      "brandName","brandTagline","brandLogoUrl","brandPrimaryColor","brandAccentColor","brandSidebarColor",
+      "brandSupportEmail","brandSupportPhone","showPoweredBy","marketplaceEnabled"
   `;
   await writeAuditEvent({ companyId: req.user!.companyId, actorUserId: req.user!.id, actorEmail: req.user!.email, action: "UPDATE", entityType: "BUSINESS_CONTROLS", entityId: req.user!.companyId, summary: "Updated company billing, privacy or readiness controls" });
   res.json(rows[0]);

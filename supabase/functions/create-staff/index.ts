@@ -82,6 +82,14 @@ Deno.serve(async (req) => {
     );
     if (!membership) return json({ error: "You do not have permission to add staff to this company" }, 403);
 
+    const [{ data: company }, { data: branding }] = await Promise.all([
+      admin.from("Company").select("slug").eq("id", companyId).maybeSingle(),
+      admin.from("CompanyControl").select("brandName").eq("companyId", companyId).maybeSingle(),
+    ]);
+    if (!company?.slug) return json({ error: "Company workspace could not be resolved" }, 400);
+    const inviteBrandName = branding?.brandName?.trim() || "FleetOS";
+    const inviteRedirect = `https://fleetos-orpin-one.vercel.app/staff-invite?company=${encodeURIComponent(company.slug)}`;
+
     if (depotId) {
       const { data: depot, error: depotError } = await admin
         .from("Depot")
@@ -147,8 +155,8 @@ Deno.serve(async (req) => {
           linkedUserId = existingFleetUser.id;
         } else {
           const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(normalizedEmail, {
-            data: { firstName: firstName.trim(), lastName: lastName.trim(), personType, accessRole },
-            redirectTo: "https://fleetos-orpin-one.vercel.app",
+            data: { firstName: firstName.trim(), lastName: lastName.trim(), personType, accessRole, brandName: inviteBrandName, companySlug: company.slug },
+            redirectTo: inviteRedirect,
           });
 
           if (inviteError) {

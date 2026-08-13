@@ -22,7 +22,8 @@ function getBaseUrl() {
   return "https://fleetos-1.onrender.com/api";
 }
 
-const baseUrl = getBaseUrl();
+export const API_BASE_URL = getBaseUrl();
+const baseUrl = API_BASE_URL;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function readPayload(response: Response) {
@@ -156,4 +157,5 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   }
   return (payload ?? {}) as T;
 }
+
 

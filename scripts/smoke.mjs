@@ -4,7 +4,11 @@ const checks = [];
 async function check(name,url,expectedStatuses,validate,timeoutMs=20000){const started=Date.now();try{const response=await fetch(url,{redirect:"follow",signal:AbortSignal.timeout(timeoutMs)});const raw=await response.text();let body=raw;try{body=raw?JSON.parse(raw):null;}catch{/* HTML/text is valid */}const ok=expectedStatuses.includes(response.status)&&(!validate||validate(body,response));checks.push({name,ok,status:response.status,ms:Date.now()-started});if(!ok)throw new Error(`${name} returned ${response.status}`);}catch(error){if(!checks.find(item=>item.name===name))checks.push({name,ok:false,status:"ERROR",ms:Date.now()-started});console.error(`FAIL ${name}:`,error instanceof Error?error.message:error);}}
 await check("API health",`${API}/health`,[200],body=>body&&body.status==="ok",60000);
 await check("API root",`${API}/api`,[200],body=>body&&body.status==="ok");
+// A pull request runs against the currently live API, before this additive route deploys.
+// Post-deployment release verification requires the full 200 brand payload separately.
+await check("Public default branding",`${API}/api/company/branding`,[200,404],(body,response)=>response.status===404||(body&&body.name==="FleetOS"&&/^#[0-9A-F]{6}$/i.test(body.primaryColor)));
 await check("Protected company route",`${API}/api/company`,[401]);
+await check("Protected current branding",`${API}/api/company/branding/current`,[401,404]);
 // Pull requests exercise the currently live API before these additive routes deploy.
 // After deployment the release verification below requires 401 for every route.
 await check("Protected business controls",`${API}/api/company/admin`,[401,404]);

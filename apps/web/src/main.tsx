@@ -9,16 +9,19 @@ import { AuthPage } from "./modules/auth/AuthPage";
 import { LandingPage } from "./modules/landing/LandingPage";
 import { OnboardingPage } from "./modules/onboarding/OnboardingPage";
 import { StaffInvitePage } from "./modules/auth/StaffInvitePage";
+import { BrandingProvider, loadCurrentBranding, loadPublicBranding, useBranding } from "./lib/branding";
 import "./styles.css";
 import "./shell-fixes.css";
 import "./driver-operations.css";
 import "./jobs.css";
+import "./branding.css";
 
 const client = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1 } } });
 type AppState = "loading" | "landing" | "auth" | "onboarding" | "ready" | "error";
 type Workspace = { id: string; name: string; slug: string; role: string };
 
 function FleetOSApp() {
+  const { branding, setBranding } = useBranding();
   const [state, setState] = useState<AppState>("loading");
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [error, setError] = useState("");
@@ -33,7 +36,11 @@ function FleetOSApp() {
 
   async function resolveWorkspace() {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setState("landing"); return; }
+    if (!session) {
+      setBranding(await loadPublicBranding());
+      setState("landing");
+      return;
+    }
 
     // Keep a valid cached session while offline. A remote identity check is only safe
     // when a connection exists; otherwise it could incorrectly sign the driver out.
@@ -61,6 +68,9 @@ function FleetOSApp() {
         localStorage.setItem(ACTIVE_WORKSPACE_KEY, active.id);
       }
 
+      try { setBranding(await loadCurrentBranding()); }
+      catch { /* Keep the public/default brand if the connection is degraded. */ }
+
       if (active.role === "DRIVER" && window.location.pathname === "/") {
         window.history.replaceState(null, "", "/driver");
       }
@@ -80,9 +90,9 @@ function FleetOSApp() {
         }
       }
       const message = !navigator.onLine
-        ? "You are offline and this device has not cached the selected workspace yet. Reconnect once, then FleetOS can open it offline."
+        ? `You are offline and this device has not cached the selected workspace yet. Reconnect once, then ${branding.name} can open it offline.`
         : status === 401
-          ? "FleetOS Medic: your login is valid, but the API rejected the workspace request. Your session has been kept active."
+          ? `${branding.name} Medic: your login is valid, but the API rejected the workspace request. Your session has been kept active.`
           : err instanceof Error ? err.message : "Unable to open your workspace";
       setError(message);
       setState("error");
@@ -97,6 +107,7 @@ function FleetOSApp() {
       if (!mounted) return;
       if (event === "SIGNED_OUT") {
         void clearOfflineData().catch(() => undefined);
+        void loadPublicBranding().then(setBranding);
         setState("landing");
       } else if (event === "SIGNED_IN" && session) {
         setState("loading");
@@ -107,16 +118,16 @@ function FleetOSApp() {
   }, []);
 
   if (window.location.pathname === "/staff-invite") return <StaffInvitePage onComplete={() => { setState("loading"); void resolveWorkspace(); }} />;
-  if (state === "loading") return <main className="loading-page">FleetOS Medic is checking your connectionâ€¦</main>;
+  if (state === "loading") return <main className="loading-page">{branding.name} is checking your connection…</main>;
   if (state === "landing") return <LandingPage onLogin={() => { setAuthMode("login"); setState("auth"); }} onSignup={() => { setAuthMode("signup"); setState("auth"); }} />;
   if (state === "auth") return <AuthPage initialMode={authMode} onBack={() => setState("landing")} />;
   if (state === "onboarding") return <OnboardingPage onComplete={(workspace) => { localStorage.setItem(ACTIVE_WORKSPACE_KEY, workspace.id); setState("ready"); }} />;
-  if (state === "error") return <main className="loading-page"><div><p className="eyebrow">FleetOS Medic</p><h1>We couldn't open your workspace</h1><p>{error}</p><button onClick={() => { setState("loading"); void resolveWorkspace(); }}>Run check again</button><button onClick={() => void supabase.auth.signOut()} style={{ marginLeft: 8 }}>Sign out</button></div></main>;
+  if (state === "error") return <main className="loading-page"><div><p className="eyebrow">{branding.name} Medic</p><h1>We couldn't open your workspace</h1><p>{error}</p><button onClick={() => { setState("loading"); void resolveWorkspace(); }}>Run check again</button><button onClick={() => void supabase.auth.signOut()} style={{ marginLeft: 8 }}>Sign out</button></div></main>;
   return <RouterProvider router={router} />;
 }
 
 createRoot(document.getElementById("root")!).render(
-  <StrictMode><QueryClientProvider client={client}><FleetOSApp /></QueryClientProvider></StrictMode>,
+  <StrictMode><QueryClientProvider client={client}><BrandingProvider><FleetOSApp /></BrandingProvider></QueryClientProvider></StrictMode>,
 );
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
