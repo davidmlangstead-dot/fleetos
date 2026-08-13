@@ -1,4 +1,4 @@
-const CACHE = "fleetos-shell-v1";
+const CACHE = "fleetos-shell-v2";
 const SHELL = ["/", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {

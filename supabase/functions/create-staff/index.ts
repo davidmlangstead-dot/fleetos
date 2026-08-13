@@ -124,6 +124,7 @@ Deno.serve(async (req) => {
         } else {
           const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(normalizedEmail, {
             data: { firstName: firstName.trim(), lastName: lastName.trim(), personType, accessRole },
+            redirectTo: "https://fleetos-orpin-one.vercel.app",
           });
 
           if (inviteError) {
