@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
     const {
       companyId, firstName, lastName, email, phone, personType, accessRole, startDate, dateOfBirth,
       address, postcode, emergencyContact, emergencyPhone, licenceNumber, licenceExpiry,
-      cpcExpiry, tachoCardNumber, tachoCardExpiry, medicalDue, inviteAccount, onboardingKey,
+      cpcExpiry, tachoCardNumber, tachoCardExpiry, medicalDue, inviteAccount, onboardingKey, depotId,
     } = body;
 
     if (typeof companyId !== "string" || !companyId.trim()) return json({ error: "Active company workspace is required" }, 400);
@@ -71,6 +71,17 @@ Deno.serve(async (req) => {
     );
     if (!membership) return json({ error: "You do not have permission to add staff to this company" }, 403);
 
+    if (depotId) {
+      const { data: depot, error: depotError } = await admin
+        .from("Depot")
+        .select("id")
+        .eq("id", depotId)
+        .eq("companyId", companyId)
+        .eq("isActive", true)
+        .maybeSingle();
+      if (depotError || !depot) return json({ error: "Depot is not active in the selected company" }, 400);
+    }
+
     if (onboardingKey) {
       const { data: existing } = await admin
         .from("Person")
@@ -87,6 +98,7 @@ Deno.serve(async (req) => {
         companyId,
         userId: null,
         onboardingKey: onboardingKey || null,
+        depotId: depotId || null,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: email?.trim() || null,
@@ -182,6 +194,7 @@ Deno.serve(async (req) => {
           id: person.id,
           personId: person.id,
           companyId,
+          depotId: depotId || null,
           firstName: firstName.trim(),
           lastName: lastName.trim(),
           email: email?.trim() || null,
@@ -222,3 +235,4 @@ Deno.serve(async (req) => {
     return json({ error: "Unexpected error creating staff record" }, 500);
   }
 });
+
