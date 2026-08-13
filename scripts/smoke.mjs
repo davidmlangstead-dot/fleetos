@@ -5,6 +5,10 @@ async function check(name,url,expectedStatuses,validate,timeoutMs=20000){const s
 await check("API health",`${API}/health`,[200],body=>body&&body.status==="ok",60000);
 await check("API root",`${API}/api`,[200],body=>body&&body.status==="ok");
 await check("Protected company route",`${API}/api/company`,[401]);
+await check("Protected business controls",`${API}/api/company/admin`,[401]);
+await check("Protected portable export",`${API}/api/company/export`,[401]);
+await check("Protected backup list",`${API}/api/company/backups/not-a-backup`,[401]);
+await check("Protected retention preview",`${API}/api/company/retention-preview`,[401]);
 await check("Protected Workshop route",`${API}/api/operations/maintenance`,[401]);
 await check("Protected document links",`${API}/api/documents/link-options`,[401]);
 await check("Protected Medic route",`${API}/api/medic/status`,[401]);
@@ -13,3 +17,4 @@ await check("Web app",WEB,[200]);
 for(const item of checks)console.log(`${item.ok?"PASS":"FAIL"} ${item.name} (${item.status}, ${item.ms}ms)`);
 if(checks.some(item=>!item.ok))process.exit(1);
 console.log(`FleetOS smoke checks passed: ${checks.length}/${checks.length}`);
+
