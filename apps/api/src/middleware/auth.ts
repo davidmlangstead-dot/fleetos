@@ -57,6 +57,7 @@ async function ensureUser(identity: Identity) {
 }
 
 export const requireIdentity: RequestHandler = async (req, res, next) => {
+  if (res.locals.identity) return next();
   const token = req.header("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token || !config.SUPABASE_URL) return res.status(401).json({ error: "Unauthenticated" });
 
@@ -70,6 +71,7 @@ export const requireIdentity: RequestHandler = async (req, res, next) => {
 };
 
 export const requireAuth: RequestHandler = async (req, res, next) => {
+  if (req.user) return next();
   await requireIdentity(req, res, async () => {
     const requestedCompanyId = req.header("x-company-id")?.trim();
     const membership = requestedCompanyId
@@ -89,3 +91,4 @@ export function requireRoles(...allowed: Role[]): RequestHandler {
     next();
   };
 }
+

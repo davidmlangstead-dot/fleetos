@@ -31,3 +31,11 @@ jobs:
         with:
           node-version: 24
       - run: node scripts/smoke.mjs
+      - run: node scripts/security-smoke.mjs
+      - run: node scripts/tenant-attack.mjs
+        env:
+          FLEETOS_SECURITY_TOKEN_A: ${{ secrets.FLEETOS_SECURITY_TOKEN_A }}
+          FLEETOS_SECURITY_TOKEN_B: ${{ secrets.FLEETOS_SECURITY_TOKEN_B }}
+          FLEETOS_SECURITY_COMPANY_A: ${{ secrets.FLEETOS_SECURITY_COMPANY_A }}
+          FLEETOS_SECURITY_COMPANY_B: ${{ secrets.FLEETOS_SECURITY_COMPANY_B }}
+

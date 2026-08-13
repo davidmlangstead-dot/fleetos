@@ -1,4 +1,4 @@
-const CACHE = "fleetos-shell-v2";
+const CACHE = "fleetos-shell-v3";
 const SHELL = ["/", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
@@ -39,3 +39,17 @@ self.addEventListener("fetch", (event) => {
     })),
   );
 });
+
+async function requestClientSync() {
+  const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  for (const client of clients) client.postMessage({ type: "FLEETOS_SYNC_REQUESTED" });
+}
+
+self.addEventListener("sync", (event) => {
+  if (event.tag === "fleetos-offline-sync") event.waitUntil(requestClientSync());
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "FLEETOS_REQUEST_SYNC") event.waitUntil(requestClientSync());
+});
+
