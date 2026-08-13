@@ -6,6 +6,8 @@
     "dev:web": "pnpm --filter @fleetros/web dev",
     "dev:api": "pnpm --filter @fleetros/api dev",
     "build": "pnpm -r build",
+    "smoke": "node scripts/smoke.mjs",
+    "verify": "pnpm build && pnpm smoke",
     "db:gen": "pnpm --filter @fleetros/api prisma generate"
   }
 }
