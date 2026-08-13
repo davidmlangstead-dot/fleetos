@@ -5,7 +5,7 @@ import { requireAuth } from "../../middleware/auth.js";
 
 type Alert = {
   id: string;
-  kind: "COMPLIANCE" | "DEFECT" | "MAINTENANCE" | "MEDIC";
+  kind: "COMPLIANCE" | "DEFECT" | "MAINTENANCE" | "MEDIC" | "DRIVER";
   severity: "INFO" | "WARNING" | "CRITICAL";
   title: string;
   detail: string | null;
@@ -15,11 +15,13 @@ type Alert = {
 type MedicRow = { id: string; severity: string; summary: string; detail: string | null; createdAt: Date };
 type PlanRow = { id: string; title: string; category: string; nextDueAt: Date; registration: string };
 type WorkRow = { id: string; title: string; status: string; priority: string; dueAt: Date | null; scheduledFor: Date | null; createdAt: Date; registration: string };
+type DriverOpsAlertRow = { id: string; severity: "WARNING" | "CRITICAL"; title: string; detail: string; occurredAt: Date };
 
 const complianceRoles = new Set(["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
 const defectRoles = new Set(["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
 const workshopRoles = new Set(["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
 const medicRoles = new Set(["TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
+const driverOpsRoles = new Set(["TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
 
 export const notificationsRouter = Router();
 notificationsRouter.use(requireAuth);
@@ -30,7 +32,7 @@ notificationsRouter.get("/", asyncHandler(async (req, res) => {
   const now = new Date();
   const soon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-  const [compliance, defects, plans, workOrders, medic] = await Promise.all([
+  const [compliance, defects, plans, workOrders, medic, driverOps] = await Promise.all([
     complianceRoles.has(role)
       ? prisma.complianceItem.findMany({ where: { companyId, status: { not: "RESOLVED" }, dueDate: { lte: soon } }, select: { id: true, title: true, dueDate: true, description: true }, orderBy: { dueDate: "asc" }, take: 20 })
       : Promise.resolve([]),
@@ -61,6 +63,29 @@ notificationsRouter.get("/", asyncHandler(async (req, res) => {
           ORDER BY "createdAt" DESC LIMIT 20
         `
       : Promise.resolve([] as MedicRow[]),
+    driverOpsRoles.has(role)
+      ? prisma.$queryRaw<DriverOpsAlertRow[]>`
+          SELECT 'breakdown:'||b.id::text AS id,
+            CASE WHEN b.severity IN ('UNSAFE','IMMOBILE') THEN 'CRITICAL' ELSE 'WARNING' END AS severity,
+            v.registration||': breakdown reported' AS title,
+            d."firstName"||' '||d."lastName"||' · '||b.location AS detail,
+            b."reportedAt" AS "occurredAt"
+          FROM "DriverBreakdown" b JOIN "Vehicle" v ON v.id=b."vehicleId" JOIN "Driver" d ON d.id=b."driverId"
+          WHERE b."companyId"=${companyId} AND b.status NOT IN ('RESOLVED','CANCELLED')
+          UNION ALL
+          SELECT 'absence:'||a.id::text,'WARNING',d."firstName"||' '||d."lastName"||': '||lower(a.type),
+            to_char(a."startsOn",'DD Mon YYYY')||' to '||to_char(a."endsOn",'DD Mon YYYY'),a."createdAt"
+          FROM "StaffAbsenceRequest" a JOIN "Driver" d ON d.id=a."driverId"
+          WHERE a."companyId"=${companyId} AND a.status IN ('PENDING','REPORTED')
+          UNION ALL
+          SELECT 'training:'||t.id::text,CASE WHEN t."dueDate"<CURRENT_DATE THEN 'CRITICAL' ELSE 'WARNING' END,
+            d."firstName"||' '||d."lastName"||': training '||CASE WHEN t."dueDate"<CURRENT_DATE THEN 'overdue' ELSE 'due soon' END,
+            t.title||' · due '||to_char(t."dueDate",'DD Mon YYYY'),COALESCE(t."dueDate"::timestamptz,t."createdAt")
+          FROM "DriverTrainingRecord" t JOIN "Driver" d ON d.id=t."driverId"
+          WHERE t."companyId"=${companyId} AND t.status NOT IN ('COMPLETED','CANCELLED') AND t."dueDate"<=CURRENT_DATE+30
+          ORDER BY "occurredAt" DESC LIMIT 30
+        `
+      : Promise.resolve([] as DriverOpsAlertRow[]),
   ]);
 
   const alerts: Alert[] = [];
@@ -83,9 +108,13 @@ notificationsRouter.get("/", asyncHandler(async (req, res) => {
   for (const incident of medic) {
     alerts.push({ id: `medic:${incident.id}`, kind: "MEDIC", severity: incident.severity === "CRITICAL" ? "CRITICAL" : "WARNING", title: incident.summary, detail: incident.detail, occurredAt: incident.createdAt.toISOString(), href: "/settings/medic" });
   }
+  for (const item of driverOps) {
+    alerts.push({ id: item.id, kind: "DRIVER", severity: item.severity, title: item.title, detail: item.detail, occurredAt: item.occurredAt.toISOString(), href: "/driver-operations" });
+  }
 
   const severityRank = { CRITICAL: 0, WARNING: 1, INFO: 2 } as const;
   alerts.sort((a, b) => severityRank[a.severity] - severityRank[b.severity] || b.occurredAt.localeCompare(a.occurredAt));
   res.json({ total: alerts.length, critical: alerts.filter((item) => item.severity === "CRITICAL").length, items: alerts.slice(0, 30) });
 }));
+
 

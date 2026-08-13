@@ -14,6 +14,7 @@ const routes = [
   "/api/marketplace",
   "/api/medic/status",
   "/api/notifications",
+  "/api/driver-operations/me",
 ];
 
 const results = [];
@@ -52,4 +53,5 @@ try {
 for (const result of results) console.log(`${result.ok ? "PASS" : "FAIL"} ${result.name} (${result.status}, ${result.ms}ms)`);
 if (results.some((result) => !result.ok)) process.exit(1);
 console.log(`FleetOS security probes passed: ${results.length}/${results.length}`);
+
 

@@ -98,6 +98,7 @@ export function isQueueableMutation(path: string, method: string) {
     "/operations/defects",
     "/operations/driver-hours",
     "/operations/maintenance",
+    "/driver-operations",
     "/registers",
     "/messages",
   ].some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
@@ -281,4 +282,5 @@ export async function syncOfflineMutations(authUserId: string, execute: (item: O
   }
   return getOfflineSnapshot();
 }
+
 

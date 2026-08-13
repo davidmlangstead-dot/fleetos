@@ -9,7 +9,7 @@ if (!tokenA || !tokenB || !companyA || !companyB) {
   process.exit(0);
 }
 
-const targets = ["/api/company", "/api/vehicles", "/api/drivers", "/api/jobs", "/api/operations/maintenance", "/api/messages"];
+const targets = ["/api/company", "/api/vehicles", "/api/drivers", "/api/jobs", "/api/operations/maintenance", "/api/messages", "/api/driver-operations/office"];
 const attempts = [
   { name: "Tenant A token against tenant B", token: tokenA, company: companyB },
   { name: "Tenant B token against tenant A", token: tokenB, company: companyA },
@@ -30,4 +30,5 @@ for (const attempt of attempts) {
 }
 if (failures) process.exit(1);
 console.log("FleetOS authenticated cross-tenant probes passed.");
+
 

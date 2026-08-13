@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import { DashboardPageClean } from "./modules/dashboard/DashboardPageClean";
@@ -5,7 +6,6 @@ import { VehiclesPage } from "./modules/vehicles/VehiclesPage";
 import { JobsPage } from "./modules/jobs/JobsPage";
 import { DriversPage } from "./modules/drivers/DriversPage";
 import { PersonalPage } from "./modules/personal/PersonalPage";
-import { DriverCockpitPage } from "./modules/driver/DriverCockpitPage";
 import { HoursBoardPage } from "./modules/operations/HoursBoardPage";
 import { WorkshopPage } from "./modules/workshop/WorkshopPage";
 import { ComplianceGuardianPage } from "./modules/compliance/ComplianceGuardianPage";
@@ -19,9 +19,14 @@ import { ReportsPage } from "./modules/reports/ReportsPage";
 import { MarketplacePage } from "./modules/marketplace/MarketplacePage";
 import { MedicPage } from "./modules/medic/MedicPage";
 
+const DriverCockpitPage = lazy(() => import("./modules/driver/DriverCockpitPage").then(module => ({ default: module.DriverCockpitPage })));
+const DriverOperationsOfficePage = lazy(() => import("./modules/driver/DriverOperationsOfficePage").then(module => ({ default: module.DriverOperationsOfficePage })));
+const driverFallback = <main className="loading-page"><div><h1>Loading Driver Operations</h1></div></main>;
+
 export const router = createBrowserRouter([{ element: <AppShell />, children: [
   { path: "/", element: <DashboardPageClean /> },
-  { path: "/driver", element: <DriverCockpitPage /> },
+  { path: "/driver", element: <Suspense fallback={driverFallback}><DriverCockpitPage /></Suspense> },
+  { path: "/driver-operations", element: <Suspense fallback={driverFallback}><DriverOperationsOfficePage /></Suspense> },
   { path: "/hours", element: <HoursBoardPage /> },
   { path: "/jobs", element: <JobsPage /> },
   { path: "/vehicles", element: <VehiclesPage /> },
@@ -41,3 +46,4 @@ export const router = createBrowserRouter([{ element: <AppShell />, children: [
   { path: "/messages", element: <MessagesPage /> },
   { path: "*", element: <Navigate to="/" replace /> },
 ]}]);
+

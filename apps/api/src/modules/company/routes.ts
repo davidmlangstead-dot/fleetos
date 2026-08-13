@@ -15,6 +15,7 @@ const backupTables = [
   "Depot", "Person", "Vehicle", "Driver", "Job", "Defect", "ComplianceItem", "RegisterItem",
   "MaintenancePlan", "MaintenanceWorkOrder", "Document", "DriverActivity", "Conversation",
   "ConversationMember", "Message", "MarketplaceListing", "MarketplaceInquiry",
+  "DriverWalkaroundCheck", "DriverBreakdown", "StaffAbsenceRequest", "DriverTrainingRecord",
 ] as const;
 
 type Snapshot = { format: "fleetos-backup-v1"; generatedAt: string; companyId: string; tables: Record<string, unknown[]> };
@@ -335,4 +336,5 @@ companyRouter.patch("/", requireAuth, requireRoles(...managerRoles), asyncHandle
   await writeAuditEvent({ companyId: req.user!.companyId, actorUserId: req.user!.id, actorEmail: req.user!.email, action: "UPDATE", entityType: "COMPANY", entityId: company.id, summary: `Updated company settings for ${company.name}` });
   return res.json(company);
 }));
+
 
