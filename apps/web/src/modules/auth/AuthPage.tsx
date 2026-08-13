@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import { BrandLogo, BrandSupport, PoweredBy, useBranding } from "../../lib/branding";
 
 type Props = { initialMode?: "login" | "signup"; onBack?: () => void };
 
 export function AuthPage({ initialMode = "login", onBack }: Props) {
+  const { branding } = useBranding();
   const [mode, setMode] = useState<"login" | "signup">(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,7 +34,7 @@ export function AuthPage({ initialMode = "login", onBack }: Props) {
     }
 
     if (mode === "signup" && !result.data.session) {
-      setMessage("If this is a new email address, check your inbox to confirm it. If you already have a FleetOS account, choose Sign in below — Supabase may not send another signup email for an existing account.");
+      setMessage(`If this is a new email address, check your inbox to confirm it. If you already have a ${branding.name} account, choose Sign in below — a second signup email may not be sent.`);
       return;
     }
 
@@ -42,21 +44,24 @@ export function AuthPage({ initialMode = "login", onBack }: Props) {
   return (
     <main className="auth-page">
       <section className="auth-card">
-        {onBack && <button className="switch-mode" onClick={onBack} style={{ marginBottom: 18 }}><ArrowLeft size={16}/> Back to FleetOS</button>}
-        <div className="brand auth-brand"><span className="brand-mark">F</span><span>FleetOS</span></div>
-        <p className="eyebrow">Transport operations, made simpler</p>
-        <h1>{mode === "login" ? "Welcome back" : "Create your FleetOS account"}</h1>
-        <p className="subtle">{mode === "login" ? "Existing account? Enter your email and password — no email link is required." : "Only use Create account for a brand-new email. Existing FleetOS users should use Sign in."}</p>
+        {onBack && <button className="switch-mode" onClick={onBack} style={{ marginBottom: 18 }}><ArrowLeft size={16}/> Back to {branding.name}</button>}
+        <div className="brand auth-brand"><BrandLogo /></div>
+        <p className="eyebrow">{branding.tagline}</p>
+        <h1>{mode === "login" ? "Welcome back" : `Create your ${branding.name} account`}</h1>
+        <p className="subtle">{mode === "login" ? "Existing account? Enter your email and password — no email link is required." : `Only use Create account for a brand-new email. Existing ${branding.name} users should use Sign in.`}</p>
         <form onSubmit={submit}>
           <label>Email<input type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.co.uk" /></label>
           <label>Password<input type="password" required minLength={8} autoComplete={mode === "login" ? "current-password" : "new-password"} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" /></label>
           {message && <p className="form-message">{message}</p>}
           <button className="primary-button auth-submit" disabled={busy}>{busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}</button>
         </form>
-        <button className="switch-mode" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setMessage(""); }}>
-          {mode === "login" ? "New to FleetOS? Create an account" : "Already have an account? Sign in"}
-        </button>
+        {!branding.companySlug && <button className="switch-mode" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setMessage(""); }}>
+          {mode === "login" ? `New to ${branding.name}? Create an account` : "Already have an account? Sign in"}
+        </button>}
+        <BrandSupport />
+        <PoweredBy />
       </section>
     </main>
   );
 }
+

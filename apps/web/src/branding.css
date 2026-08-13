@@ -1,0 +1,70 @@
+:root {
+  --brand-primary: #197b58;
+  --brand-accent: #32c58b;
+  --brand-sidebar: #0e1b2c;
+}
+
+.sidebar { background: var(--brand-sidebar); }
+.brand-mark { background: var(--brand-accent); }
+.primary-button,
+.timeline-note button { background: var(--brand-primary); }
+.eyebrow,
+.text-button,
+.job-view-tabs button.active,
+.job-wizard-head > svg,
+.job-steps button.active,
+.job-review article svg,
+.job-summary-grid svg,
+.job-controls svg,
+.my-work-card footer strong { color: var(--brand-primary); }
+.job-view-tabs button.active { border-bottom-color: var(--brand-primary); }
+.job-steps button.active span,
+.job-steps button.done span { background: var(--brand-primary); }
+
+.brand-logo {
+  display: block;
+  width: auto;
+  max-width: 46px;
+  height: 34px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+.brand-logo.compact { max-width: 34px; height: 28px; }
+.powered-by { display: block; margin-top: 6px; color: #94a3b8; font-size: 10px; font-weight: 500; }
+.brand-support { margin: 18px 0 0; color: #64748b; font-size: .82rem; text-align: center; }
+.brand-support a { color: var(--brand-primary); font-weight: 700; }
+
+.brand-preview {
+  display: grid;
+  grid-template-columns: minmax(190px, .7fr) minmax(220px, 1.3fr);
+  min-height: 170px;
+  overflow: hidden;
+  border: 1px solid #dce3ea;
+  border-radius: 14px;
+  background: #fff;
+}
+.brand-preview-sidebar {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 22px;
+  color: #fff;
+  background: var(--preview-sidebar);
+}
+.brand-preview-sidebar .brand { padding: 0; }
+.brand-preview-sidebar .brand-mark { background: var(--preview-accent); }
+.brand-preview > div:last-child { padding: 28px; }
+.brand-preview-button { margin-top: 22px; border: 0; border-radius: 8px; padding: 10px 15px; color: #fff; background: var(--preview-primary); }
+.colour-grid { display: grid; grid-template-columns: repeat(3, minmax(180px, 1fr)); gap: 12px; }
+.colour-grid label { display: grid; grid-template-columns: 45px 1fr; align-items: end; gap: 8px; }
+.colour-grid label > input[type="color"] { width: 45px; height: 42px; padding: 3px; }
+.toggle-grid { display: flex; gap: 18px; flex-wrap: wrap; }
+.toggle-grid label { display: flex; flex-direction: row; align-items: center; gap: 8px; }
+.toggle-grid input { width: auto; }
+.copy-link { display: flex; gap: 8px; margin-top: 8px; }
+.copy-link code { flex: 1; overflow: auto; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; }
+
+@media (max-width: 760px) {
+  .brand-preview { grid-template-columns: 1fr; }
+  .colour-grid { grid-template-columns: 1fr; }
+}

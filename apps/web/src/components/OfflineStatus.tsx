@@ -10,6 +10,7 @@ import {
   type OfflineSnapshot,
   retryOfflineMutation,
 } from "../lib/offline";
+import { useBranding } from "../lib/branding";
 
 const initial: OfflineSnapshot = { online: navigator.onLine, syncing: false, pending: 0, failed: 0, lastSyncedAt: null };
 
@@ -22,10 +23,11 @@ function friendlyPath(item: OfflineMutation) {
   if (item.path.startsWith("/vehicles")) return "Vehicle change";
   if (item.path.startsWith("/drivers")) return "Driver change";
   if (item.path.startsWith("/jobs")) return "Job change";
-  return "FleetOS change";
+  return "App change";
 }
 
 export function OfflineStatus() {
+  const { branding } = useBranding();
   const [state, setState] = useState(initial);
   const [items, setItems] = useState<OfflineMutation[]>([]);
   const [open, setOpen] = useState(false);
@@ -71,7 +73,7 @@ export function OfflineStatus() {
       <Icon size={16} className={state.syncing ? "spin" : undefined} /> <span>{label}</span>
     </button>
     {open && <div style={{ position: "absolute", right: 0, top: 38, width: 330, maxWidth: "85vw", maxHeight: 430, overflowY: "auto", background: "white", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 12, boxShadow: "0 18px 45px rgba(15,23,42,.18)", zIndex: 60, padding: 12 }}>
-      <strong>{state.online ? "FleetOS sync" : "Working offline"}</strong>
+      <strong>{state.online ? `${branding.name} sync` : "Working offline"}</strong>
       <p style={{ margin: "6px 0 12px", color: "#64748b", fontSize: 12 }}>{state.online ? "Saved changes sync automatically and are protected from duplicates." : "Your changes stay safely on this device and will send when the connection returns."}</p>
       {items.length === 0 ? <p style={{ color: "#166534", fontSize: 13 }}>Everything is up to date.</p> : items.map((item) => <div key={item.id} style={{ borderTop: "1px solid #f1f5f9", padding: "10px 0", display: "flex", justifyContent: "space-between", gap: 10 }}>
         <div><strong style={{ fontSize: 13 }}>{friendlyPath(item)}</strong><div style={{ color: item.state === "failed" ? "#b91c1c" : "#64748b", fontSize: 11 }}>{item.state === "failed" ? item.lastError ?? "Needs attention" : `Waiting to sync Â· ${new Date(item.createdAt).toLocaleString("en-GB")}`}</div></div>
@@ -81,4 +83,5 @@ export function OfflineStatus() {
     </div>}
   </div>;
 }
+
 

@@ -22,7 +22,8 @@ async function probe(name, path, headers, expected = 401) {
   const started = Date.now();
   try {
     const response = await fetch(`${API}${path}`, { headers, redirect: "manual", signal: AbortSignal.timeout(20_000) });
-    const ok = response.status === expected;
+    const expectedStatuses = Array.isArray(expected) ? expected : [expected];
+    const ok = expectedStatuses.includes(response.status);
     results.push({ name, ok, status: response.status, ms: Date.now() - started });
   } catch (error) {
     results.push({ name, ok: false, status: "ERROR", ms: Date.now() - started, error: error instanceof Error ? error.message : String(error) });
@@ -37,6 +38,12 @@ for (const route of routes) {
     "x-company-id": "forged-company",
   });
 }
+
+await probe("No-session attack /api/company/branding/current", "/api/company/branding/current", {}, [401, 404]);
+await probe("Forged-session attack /api/company/branding/current", "/api/company/branding/current", {
+  authorization: "Bearer fleetos-forged-token",
+  "x-company-id": "forged-company",
+}, [401, 404]);
 
 try {
   const response = await fetch(`${API}/api`, {

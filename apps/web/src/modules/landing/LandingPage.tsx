@@ -1,4 +1,5 @@
 import { ArrowRight, CheckCircle2, ShieldCheck, Truck, Users, Wrench } from "lucide-react";
+import { BrandLogo, BrandSupport, PoweredBy, useBranding } from "../../lib/branding";
 
 type Props = { onLogin: () => void; onSignup: () => void };
 
@@ -10,12 +11,13 @@ const features = [
 ] as const;
 
 export function LandingPage({ onLogin, onSignup }: Props) {
+  const { branding } = useBranding();
   return <main style={{ minHeight: "100vh", background: "#f8fafc", color: "#0f172a" }}>
     <header style={{ maxWidth: 1180, margin: "0 auto", padding: "22px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-      <div className="brand"><span className="brand-mark">F</span><span>FleetOS</span></div>
+      <div className="brand"><BrandLogo /></div>
       <div style={{ display: "flex", gap: 10 }}>
         <button className="switch-mode" onClick={onLogin}>Sign in</button>
-        <button className="primary-button" onClick={onSignup}>Start FleetOS</button>
+        {!branding.companySlug && <button className="primary-button" onClick={onSignup}>Start {branding.name}</button>}
       </div>
     </header>
 
@@ -23,9 +25,9 @@ export function LandingPage({ onLogin, onSignup }: Props) {
       <div>
         <p className="eyebrow">Driver-first fleet management</p>
         <h1 style={{ fontSize: "clamp(44px,6vw,76px)", lineHeight: .98, letterSpacing: "-.055em", margin: "14px 0 24px", maxWidth: 760 }}>Run the fleet without losing sight of the people driving it.</h1>
-        <p style={{ fontSize: 20, lineHeight: 1.6, color: "#475569", maxWidth: 700 }}>FleetOS brings drivers, office, workshop and compliance into one connected operating system for growing fleets.</p>
+        <p style={{ fontSize: 20, lineHeight: 1.6, color: "#475569", maxWidth: 700 }}>{branding.tagline}. Drivers, office, workshop and compliance stay connected in one operating system.</p>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 30 }}>
-          <button className="primary-button" onClick={onSignup}>Create your workspace <ArrowRight size={18}/></button>
+          {!branding.companySlug && <button className="primary-button" onClick={onSignup}>Create your workspace <ArrowRight size={18}/></button>}
           <button className="secondary-button" onClick={onLogin}>Sign in</button>
         </div>
         <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginTop: 28, color: "#475569", fontSize: 14 }}>
@@ -46,9 +48,10 @@ export function LandingPage({ onLogin, onSignup }: Props) {
 
     <section style={{ maxWidth: 1180, margin: "0 auto", padding: "10px 24px 88px" }}>
       <div className="panel" style={{ padding: "34px 38px", display: "flex", gap: 24, justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
-        <div><p className="eyebrow">Built for real operations</p><h2 style={{ margin: "7px 0" }}>Start with your company. Build the records you actually have.</h2><p className="subtle">FleetOS does not invent compliance or operational status. Your workspace grows from recorded evidence.</p></div>
-        <button className="primary-button" onClick={onSignup}>Get started <ArrowRight size={18}/></button>
+        <div><p className="eyebrow">Built for real operations</p><h2 style={{ margin: "7px 0" }}>Start with your company. Build the records you actually have.</h2><p className="subtle">{branding.name} does not invent compliance or operational status. Your workspace grows from recorded evidence.</p><BrandSupport /><PoweredBy /></div>
+        {!branding.companySlug && <button className="primary-button" onClick={onSignup}>Get started <ArrowRight size={18}/></button>}
       </div>
     </section>
   </main>;
 }
+

@@ -4,6 +4,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { api, ACTIVE_WORKSPACE_KEY } from "../lib/api";
 import { supabase } from "../lib/supabase";
 import { OfflineStatus } from "./OfflineStatus";
+import { BrandLogo, PoweredBy, useBranding } from "../lib/branding";
 
 type Role = "DRIVER" | "WORKSHOP_TECHNICIAN" | "TRANSPORT_PLANNER" | "TRANSPORT_MANAGER" | "OFFICE_STAFF" | "FINANCE" | "COMPANY_ADMIN" | "PLATFORM_ADMIN";
 type Workspace = { id: string; name: string; slug: string; role: Role };
@@ -41,7 +42,7 @@ const nav: readonly NavItem[] = [
   ["/organisation/depots", "Depots & Sites", MapPin, companyManagers],
   ["/settings/company", "Company Settings", Building2, companyManagers],
   ["/settings/audit", "Audit Trail", History, companyManagers],
-  ["/settings/medic", "FleetOS Medic", Stethoscope, companyManagers],
+  ["/settings/medic", "System Medic", Stethoscope, companyManagers],
   ["/messages", "Messages", MessageCircle, everyone],
 ] as const;
 
@@ -57,6 +58,7 @@ function routeRoles(pathname: string) {
 }
 
 export function AppShell() {
+  const { branding } = useBranding();
   const location = useLocation();
   const [company, setCompany] = useState<{ id: string; name: string } | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -65,7 +67,10 @@ export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const activeWorkspace = useMemo(() => workspaces.find((item) => item.id === company?.id) ?? null, [workspaces, company]);
-  const visibleNav = useMemo(() => nav.filter(([, , , roles]) => activeWorkspace ? roles.includes(activeWorkspace.role) : false), [activeWorkspace]);
+  const visibleNav = useMemo(() => nav.filter(([path, , , roles]) => {
+    if (path === "/marketplace" && !branding.marketplaceEnabled) return false;
+    return activeWorkspace ? roles.includes(activeWorkspace.role) : false;
+  }), [activeWorkspace, branding.marketplaceEnabled]);
 
   async function load() {
     const [current, all] = await Promise.all([api<{ id: string; name: string }>("/company"), api<Workspace[]>("/company/workspaces")]);
@@ -90,7 +95,7 @@ export function AppShell() {
     switchWorkspace(created.id);
   }
 
-  const companyName = company?.name ?? "FleetOS";
+  const companyName = company?.name ?? branding.name;
   const initials = companyName.split(" ").map((word) => word[0]).join("").slice(0, 2).toUpperCase();
   const role = activeWorkspace?.role;
   const allowedRoles = routeRoles(location.pathname);
@@ -98,13 +103,13 @@ export function AppShell() {
 
   return <div className="app-shell">
     <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
-      <div className="brand"><span className="brand-mark">F</span><span>FleetOS</span><button className="mobile-close" aria-label="Close navigation" onClick={() => setMobileOpen(false)}><X /></button></div>
+      <div className="brand"><BrandLogo /><button className="mobile-close" aria-label="Close navigation" onClick={() => setMobileOpen(false)}><X /></button></div>
       <div style={{ padding: "0 12px 14px" }}>
         <select aria-label="Company workspace" value={company?.id ?? ""} onChange={(event) => switchWorkspace(event.target.value)} style={{ width: "100%", padding: 10, borderRadius: 8 }}>{workspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}</select>
         {role !== "DRIVER" && <button onClick={() => void addWorkspace()} style={{ width: "100%", marginTop: 8 }}><Plus size={15} /> Add company</button>}
       </div>
       <nav>{visibleNav.map(([to, label, Icon]) => <NavLink key={to} to={to} end={to === "/"} onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}><Icon size={20} /><span>{label}</span></NavLink>)}</nav>
-      <div className="sidebar-bottom"><div className="company-dot">{initials}</div><div><strong>{companyName}</strong><small>{role ? roleLabels[role] : "Company workspace"}</small></div></div>
+      <div className="sidebar-bottom"><div className="company-dot">{initials}</div><div><strong>{companyName}</strong><small>{role ? roleLabels[role] : "Company workspace"}</small><PoweredBy /></div></div>
     </aside>
     {mobileOpen && <button className="mobile-overlay" aria-label="Close navigation" onClick={() => setMobileOpen(false)} />}
     <main>
@@ -122,7 +127,7 @@ export function AppShell() {
           {accountOpen && <div className="account-menu">{role && companyManagers.includes(role) && <button onClick={() => { setAccountOpen(false); window.location.href = "/settings/company"; }}><Building2 size={16} /> Company settings</button>}<button onClick={() => { setAccountOpen(false); void supabase.auth.signOut(); }}><LogOut size={16} /> Sign out</button></div>}
         </div>
       </header>
-      {accessDenied ? <main className="loading-page"><div><h1>Access denied</h1><p>Your role does not have access to this FleetOS area.</p><button onClick={() => { window.location.href = role === "DRIVER" ? "/driver" : "/"; }}>Return to your dashboard</button></div></main> : <Outlet />}
+      {accessDenied ? <main className="loading-page"><div><h1>Access denied</h1><p>Your role does not have access to this area.</p><button onClick={() => { window.location.href = role === "DRIVER" ? "/driver" : "/"; }}>Return to your dashboard</button></div></main> : <Outlet />}
     </main>
   </div>;
 }
