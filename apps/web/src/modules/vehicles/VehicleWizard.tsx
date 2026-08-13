@@ -46,12 +46,7 @@ export function VehicleWizard({ onComplete, onCancel }: { onComplete: () => void
   function validateCurrentStep() {
     setError(null);
     if (step === 0 && !form.type) return "Choose a vehicle type.";
-    if (step === 1) {
-      if (!form.registration.trim()) return "Registration is required.";
-      if (["TRUCK", "VAN"].includes(form.type) && (!form.make.trim() || !form.model.trim())) return "Make and model are required for this vehicle type.";
-      if (["TRUCK", "TRAILER"].includes(form.type) && !form.vin.trim()) return "VIN/chassis number is required for this vehicle type.";
-      if (form.type === "TRUCK" && !form.year) return "Year is required for an HGV / Truck.";
-    }
+    if (step === 1 && !form.registration.trim()) return "Enter the vehicle registration before continuing.";
     if (step === 2) {
       if (!form.firstRegisteredAt || !form.acquiredAt) return "First registration and acquired dates are required.";
       if (dateError) return dateError;
@@ -110,10 +105,10 @@ export function VehicleWizard({ onComplete, onCancel }: { onComplete: () => void
         {step === 1 && <div className="form-grid">
           <label>Registration *<input required value={form.registration} onChange={(e) => set("registration", e.target.value)} placeholder="AB12 CDE" /></label>
           <label>Fleet number<input value={form.fleetNumber} onChange={(e) => set("fleetNumber", e.target.value)} placeholder="Optional" /></label>
-          <label>Make {form.type !== "CAR" && form.type !== "OTHER" ? "*" : ""}<input value={form.make} onChange={(e) => set("make", e.target.value)} /></label>
-          <label>Model {form.type !== "CAR" && form.type !== "OTHER" ? "*" : ""}<input value={form.model} onChange={(e) => set("model", e.target.value)} /></label>
-          <label>Year {form.type === "TRUCK" ? "*" : ""}<input type="number" min="1900" max={new Date().getFullYear() + 1} value={form.year} onChange={(e) => set("year", e.target.value)} /></label>
-          <label>VIN / chassis {(["TRUCK", "TRAILER"] as VehicleType[]).includes(form.type) ? "*" : ""}<input value={form.vin} onChange={(e) => set("vin", e.target.value)} /></label>
+          <label>Make<input value={form.make} onChange={(e) => set("make", e.target.value)} /></label>
+          <label>Model<input value={form.model} onChange={(e) => set("model", e.target.value)} /></label>
+          <label>Year<input type="number" min="1900" max={new Date().getFullYear() + 1} value={form.year} onChange={(e) => set("year", e.target.value)} /></label>
+          <label>VIN / chassis<input value={form.vin} onChange={(e) => set("vin", e.target.value)} /></label>
         </div>}
         {step === 2 && <div className="form-grid">
           <label>First registered *<input type="date" max={today} value={form.firstRegisteredAt} onChange={(e) => set("firstRegisteredAt", e.target.value)} /></label>

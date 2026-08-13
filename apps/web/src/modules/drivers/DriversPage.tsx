@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Search, Plus, Trash2 } from "lucide-react";
+import { Search, UserPlus, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
 
 type Driver = {
@@ -13,12 +14,9 @@ type Driver = {
 };
 
 export function DriversPage() {
+  const navigate = useNavigate();
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [search, setSearch] = useState("");
-  const [showForm, setShowForm] = useState(false);
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function load() {
@@ -31,26 +29,6 @@ export function DriversPage() {
   }
 
   useEffect(() => { void load(); }, []);
-
-  async function addDriver(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      await api<Driver>("/drivers", {
-        method: "POST",
-        body: JSON.stringify({ firstName: firstName.trim(), lastName: lastName.trim() }),
-      });
-      setFirstName("");
-      setLastName("");
-      setShowForm(false);
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not add driver");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function remove(id: string) {
     if (!window.confirm("Archive this driver? Their historical records will be kept.")) return;
@@ -72,26 +50,12 @@ export function DriversPage() {
         <div>
           <p className="eyebrow">Fleet operations</p>
           <h1>Drivers</h1>
-          <p className="subtle">Manage tenant-scoped driver records.</p>
+          <p className="subtle">Drivers are created once in Personal, together with their staff details, compliance information and FleetOS login.</p>
         </div>
-        <button className="primary-button" onClick={() => setShowForm(true)}><Plus size={18} /> Add driver</button>
+        <button className="primary-button" onClick={() => navigate("/personal")}><UserPlus size={18} /> Add driver in Personal</button>
       </div>
 
       {error && <div className="panel" style={{ marginBottom: 16, padding: 14, color: "#991b1b" }}>{error}</div>}
-
-      {showForm && (
-        <section className="panel" style={{ marginBottom: 24 }}>
-          <div className="panel-heading"><h2>Add driver</h2></div>
-          <form onSubmit={addDriver} style={{ display: "grid", gap: 12, padding: 16 }}>
-            <label>First name<input required value={firstName} onChange={(e) => setFirstName(e.target.value)} /></label>
-            <label>Last name<input required value={lastName} onChange={(e) => setLastName(e.target.value)} /></label>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button className="primary-button" disabled={busy} type="submit">{busy ? "Saving…" : "Save driver"}</button>
-              <button type="button" className="switch-mode" onClick={() => setShowForm(false)}>Cancel</button>
-            </div>
-          </form>
-        </section>
-      )}
 
       <section className="panel">
         <div className="search" style={{ padding: 16 }}>
@@ -101,8 +65,8 @@ export function DriversPage() {
         {filtered.length === 0 ? (
           <div className="empty-state">
             <h2>No active drivers yet</h2>
-            <p>Add your first driver to the team.</p>
-            <button className="primary-button" onClick={() => setShowForm(true)}><Plus size={18} /> Add driver</button>
+            <p>Add the person in Personal and choose Driver. FleetOS will create their staff record, driver record and optional login together.</p>
+            <button className="primary-button" onClick={() => navigate("/personal")}><UserPlus size={18} /> Add driver in Personal</button>
           </div>
         ) : (
           <div className="job-list">

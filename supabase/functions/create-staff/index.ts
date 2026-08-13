@@ -159,9 +159,11 @@ Deno.serve(async (req) => {
 
           if (!existingMembership) {
             const { error: membershipError } = await admin.from("CompanyMembership").insert({
+              id: crypto.randomUUID(),
               userId: linkedUserId,
               companyId,
               role: roleMap[accessRole],
+              updatedAt: new Date().toISOString(),
             });
             if (membershipError) throw membershipError;
           }
@@ -178,6 +180,7 @@ Deno.serve(async (req) => {
       if (personType === "DRIVER") {
         const { error: driverError } = await admin.from("Driver").insert({
           id: person.id,
+          personId: person.id,
           companyId,
           firstName: firstName.trim(),
           lastName: lastName.trim(),
@@ -196,10 +199,18 @@ Deno.serve(async (req) => {
           emergencyPhone: emergencyPhone?.trim() || null,
           startDate: startDate || null,
           isActive: true,
+          updatedAt: new Date().toISOString(),
         });
         if (driverError) throw driverError;
       }
     } catch (error) {
+      console.error("create-staff transaction failed", {
+        companyId,
+        personId: person.id,
+        personType,
+        inviteAccount: !!inviteAccount,
+        error: error instanceof Error ? error.message : String(error),
+      });
       await admin.from("Driver").delete().eq("id", person.id).eq("companyId", companyId);
       await admin.from("Person").delete().eq("id", person.id).eq("companyId", companyId);
       return json({ error: error instanceof Error ? error.message : "Could not create staff record" }, 400);

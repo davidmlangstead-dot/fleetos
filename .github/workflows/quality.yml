@@ -19,7 +19,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @fleetros/api prisma generate
+      - run: pnpm --filter @fleetros/api exec prisma generate
       - run: pnpm build
 
   production-smoke:
