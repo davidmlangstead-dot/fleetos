@@ -1,81 +1,41 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Archive, Check, MessageCircle, Search, Settings2, Users } from "lucide-react";
 import { api } from "../../lib/api";
 
-type Member = { id:string; email:string; firstName:string|null; lastName:string|null; role:string };
-type Conversation = { id:string; title:string; lastMessage:string|null; lastMessageAt:string|null; memberCount:number };
-type Message = { id:string; body:string; createdAt:string; senderUserId:string; senderEmail:string|null; senderFirstName:string|null; senderLastName:string|null };
+type Member={id:string;email:string;firstName:string|null;lastName:string|null;role:string};
+type Conversation={id:string;title:string;createdById:string;lastMessage:string|null;lastMessageAt:string|null;memberCount:number;unreadCount:number;archivedAt:string|null};
+type Message={id:string;body:string;createdAt:string;senderUserId:string;senderEmail:string|null;senderFirstName:string|null;senderLastName:string|null};
+type ThreadDetail={conversation:{id:string;title:string;createdById:string;archivedAt:string|null};messages:Message[];members:Array<Member&{joinedAt:string}>};
+function displayMember(member:Member){const name=[member.firstName,member.lastName].filter(Boolean).join(" ");return name||member.email;}
+function displaySender(message:Message){const name=[message.senderFirstName,message.senderLastName].filter(Boolean).join(" ");return name||message.senderEmail||"FleetOS user";}
 
-function displayMember(member: Member) {
-  const name = [member.firstName,member.lastName].filter(Boolean).join(" ");
-  return name || member.email;
-}
-function displaySender(message: Message) {
-  const name = [message.senderFirstName,message.senderLastName].filter(Boolean).join(" ");
-  return name || message.senderEmail || "FleetOS user";
-}
+export function MessagesPage(){
+  const [members,setMembers]=useState<Member[]>([]);const [conversations,setConversations]=useState<Conversation[]>([]);const [active,setActive]=useState<Conversation|null>(null);const [detail,setDetail]=useState<ThreadDetail|null>(null);
+  const [newTitle,setNewTitle]=useState("");const [selectedMembers,setSelectedMembers]=useState<string[]>([]);const [editMembers,setEditMembers]=useState<string[]>([]);const [body,setBody]=useState("");const [search,setSearch]=useState("");
+  const [showCreate,setShowCreate]=useState(false);const [showSettings,setShowSettings]=useState(false);const [showArchived,setShowArchived]=useState(false);const [error,setError]=useState("");const [busy,setBusy]=useState(false);
+  async function loadConversations(archived=showArchived){const [m,c]=await Promise.all([api<Member[]>("/messages/members"),api<Conversation[]>(`/messages${archived?"?archived=true":""}`)]);setMembers(m);setConversations(c);if(active)setActive(c.find(x=>x.id===active.id)??null);}
+  async function openConversation(conversation:Conversation){setActive({...conversation,unreadCount:0});setError("");setShowSettings(false);try{const response=await api<ThreadDetail>(`/messages/${conversation.id}`);setDetail(response);setEditMembers(response.members.map(m=>m.id));setConversations(v=>v.map(c=>c.id===conversation.id?{...c,unreadCount:0}:c));}catch(e){setError(e instanceof Error?e.message:"Could not load messages.");}}
+  useEffect(()=>{void loadConversations(false).catch(e=>setError(e instanceof Error?e.message:"Could not load conversations."));},[]);
+  const filtered=useMemo(()=>conversations.filter(c=>`${c.title} ${c.lastMessage||""}`.toLowerCase().includes(search.toLowerCase())),[conversations,search]);
 
-export function MessagesPage() {
-  const [members,setMembers] = useState<Member[]>([]);
-  const [conversations,setConversations] = useState<Conversation[]>([]);
-  const [active,setActive] = useState<Conversation|null>(null);
-  const [messages,setMessages] = useState<Message[]>([]);
-  const [newTitle,setNewTitle] = useState("");
-  const [selectedMembers,setSelectedMembers] = useState<string[]>([]);
-  const [body,setBody] = useState("");
-  const [error,setError] = useState("");
-  const [busy,setBusy] = useState(false);
-
-  async function loadConversations() {
-    const [m,c] = await Promise.all([api<Member[]>("/messages/members"),api<Conversation[]>("/messages")]);
-    setMembers(m); setConversations(c);
-    if (active) setActive(c.find(x=>x.id===active.id) ?? null);
-  }
-  async function openConversation(conversation: Conversation) {
-    setActive(conversation); setError("");
-    try { setMessages(await api<Message[]>(`/messages/${conversation.id}`)); }
-    catch(e) { setError(e instanceof Error ? e.message : "Could not load messages."); }
-  }
-  useEffect(()=>{ void loadConversations().catch(e=>setError(e instanceof Error?e.message:"Could not load conversations.")); },[]);
-
-  async function createConversation(e:FormEvent) {
-    e.preventDefault();
-    if(!newTitle.trim()) return setError("Conversation title is required.");
-    setBusy(true); setError("");
-    try {
-      const created = await api<Conversation>("/messages",{method:"POST",body:JSON.stringify({title:newTitle.trim(),memberUserIds:selectedMembers})});
-      setNewTitle(""); setSelectedMembers([]); await loadConversations(); await openConversation(created);
-    } catch(e) { setError(e instanceof Error?e.message:"Could not create conversation."); }
-    finally { setBusy(false); }
-  }
-
-  async function send(e:FormEvent) {
-    e.preventDefault();
-    if(!active || !body.trim()) return;
-    setBusy(true); setError("");
-    try { await api(`/messages/${active.id}`,{method:"POST",body:JSON.stringify({body:body.trim()})}); setBody(""); await openConversation(active); await loadConversations(); }
-    catch(e) { setError(e instanceof Error?e.message:"Could not send message."); }
-    finally { setBusy(false); }
-  }
-
-  function toggleMember(id:string) { setSelectedMembers(v=>v.includes(id)?v.filter(x=>x!==id):[...v,id]); }
+  async function createConversation(e:FormEvent){e.preventDefault();if(!newTitle.trim())return setError("Conversation title is required.");setBusy(true);setError("");try{const created=await api<Conversation>("/messages",{method:"POST",body:JSON.stringify({title:newTitle.trim(),memberUserIds:selectedMembers})});setNewTitle("");setSelectedMembers([]);setShowCreate(false);await loadConversations();await openConversation(created);}catch(e){setError(e instanceof Error?e.message:"Could not create conversation.");}finally{setBusy(false);}}
+  async function send(e:FormEvent){e.preventDefault();if(!active||!body.trim())return;setBusy(true);setError("");try{await api(`/messages/${active.id}`,{method:"POST",body:JSON.stringify({body:body.trim()})});setBody("");await openConversation(active);await loadConversations();}catch(e){setError(e instanceof Error?e.message:"Could not send message.");}finally{setBusy(false);}}
+  async function saveMembers(){if(!active)return;setBusy(true);setError("");try{await api(`/messages/${active.id}/members`,{method:"PUT",body:JSON.stringify({memberUserIds:editMembers})});await openConversation(active);await loadConversations();setShowSettings(false);}catch(e){setError(e instanceof Error?e.message:"Could not update participants.");}finally{setBusy(false);}}
+  async function rename(){if(!active)return;const title=window.prompt("Conversation title",active.title);if(!title?.trim())return;setBusy(true);try{await api(`/messages/${active.id}`,{method:"PATCH",body:JSON.stringify({title:title.trim()})});await loadConversations();setActive({...active,title:title.trim()});if(detail)setDetail({...detail,conversation:{...detail.conversation,title:title.trim()}});}catch(e){setError(e instanceof Error?e.message:"Could not rename conversation.");}finally{setBusy(false);}}
+  async function archive(){if(!active)return;if(!window.confirm("Archive this conversation for the company? Its message history will be kept."))return;setBusy(true);try{await api(`/messages/${active.id}`,{method:"PATCH",body:JSON.stringify({archived:true})});setActive(null);setDetail(null);await loadConversations();}catch(e){setError(e instanceof Error?e.message:"Could not archive conversation.");}finally{setBusy(false);}}
+  function toggle(id:string,setter:(next:string[])=>void,current:string[]){setter(current.includes(id)?current.filter(x=>x!==id):[...current,id]);}
 
   return <section className="page">
-    <div className="page-heading"><div><p className="eyebrow">Company messaging</p><h1>Messages</h1><p className="subtle">Private workspace conversations. Only selected participants from this company can open each thread.</p></div></div>
-    {error && <div className="panel" style={{padding:14,marginBottom:16,borderColor:"#dc2626",color:"#991b1b"}}>{error}</div>}
+    <div className="page-heading"><div><p className="eyebrow">Company messaging</p><h1>Messages</h1><p className="subtle">Private team conversations with unread tracking and controlled participants inside the selected company.</p></div><button className="primary-button" onClick={()=>setShowCreate(v=>!v)}><MessageCircle size={18}/> New conversation</button></div>
+    {error&&<p role="alert" className="form-message error">{error}</p>}
+    {showCreate&&<form className="panel" onSubmit={createConversation} style={{padding:18,marginBottom:18}}><h2>Start a conversation</h2><div className="form-grid" style={{marginTop:14}}><label>Title *<input required maxLength={120} value={newTitle} onChange={e=>setNewTitle(e.target.value)} placeholder="Workshop team / job handover"/></label><div><strong>Participants</strong><div style={{display:"grid",gap:6,marginTop:8,maxHeight:180,overflow:"auto"}}>{members.map(member=><label key={member.id} style={{display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={selectedMembers.includes(member.id)} onChange={()=>toggle(member.id,setSelectedMembers,selectedMembers)}/><span>{displayMember(member)} <small className="subtle">Â· {member.role.replaceAll("_"," ")}</small></span></label>)}</div></div></div><button className="primary-button" disabled={busy}>{busy?"Creatingâ€¦":"Create conversation"}</button></form>}
     <div style={{display:"grid",gridTemplateColumns:"minmax(280px,360px) minmax(0,1fr)",gap:18,alignItems:"start"}}>
-      <div style={{display:"grid",gap:16}}>
-        <form className="panel" onSubmit={createConversation} style={{padding:16}}>
-          <h2>New conversation</h2>
-          <label>Title<input required maxLength={120} value={newTitle} onChange={e=>setNewTitle(e.target.value)} placeholder="Workshop / office / job team"/></label>
-          <div style={{display:"grid",gap:6,marginTop:12,maxHeight:220,overflow:"auto"}}>{members.map(member=><label key={member.id} style={{display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={selectedMembers.includes(member.id)} onChange={()=>toggleMember(member.id)}/><span>{displayMember(member)} <small className="subtle">· {member.role.replaceAll("_"," ")}</small></span></label>)}</div>
-          <button className="primary-button" disabled={busy} style={{marginTop:14}}>{busy?"Creating…":"Create conversation"}</button>
-        </form>
-        <section className="panel"><div className="panel-heading"><h2>Conversations</h2></div><div style={{display:"grid",gap:8,padding:12}}>{conversations.length===0?<p className="subtle">No conversations yet.</p>:conversations.map(c=><button key={c.id} type="button" onClick={()=>void openConversation(c)} style={{textAlign:"left",padding:12,borderRadius:10,border:active?.id===c.id?"2px solid #2563eb":"1px solid #e5e7eb",background:"white"}}><strong>{c.title}</strong><div className="subtle">{c.lastMessage || `${c.memberCount} participants`}</div></button>)}</div></section>
-      </div>
-      <section className="panel" style={{minHeight:560}}>{!active?<div className="empty-state" style={{padding:40}}><h2>Select a conversation</h2><p className="subtle">Create a company thread or open one you already belong to.</p></div>:<>
-        <div className="panel-heading"><div><h2>{active.title}</h2><p className="subtle">{active.memberCount} participants</p></div></div>
-        <div style={{display:"grid",gap:10,padding:16,maxHeight:420,overflow:"auto"}}>{messages.length===0?<p className="subtle">No messages yet.</p>:messages.map(m=><article key={m.id} style={{padding:12,borderRadius:12,background:"#f8fafc"}}><div style={{display:"flex",justifyContent:"space-between",gap:10}}><strong>{displaySender(m)}</strong><small className="subtle">{new Date(m.createdAt).toLocaleString("en-GB")}</small></div><p style={{whiteSpace:"pre-wrap",marginBottom:0}}>{m.body}</p></article>)}</div>
-        <form onSubmit={send} style={{display:"flex",gap:10,padding:16,borderTop:"1px solid #e5e7eb"}}><input style={{flex:1}} maxLength={5000} value={body} onChange={e=>setBody(e.target.value)} placeholder="Write a message…"/><button className="primary-button" disabled={busy||!body.trim()}>Send</button></form>
+      <section className="panel"><div style={{padding:12,display:"grid",gap:10}}><div className="search"><Search size={18}/><input placeholder="Search conversationsâ€¦" value={search} onChange={e=>setSearch(e.target.value)}/></div><label style={{display:"flex",gap:8,alignItems:"center",fontSize:13}}><input type="checkbox" checked={showArchived} onChange={e=>{setShowArchived(e.target.checked);setActive(null);setDetail(null);void loadConversations(e.target.checked).catch(err=>setError(err instanceof Error?err.message:"Could not load conversations."));}}/> Include archived</label></div><div className="job-list">{filtered.length===0?<div className="empty-state" style={{margin:"40px auto"}}><h2>No conversations</h2><p>Start a private company thread above.</p></div>:filtered.map(c=><button key={c.id} type="button" onClick={()=>void openConversation(c)} style={{width:"100%",textAlign:"left",padding:14,border:0,borderBottom:"1px solid #edf0f4",background:active?.id===c.id?"#eef6ff":"white",cursor:"pointer",opacity:c.archivedAt?.7:1}}><div style={{display:"flex",justifyContent:"space-between",gap:8}}><strong>{c.title}</strong>{c.unreadCount>0&&<span className="notification-badge" style={{position:"static",minWidth:20}}>{c.unreadCount}</span>}</div><div className="subtle" style={{whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.lastMessage||`${c.memberCount} participants`}</div></button>)}</div></section>
+      <section className="panel" style={{minHeight:570}}>{!active||!detail?<div className="empty-state"><MessageCircle size={32}/><h2>Select a conversation</h2><p>Open a thread to see its participants and message history.</p></div>:<>
+        <div className="panel-heading"><div><h2>{active.title}</h2><p>{detail.members.length} participants{active.archivedAt?" Â· archived":""}</p></div><div style={{display:"flex",gap:8}}><button className="icon-button" title="Conversation settings" onClick={()=>setShowSettings(v=>!v)}><Settings2 size={19}/></button></div></div>
+        {showSettings&&<div style={{padding:16,borderTop:"1px solid #edf0f4",borderBottom:"1px solid #edf0f4",background:"#f8fafc"}}><div style={{display:"flex",gap:8,alignItems:"center",marginBottom:10}}><Users size={18}/><strong>Participants</strong></div><div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:7,maxHeight:180,overflow:"auto"}}>{members.map(member=><label key={member.id} style={{display:"flex",gap:8,alignItems:"center"}}><input type="checkbox" checked={editMembers.includes(member.id)} onChange={()=>toggle(member.id,setEditMembers,editMembers)}/>{displayMember(member)}</label>)}</div><div style={{display:"flex",gap:8,marginTop:12,flexWrap:"wrap"}}><button className="primary-button" disabled={busy} onClick={()=>void saveMembers()}><Check size={16}/> Save participants</button><button className="secondary-button" onClick={()=>void rename()}>Rename</button><button className="secondary-button" onClick={()=>void archive()}><Archive size={16}/> Archive</button></div></div>}
+        <div style={{display:"grid",gap:10,padding:16,maxHeight:405,overflow:"auto"}}>{detail.messages.length===0?<p className="subtle">No messages yet.</p>:detail.messages.map(m=><article key={m.id} style={{padding:12,borderRadius:12,background:"#f8fafc"}}><div style={{display:"flex",justifyContent:"space-between",gap:10}}><strong>{displaySender(m)}</strong><small className="subtle">{new Date(m.createdAt).toLocaleString("en-GB")}</small></div><p style={{whiteSpace:"pre-wrap",marginBottom:0}}>{m.body}</p></article>)}</div>
+        <form onSubmit={send} style={{display:"flex",gap:10,padding:16,borderTop:"1px solid #e5e7eb"}}><input style={{flex:1}} maxLength={5000} value={body} onChange={e=>setBody(e.target.value)} placeholder={active.archivedAt?"Archived conversation":"Write a messageâ€¦"} disabled={!!active.archivedAt}/><button className="primary-button" disabled={busy||!body.trim()||!!active.archivedAt}>Send</button></form>
       </>}</section>
     </div>
   </section>;
