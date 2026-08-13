@@ -125,13 +125,13 @@ driverOperationsRouter.get("/me", driverOnly, asyncHandler(async (req, res) => {
   const companyId = req.user!.companyId;
   const [vehicles, jobs, checks, breakdowns, absences, training] = await Promise.all([
     prisma.vehicle.findMany({ where: { companyId, status: "ACTIVE" }, select: { id: true, registration: true, type: true, mileage: true, status: true }, orderBy: { registration: "asc" } }),
-    prisma.job.findMany({ where: { companyId, driverId: driver.id, status: { notIn: ["CANCELLED"] } }, select: { id: true, jobNumber: true, customerName: true, collectionAddress: true, collectionPostcode: true, deliveryAddress: true, deliveryPostcode: true, collectionDateTime: true, deliveryDateTime: true, status: true, instructions: true, vehicle: { select: { id: true, registration: true } } }, orderBy: { collectionDateTime: "asc" }, take: 50 }),
+    prisma.job.findMany({ where: { companyId, driverId: driver.id, status: { notIn: ["CANCELLED", "CLOSED"] } }, select: { id: true, jobNumber: true, title: true, customerName: true, collectionAddress: true, collectionPostcode: true, deliveryAddress: true, deliveryPostcode: true, scheduledStart: true, scheduledEnd: true, collectionDateTime: true, deliveryDateTime: true, status: true, instructions: true, vehicle: { select: { id: true, registration: true } } }, orderBy: { scheduledStart: "asc" }, take: 50 }),
     prisma.$queryRaw<Array<Record<string, unknown>>>`SELECT c.id::text,c.status,c."nilDefect",c."roadworthyConfirmed",c.odometer,c.location,c.items,c."completedAt",c."durationSeconds",v.registration,t.registration AS "trailerRegistration" FROM "DriverWalkaroundCheck" c JOIN "Vehicle" v ON v.id=c."vehicleId" LEFT JOIN "Vehicle" t ON t.id=c."trailerVehicleId" WHERE c."companyId"=${companyId} AND c."driverId"=${driver.id} ORDER BY c."completedAt" DESC LIMIT 30`,
     prisma.$queryRaw<Array<Record<string, unknown>>>`SELECT b.id::text,b.severity,b.status,b.location,b.description,b."canMove",b."occupantsSafe",b."reportedAt",b."resolutionNotes",v.registration FROM "DriverBreakdown" b JOIN "Vehicle" v ON v.id=b."vehicleId" WHERE b."companyId"=${companyId} AND b."driverId"=${driver.id} ORDER BY b."reportedAt" DESC LIMIT 30`,
     prisma.$queryRaw<Array<Record<string, unknown>>>`SELECT id::text,type,status,"startsOn","endsOn",reason,"officeNotes","createdAt" FROM "StaffAbsenceRequest" WHERE "companyId"=${companyId} AND "driverId"=${driver.id} ORDER BY "startsOn" DESC LIMIT 50`,
     prisma.$queryRaw<Array<Record<string, unknown>>>`SELECT id::text,title,category,status,provider,"dueDate","bookedDate","completedDate","expiryDate",notes FROM "DriverTrainingRecord" WHERE "companyId"=${companyId} AND "driverId"=${driver.id} ORDER BY COALESCE("dueDate","bookedDate","expiryDate") ASC NULLS LAST LIMIT 100`,
   ]);
-  res.json({ driver, vehicles, jobs: jobs.map(job => ({ ...job, reference: job.jobNumber, scheduledAt: job.collectionDateTime ?? job.deliveryDateTime })), checks, breakdowns, absences, training });
+  res.json({ driver, vehicles, jobs: jobs.map(job => ({ ...job, reference: job.jobNumber, scheduledAt: job.scheduledStart ?? job.collectionDateTime ?? job.deliveryDateTime })), checks, breakdowns, absences, training });
 }));
 
 driverOperationsRouter.get("/check-template", driverOnly, asyncHandler(async (req, res) => {
@@ -215,14 +215,12 @@ driverOperationsRouter.post("/absences", driverOnly, asyncHandler(async (req, re
 }));
 
 driverOperationsRouter.patch("/jobs/:id/status", driverOnly, asyncHandler(async (req, res) => {
-  const status = z.enum(["IN_PROGRESS", "DELIVERED"]).parse(req.body?.status);
+  const status = z.enum(["TRAVELLING", "ON_SITE", "PAUSED", "COMPLETED", "COMPLETED_ISSUES"]).parse(req.body?.status);
   const driver = await requireCurrentDriver(req.user!.companyId, req.user!.email);
   if (!driver) return res.status(404).json({ error: "No active driver profile is linked to this login" });
   const job = await prisma.job.findFirst({ where: { id: req.params.id, companyId: req.user!.companyId, driverId: driver.id } });
   if (!job) return res.status(404).json({ error: "Assigned job not found" });
-  if (status === "IN_PROGRESS" && !["ASSIGNED", "PLANNED"].includes(job.status)) return res.status(409).json({ error: "This job cannot be started from its current status" });
-  if (status === "DELIVERED" && job.status !== "IN_PROGRESS") return res.status(409).json({ error: "Start the job before marking it delivered" });
-  const updated = await prisma.job.update({ where: { id: job.id }, data: { status } });
+  const updated = await prisma.job.update({ where: { id: job.id }, data: { status, completedAt: ["COMPLETED", "COMPLETED_ISSUES"].includes(status) ? new Date() : undefined } });
   await writeAuditEvent({ companyId: req.user!.companyId, actorUserId: req.user!.id, actorEmail: req.user!.email, action: "UPDATE", entityType: "JOB", entityId: job.id, summary: `Driver moved job ${job.jobNumber ?? job.id} to ${status}` });
   res.json({ id: updated.id, status: updated.status });
 }));

@@ -3,7 +3,6 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import { DashboardPageClean } from "./modules/dashboard/DashboardPageClean";
 import { VehiclesPage } from "./modules/vehicles/VehiclesPage";
-import { JobsPage } from "./modules/jobs/JobsPage";
 import { DriversPage } from "./modules/drivers/DriversPage";
 import { PersonalPage } from "./modules/personal/PersonalPage";
 import { HoursBoardPage } from "./modules/operations/HoursBoardPage";
@@ -21,6 +20,8 @@ import { MedicPage } from "./modules/medic/MedicPage";
 
 const DriverCockpitPage = lazy(() => import("./modules/driver/DriverCockpitPage").then(module => ({ default: module.DriverCockpitPage })));
 const DriverOperationsOfficePage = lazy(() => import("./modules/driver/DriverOperationsOfficePage").then(module => ({ default: module.DriverOperationsOfficePage })));
+const JobsPage = lazy(() => import("./modules/jobs/JobsPage").then(module => ({ default: module.JobsPage })));
+const MyWorkPage = lazy(() => import("./modules/jobs/MyWorkPage").then(module => ({ default: module.MyWorkPage })));
 const driverFallback = <main className="loading-page"><div><h1>Loading Driver Operations</h1></div></main>;
 
 export const router = createBrowserRouter([{ element: <AppShell />, children: [
@@ -28,7 +29,8 @@ export const router = createBrowserRouter([{ element: <AppShell />, children: [
   { path: "/driver", element: <Suspense fallback={driverFallback}><DriverCockpitPage /></Suspense> },
   { path: "/driver-operations", element: <Suspense fallback={driverFallback}><DriverOperationsOfficePage /></Suspense> },
   { path: "/hours", element: <HoursBoardPage /> },
-  { path: "/jobs", element: <JobsPage /> },
+  { path: "/jobs", element: <Suspense fallback={driverFallback}><JobsPage /></Suspense> },
+  { path: "/my-work", element: <Suspense fallback={driverFallback}><MyWorkPage /></Suspense> },
   { path: "/vehicles", element: <VehiclesPage /> },
   { path: "/drivers", element: <DriversPage /> },
   { path: "/personal", element: <PersonalPage /> },

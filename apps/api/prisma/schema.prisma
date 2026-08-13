@@ -34,10 +34,19 @@ enum VehicleStatus {
 }
 
 enum JobStatus {
+  DRAFT
   PLANNED
   ASSIGNED
+  SCHEDULED
+  DISPATCHED
+  TRAVELLING
+  ON_SITE
+  PAUSED
   IN_PROGRESS
   DELIVERED
+  COMPLETED
+  COMPLETED_ISSUES
+  CLOSED
   CANCELLED
 }
 
@@ -194,6 +203,31 @@ model Driver {
 model Job {
   id                 String      @id @default(cuid())
   companyId          String
+  jobTypeId          String?     @db.Uuid
+  title              String?
+  description        String?
+  priority           String      @default("NORMAL")
+  source             String      @default("OFFICE")
+  customerId         String?     @db.Uuid
+  siteId             String?     @db.Uuid
+  assetId            String?     @db.Uuid
+  contactName        String?
+  contactPhone       String?
+  contactEmail       String?
+  scheduledStart     DateTime?
+  scheduledEnd       DateTime?
+  dueAt              DateTime?
+  estimatedDurationMinutes Int?
+  purchaseOrderNumber String?
+  quotePence         Int?
+  estimatedCostPence Int?
+  customFields       Json        @default("{}")
+  workflowSnapshot   Json        @default("[]")
+  worksheetSchema    Json        @default("[]")
+  worksheetResponses Json        @default("{}")
+  riskAssessment     Json        @default("{}")
+  customerSignature  Json        @default("{}")
+  completedAt        DateTime?
   vehicleId          String?
   driverId           String?
   jobNumber          String?
@@ -324,3 +358,4 @@ model RegisterItem {
   @@index([companyId, module, archivedAt])
   @@index([companyId, dueAt])
 }
+

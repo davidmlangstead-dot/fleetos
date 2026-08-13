@@ -1,86 +1,29 @@
-import { useEffect, useState } from "react";
-import { Search, Plus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { CalendarDays, KanbanSquare, List, Plus, Search, Settings2, Users } from "lucide-react";
 import { api } from "../../lib/api";
+import { JobDetails } from "./JobDetails";
+import { JobTypeManager } from "./JobTypeManager";
 import { JobWizard } from "./JobWizard";
+import type { JobConfig, JobRow } from "./types";
 
-type JobRow = {
-  id: string;
-  reference?: string | null;
-  jobNumber?: string | null;
-  customerName?: string | null;
-  collectionAddress?: string | null;
-  deliveryAddress?: string | null;
-  status: string;
-  scheduledAt?: string | null;
-};
+type View="BOARD"|"LIST"|"TYPES";
+const boardColumns=[{key:"BACKLOG",name:"Backlog",statuses:["DRAFT","PLANNED","ASSIGNED"]},{key:"SCHEDULED",name:"Scheduled",statuses:["SCHEDULED","DISPATCHED"]},{key:"ACTIVE",name:"In progress",statuses:["TRAVELLING","ON_SITE","PAUSED","IN_PROGRESS"]},{key:"COMPLETE",name:"Completed",statuses:["DELIVERED","COMPLETED","COMPLETED_ISSUES","CLOSED"]}];
+const label=(value:string)=>value.replaceAll("_"," ");const date=(value:string|null)=>value?new Date(value).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"}):"Unscheduled";
 
-export function JobsPage() {
-  const [jobs, setJobs] = useState<JobRow[]>([]);
-  const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [showWizard, setShowWizard] = useState(false);
-
-  async function load() {
-    try {
-      setJobs(await api<JobRow[]>("/jobs"));
-      setError("");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load jobs");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void load();
-  }, []);
-
-  const filtered = jobs.filter((job) => {
-    const reference = job.reference ?? job.jobNumber ?? "";
-    return reference.toLowerCase().includes(search.toLowerCase()) || (job.customerName ?? "").toLowerCase().includes(search.toLowerCase());
-  });
-
-  return (
-    <section className="page">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">Fleet operations</p>
-          <h1>Jobs</h1>
-          <p className="subtle">Track collections and deliveries in the active company workspace.</p>
-        </div>
-        <button className="primary-button" onClick={() => setShowWizard(true)}><Plus size={18} /> Create job</button>
-      </div>
-      {error && <div className="panel" style={{ padding: 14, marginBottom: 16, color: "#991b1b" }}>{error}</div>}
-      {showWizard && <JobWizard onCancel={() => setShowWizard(false)} onComplete={() => { setShowWizard(false); setLoading(true); void load(); }} />}
-      {!showWizard && <section className="panel">
-        <div className="search" style={{ padding: 16 }}>
-          <Search size={19} />
-          <input placeholder="Search jobs…" value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
-        {loading && <p className="empty-line" style={{ padding: 24 }}>Loading jobs…</p>}
-        {!loading && filtered.length === 0 && (
-          <div className="empty-state">
-            <h2>No jobs yet</h2>
-            <p>Create your first delivery or collection job.</p>
-            <button className="primary-button" onClick={() => setShowWizard(true)}><Plus size={18} /> Create job</button>
-          </div>
-        )}
-        {!loading && filtered.length > 0 && (
-          <div className="job-list">
-            {filtered.map((job) => (
-              <div className="job-row" key={job.id}>
-                <div>
-                  <strong>{job.reference ?? job.jobNumber ?? "—"}</strong>
-                  <p>{job.customerName || "No customer"} · {job.collectionAddress || "Collection not set"} → {job.deliveryAddress || "Delivery not set"}</p>
-                </div>
-                <span className={`status ${job.status === "DELIVERED" ? "success" : "warning"}`}>{job.status}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>}
-    </section>
-  );
+export function JobsPage(){
+  const [jobs,setJobs]=useState<JobRow[]>([]);const [config,setConfig]=useState<JobConfig|null>(null);const [view,setView]=useState<View>("BOARD");const [search,setSearch]=useState("");const [trade,setTrade]=useState("ALL");const [loading,setLoading]=useState(true);const [error,setError]=useState("");const [showWizard,setShowWizard]=useState(false);const [selected,setSelected]=useState<string|null>(null);
+  async function load(){setError("");try{const [nextJobs,nextConfig]=await Promise.all([api<JobRow[]>("/jobs"),api<JobConfig>("/jobs/config")]);setJobs(nextJobs);setConfig(nextConfig);}catch(reason){setError(reason instanceof Error?reason.message:"Could not load jobs.");}finally{setLoading(false);}}
+  useEffect(()=>{void load();},[]);
+  const filtered=useMemo(()=>jobs.filter(job=>{const term=search.toLowerCase();return (!term||[job.reference,job.title,job.customerName,job.siteName,job.siteAddress,...job.assignments.map(a=>a.name)].some(value=>String(value??"").toLowerCase().includes(term)))&&(trade==="ALL"||job.trade===trade);}),[jobs,search,trade]);
+  const metrics=useMemo(()=>({open:jobs.filter(job=>!["COMPLETED","CLOSED","CANCELLED","DELIVERED"].includes(job.status)).length,today:jobs.filter(job=>job.scheduledStart&&new Date(job.scheduledStart).toDateString()===new Date().toDateString()).length,unassigned:jobs.filter(job=>!job.assignments.length&&!job.registration).length,urgent:jobs.filter(job=>["URGENT","EMERGENCY"].includes(job.priority)&&!["COMPLETED","CLOSED","CANCELLED"].includes(job.status)).length}),[jobs]);
+  if(selected)return <JobDetails id={selected} onClose={()=>setSelected(null)} onChanged={load}/>;
+  return <section className="page jobs-page"><div className="page-heading"><div><p className="eyebrow">Field service operations</p><h1>Jobs & work orders</h1><p className="subtle">Run any trade, contract or transport workflow from booking through field completion and cost control.</p></div><button className="primary-button" onClick={()=>setShowWizard(true)}><Plus/> Create job</button></div>{error&&<p role="alert" className="form-message error">{error}</p>}
+    <div className="job-metrics"><article className="panel"><span>Open work</span><strong>{metrics.open}</strong></article><article className="panel"><span>Today</span><strong>{metrics.today}</strong></article><article className="panel"><span>Unallocated</span><strong>{metrics.unassigned}</strong></article><article className="panel"><span>Urgent / emergency</span><strong>{metrics.urgent}</strong></article></div>
+    {showWizard&&config&&<JobWizard config={config} onCancel={()=>setShowWizard(false)} onComplete={()=>{setShowWizard(false);setLoading(true);void load();}}/>}
+    {!showWizard&&<><nav className="job-view-tabs"><button className={view==="BOARD"?"active":""} onClick={()=>setView("BOARD")}><KanbanSquare/> Workflow board</button><button className={view==="LIST"?"active":""} onClick={()=>setView("LIST")}><List/> Job register</button><button className={view==="TYPES"?"active":""} onClick={()=>setView("TYPES")}><Settings2/> Job types</button></nav>{view!=="TYPES"&&<div className="job-toolbar panel"><div className="search"><Search/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search reference, customer, site or assignee…"/></div><select value={trade} onChange={e=>setTrade(e.target.value)}><option value="ALL">All trades</option>{[...new Set(config?.jobTypes.map(type=>type.trade)??[])].map(value=><option key={value}>{value}</option>)}</select><span>{filtered.length} jobs</span></div>}
+      {view==="TYPES"&&config&&<JobTypeManager types={config.jobTypes} onSaved={load}/>} {loading&&<p className="empty-line">Loading jobs…</p>}
+      {!loading&&view==="BOARD"&&<div className="job-board">{boardColumns.map(column=>{const items=filtered.filter(job=>column.statuses.includes(job.status));return <section key={column.key}><header><h2>{column.name}</h2><span>{items.length}</span></header><div>{items.map(job=><button className="job-card panel" key={job.id} onClick={()=>setSelected(job.id)} style={{"--job-colour":job.colour??"#718094"} as React.CSSProperties}><div><span className="job-colour"></span><small>{job.jobTypeName??job.trade??"Job"}</small><em className={`job-priority ${job.priority.toLowerCase()}`}>{job.priority}</em></div><strong>{job.reference} · {job.title}</strong><p>{job.customerName}</p><p>{job.siteName||job.siteAddress}</p><footer><span><CalendarDays/> {date(job.scheduledStart)}</span><span><Users/> {job.assignments.length?job.assignments.map(person=>person.name).join(", "):"Unallocated"}</span></footer></button>)}{!items.length&&<p className="board-empty">No jobs</p>}</div></section>})}</div>}
+      {!loading&&view==="LIST"&&<section className="panel job-register"><div className="job-register-row heading"><span>Work order</span><span>Customer / site</span><span>Schedule / team</span><span>Status</span><span>Value</span></div>{filtered.map(job=><button className="job-register-row" key={job.id} onClick={()=>setSelected(job.id)}><span><strong>{job.reference}</strong><small>{job.jobTypeName} · {job.title}</small></span><span><strong>{job.customerName}</strong><small>{job.siteName||job.siteAddress}</small></span><span><strong>{date(job.scheduledStart)}</strong><small>{job.assignments.map(person=>person.name).join(", ")||"Unallocated"}</small></span><span><em className={`driver-status ${job.status.toLowerCase()}`}>{label(job.status)}</em><small>{job.priority}</small></span><span><strong>{job.quotePence?new Intl.NumberFormat("en-GB",{style:"currency",currency:"GBP"}).format(job.quotePence/100):"—"}</strong><small>{job.purchaseOrderNumber||"No PO"}</small></span></button>)}{!filtered.length&&<div className="empty-state"><h2>No matching jobs</h2><p>Create a work order or change the filters.</p><button className="primary-button" onClick={()=>setShowWizard(true)}><Plus/> Create job</button></div>}</section>}
+    </>}
+  </section>;
 }
-

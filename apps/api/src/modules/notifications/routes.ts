@@ -5,7 +5,7 @@ import { requireAuth } from "../../middleware/auth.js";
 
 type Alert = {
   id: string;
-  kind: "COMPLIANCE" | "DEFECT" | "MAINTENANCE" | "MEDIC" | "DRIVER";
+  kind: "COMPLIANCE" | "DEFECT" | "MAINTENANCE" | "MEDIC" | "DRIVER" | "JOB";
   severity: "INFO" | "WARNING" | "CRITICAL";
   title: string;
   detail: string | null;
@@ -16,12 +16,14 @@ type MedicRow = { id: string; severity: string; summary: string; detail: string 
 type PlanRow = { id: string; title: string; category: string; nextDueAt: Date; registration: string };
 type WorkRow = { id: string; title: string; status: string; priority: string; dueAt: Date | null; scheduledFor: Date | null; createdAt: Date; registration: string };
 type DriverOpsAlertRow = { id: string; severity: "WARNING" | "CRITICAL"; title: string; detail: string; occurredAt: Date };
+type JobAlertRow = { id: string; severity: "WARNING" | "CRITICAL"; title: string; detail: string; occurredAt: Date };
 
 const complianceRoles = new Set(["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
 const defectRoles = new Set(["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
 const workshopRoles = new Set(["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
 const medicRoles = new Set(["TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
 const driverOpsRoles = new Set(["TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
+const jobOpsRoles = new Set(["TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
 
 export const notificationsRouter = Router();
 notificationsRouter.use(requireAuth);
@@ -32,7 +34,7 @@ notificationsRouter.get("/", asyncHandler(async (req, res) => {
   const now = new Date();
   const soon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-  const [compliance, defects, plans, workOrders, medic, driverOps] = await Promise.all([
+  const [compliance, defects, plans, workOrders, medic, driverOps, jobOps] = await Promise.all([
     complianceRoles.has(role)
       ? prisma.complianceItem.findMany({ where: { companyId, status: { not: "RESOLVED" }, dueDate: { lte: soon } }, select: { id: true, title: true, dueDate: true, description: true }, orderBy: { dueDate: "asc" }, take: 20 })
       : Promise.resolve([]),
@@ -86,6 +88,19 @@ notificationsRouter.get("/", asyncHandler(async (req, res) => {
           ORDER BY "occurredAt" DESC LIMIT 30
         `
       : Promise.resolve([] as DriverOpsAlertRow[]),
+    jobOpsRoles.has(role)
+      ? prisma.$queryRaw<JobAlertRow[]>`
+          SELECT 'job:'||j.id AS id,
+            CASE WHEN j.priority='EMERGENCY' OR (j."dueAt"<NOW() AND j.status NOT IN ('COMPLETED','CLOSED','CANCELLED')) THEN 'CRITICAL' ELSE 'WARNING' END AS severity,
+            j."jobNumber"||': '||COALESCE(j.title,'Job needs attention') AS title,
+            COALESCE(c.name,j."customerName")||' · '||COALESCE(s.name,s.address,j."collectionAddress",'site not set') AS detail,
+            COALESCE(j."dueAt",j."scheduledStart",j."createdAt") AS "occurredAt"
+          FROM "Job" j LEFT JOIN "Customer" c ON c.id=j."customerId" LEFT JOIN "CustomerSite" s ON s.id=j."siteId"
+          WHERE j."companyId"=${companyId} AND j.status NOT IN ('COMPLETED','CLOSED','CANCELLED','DELIVERED')
+            AND (j.priority IN ('URGENT','EMERGENCY') OR j."dueAt"<=NOW()+INTERVAL '24 hours')
+          ORDER BY "occurredAt" ASC LIMIT 20
+        `
+      : Promise.resolve([] as JobAlertRow[]),
   ]);
 
   const alerts: Alert[] = [];
@@ -110,6 +125,9 @@ notificationsRouter.get("/", asyncHandler(async (req, res) => {
   }
   for (const item of driverOps) {
     alerts.push({ id: item.id, kind: "DRIVER", severity: item.severity, title: item.title, detail: item.detail, occurredAt: item.occurredAt.toISOString(), href: "/driver-operations" });
+  }
+  for (const item of jobOps) {
+    alerts.push({ id: item.id, kind: "JOB", severity: item.severity, title: item.title, detail: item.detail, occurredAt: item.occurredAt.toISOString(), href: "/jobs" });
   }
 
   const severityRank = { CRITICAL: 0, WARNING: 1, INFO: 2 } as const;

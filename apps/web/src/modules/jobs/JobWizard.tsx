@@ -1,88 +1,48 @@
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, ClipboardList } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowLeft, ArrowRight, BriefcaseBusiness, Check, ClipboardList, MapPin, Users } from "lucide-react";
 import { api } from "../../lib/api";
+import type { JobConfig } from "./types";
 
-type Option = { id: string; label: string };
-type Vehicle = { id: string; registration: string; fleetNumber?: string | null; status: string };
-type Driver = { id: string; firstName: string; lastName: string; isActive: boolean };
 type Form = {
-  reference: string; customerName: string; collectionAddress: string; collectionPostcode: string;
-  scheduledAt: string; deliveryAddress: string; deliveryPostcode: string; deliveryAt: string;
-  vehicleId: string; driverId: string; instructions: string; rate: string; weightKg: string; pallets: string;
+  jobTypeId:string; reference:string; title:string; description:string; priority:string; source:string;
+  customerId:string; customerName:string; accountReference:string; siteId:string; siteName:string; siteAddress:string; sitePostcode:string; assetId:string;
+  contactName:string; contactPhone:string; contactEmail:string; accessNotes:string; scheduledStart:string; scheduledEnd:string; dueAt:string;
+  estimatedDurationMinutes:string; personIds:string[]; vehicleId:string; purchaseOrderNumber:string; quote:string; estimatedCost:string; customFields:Record<string,unknown>;
 };
+const steps=["Work type","Customer & site","Schedule & team","Job sheet & finance","Review"];
+const money=(value:string)=>value?Math.round(Number(value)*100):undefined;
+const label=(value:string)=>value.replaceAll("_"," ").toLowerCase().replace(/^./,c=>c.toUpperCase());
 
-const initial: Form = { reference: "", customerName: "", collectionAddress: "", collectionPostcode: "", scheduledAt: "", deliveryAddress: "", deliveryPostcode: "", deliveryAt: "", vehicleId: "", driverId: "", instructions: "", rate: "", weightKg: "", pallets: "" };
-const steps = ["Customer", "Collection", "Delivery", "Assignment", "Review"];
-
-export function JobWizard({ onComplete, onCancel }: { onComplete: () => void; onCancel: () => void }) {
-  const [step, setStep] = useState(0);
-  const [form, setForm] = useState<Form>(initial);
-  const [vehicles, setVehicles] = useState<Option[]>([]);
-  const [drivers, setDrivers] = useState<Option[]>([]);
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
-  const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((current) => ({ ...current, [key]: value }));
-  const selectedVehicle = useMemo(() => vehicles.find((item) => item.id === form.vehicleId)?.label ?? "Unassigned", [vehicles, form.vehicleId]);
-  const selectedDriver = useMemo(() => drivers.find((item) => item.id === form.driverId)?.label ?? "Unassigned", [drivers, form.driverId]);
-
-  useEffect(() => {
-    Promise.all([api<Vehicle[]>("/vehicles"), api<Driver[]>("/drivers")])
-      .then(([vehicleRows, driverRows]) => {
-        setVehicles(vehicleRows.filter((vehicle) => vehicle.status !== "INACTIVE").map((vehicle) => ({ id: vehicle.id, label: `${vehicle.registration}${vehicle.fleetNumber ? ` · Fleet ${vehicle.fleetNumber}` : ""}` })));
-        setDrivers(driverRows.filter((driver) => driver.isActive !== false).map((driver) => ({ id: driver.id, label: `${driver.firstName} ${driver.lastName}` })));
-      })
-      .catch((reason) => setError(reason instanceof Error ? reason.message : "Could not load vehicles and drivers."));
-  }, []);
-
-  function validate() {
-    if (step === 0 && (!form.reference.trim() || !form.customerName.trim())) return "Job reference and customer are required.";
-    if (step === 1 && (!form.collectionAddress.trim() || !form.scheduledAt)) return "Collection address and date/time are required.";
-    if (step === 2 && !form.deliveryAddress.trim()) return "Delivery address is required.";
-    if (step === 2 && form.deliveryAt && form.scheduledAt && new Date(form.deliveryAt) < new Date(form.scheduledAt)) return "Delivery cannot be before collection.";
-    if (step === 3 && form.rate && Number(form.rate) < 0) return "Rate cannot be negative.";
-    if (step === 3 && form.weightKg && Number(form.weightKg) < 0) return "Weight cannot be negative.";
-    if (step === 3 && form.pallets && (!Number.isInteger(Number(form.pallets)) || Number(form.pallets) < 0)) return "Pallets must be a whole number.";
+export function JobWizard({config,onComplete,onCancel}:{config:JobConfig;onComplete:()=>void;onCancel:()=>void}){
+  const first=config.jobTypes[0];
+  const [step,setStep]=useState(0); const [saving,setSaving]=useState(false); const [error,setError]=useState("");
+  const [form,setForm]=useState<Form>({jobTypeId:first?.id??"",reference:"",title:"",description:"",priority:first?.defaultPriority??"NORMAL",source:"OFFICE",customerId:"",customerName:"",accountReference:"",siteId:"",siteName:"Main site",siteAddress:"",sitePostcode:"",assetId:"",contactName:"",contactPhone:"",contactEmail:"",accessNotes:"",scheduledStart:"",scheduledEnd:"",dueAt:"",estimatedDurationMinutes:String(first?.defaultDurationMinutes??60),personIds:[],vehicleId:"",purchaseOrderNumber:"",quote:"",estimatedCost:"",customFields:{}});
+  const type=useMemo(()=>config.jobTypes.find(item=>item.id===form.jobTypeId)??first,[config.jobTypes,first,form.jobTypeId]);
+  const sites=config.sites.filter(site=>!form.customerId||site.customerId===form.customerId); const assets=config.assets.filter(asset=>!form.siteId||asset.siteId===form.siteId);
+  const set=<K extends keyof Form>(key:K,value:Form[K])=>setForm(current=>({...current,[key]:value}));
+  function chooseType(id:string){const next=config.jobTypes.find(item=>item.id===id);setForm(current=>({...current,jobTypeId:id,priority:next?.defaultPriority??current.priority,estimatedDurationMinutes:String(next?.defaultDurationMinutes??60),customFields:{}}));}
+  function validate(){
+    if(step===0&&(!form.jobTypeId||!form.title.trim())) return "Choose a job type and enter the work title.";
+    if(step===1&&!form.customerId&&!form.customerName.trim()) return "Choose or enter a customer.";
+    if(step===1&&!form.siteId&&!form.siteAddress.trim()) return "Choose or enter the site address.";
+    if(step===2&&form.scheduledStart&&form.scheduledEnd&&new Date(form.scheduledEnd)<new Date(form.scheduledStart)) return "The end time cannot be before the start time.";
     return "";
   }
-
-  function next() {
-    const problem = validate();
-    if (problem) return setError(problem);
-    setError("");
-    setStep((value) => Math.min(value + 1, steps.length - 1));
-  }
-
-  async function save() {
-    const problem = validate();
-    if (problem) return setError(problem);
-    setSaving(true);
-    setError("");
-    try {
-      await api("/jobs", { method: "POST", body: JSON.stringify({
-        reference: form.reference.trim(), customerName: form.customerName.trim(), collectionAddress: form.collectionAddress.trim(),
-        collectionPostcode: form.collectionPostcode.trim() || undefined, scheduledAt: form.scheduledAt,
-        deliveryAddress: form.deliveryAddress.trim(), deliveryPostcode: form.deliveryPostcode.trim() || undefined,
-        deliveryAt: form.deliveryAt || undefined, vehicleId: form.vehicleId || undefined, driverId: form.driverId || undefined,
-        instructions: form.instructions.trim() || undefined, rate: form.rate ? Number(form.rate) : undefined,
-        weightKg: form.weightKg ? Number(form.weightKg) : undefined, pallets: form.pallets ? Number(form.pallets) : undefined,
-      }) });
-      onComplete();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not create the job.");
-    } finally { setSaving(false); }
-  }
-
-  return <section className="panel" style={{ marginBottom: 24 }}>
-    <div className="panel-heading" style={{ padding: 20 }}><div><p className="eyebrow">Job setup</p><h2>Create job</h2><p className="subtle">Record the work once, then assign the vehicle and driver when ready.</p></div></div>
-    <div style={{ display: "flex", gap: 6, padding: "0 20px 18px", flexWrap: "wrap" }}>{steps.map((label, index) => <span key={label} style={{ padding: "6px 10px", borderRadius: 999, fontSize: 13, fontWeight: index === step ? 700 : 500, opacity: index === step ? 1 : .55, border: "1px solid currentColor" }}>{index + 1}. {label}</span>)}</div>
-    <div style={{ padding: "0 20px 20px", display: "grid", gap: 16 }}>
-      {error && <p role="alert" className="form-message error">{error}</p>}
-      {step === 0 && <div className="form-grid"><label>Job reference *<input autoFocus required maxLength={80} value={form.reference} onChange={(event) => set("reference", event.target.value)} placeholder="JOB-1001" /></label><label>Customer *<input required maxLength={160} value={form.customerName} onChange={(event) => set("customerName", event.target.value)} placeholder="Customer name" /></label></div>}
-      {step === 1 && <div className="form-grid"><label>Collection address *<textarea rows={3} required value={form.collectionAddress} onChange={(event) => set("collectionAddress", event.target.value)} /></label><label>Collection postcode<input maxLength={20} value={form.collectionPostcode} onChange={(event) => set("collectionPostcode", event.target.value)} /></label><label>Collection date & time *<input type="datetime-local" required value={form.scheduledAt} onChange={(event) => set("scheduledAt", event.target.value)} /></label></div>}
-      {step === 2 && <div className="form-grid"><label>Delivery address *<textarea rows={3} required value={form.deliveryAddress} onChange={(event) => set("deliveryAddress", event.target.value)} /></label><label>Delivery postcode<input maxLength={20} value={form.deliveryPostcode} onChange={(event) => set("deliveryPostcode", event.target.value)} /></label><label>Expected delivery date & time<input type="datetime-local" min={form.scheduledAt || undefined} value={form.deliveryAt} onChange={(event) => set("deliveryAt", event.target.value)} /></label></div>}
-      {step === 3 && <div style={{ display: "grid", gap: 16 }}><div className="form-grid"><label>Vehicle<select value={form.vehicleId} onChange={(event) => set("vehicleId", event.target.value)}><option value="">Unassigned</option>{vehicles.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label><label>Driver<select value={form.driverId} onChange={(event) => set("driverId", event.target.value)}><option value="">Unassigned</option>{drivers.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label><label>Agreed rate (£)<input type="number" min="0" step="0.01" value={form.rate} onChange={(event) => set("rate", event.target.value)} /></label><label>Weight (kg)<input type="number" min="0" step="0.01" value={form.weightKg} onChange={(event) => set("weightKg", event.target.value)} /></label><label>Pallets<input type="number" min="0" step="1" value={form.pallets} onChange={(event) => set("pallets", event.target.value)} /></label></div><label>Instructions<textarea rows={4} maxLength={4000} value={form.instructions} onChange={(event) => set("instructions", event.target.value)} /></label></div>}
-      {step === 4 && <div style={{ display: "grid", gap: 12 }}><div className="metric-card"><div className="metric-icon violet"><ClipboardList size={21} /></div><div><p>Job</p><strong>{form.reference}</strong><small>{form.customerName}</small></div></div><div className="panel" style={{ padding: 16 }}><p><strong>Collection:</strong> {form.collectionAddress} · {new Date(form.scheduledAt).toLocaleString("en-GB")}</p><p><strong>Delivery:</strong> {form.deliveryAddress}{form.deliveryAt ? ` · ${new Date(form.deliveryAt).toLocaleString("en-GB")}` : ""}</p><p><strong>Vehicle:</strong> {selectedVehicle}</p><p><strong>Driver:</strong> {selectedDriver}</p>{form.instructions && <p><strong>Instructions:</strong> {form.instructions}</p>}</div></div>}
-      <div style={{ display: "flex", gap: 8, justifyContent: "space-between", marginTop: 4 }}><button type="button" className="switch-mode" disabled={saving} onClick={step === 0 ? onCancel : () => { setError(""); setStep((value) => value - 1); }}><ArrowLeft size={17} /> {step === 0 ? "Cancel" : "Back"}</button>{step < steps.length - 1 ? <button type="button" className="primary-button" onClick={next}>Next <ArrowRight size={17} /></button> : <button type="button" className="primary-button" disabled={saving} onClick={() => void save()}><Check size={17} /> {saving ? "Creating…" : "Create job"}</button>}</div>
+  function next(){const problem=validate();if(problem)return setError(problem);setError("");setStep(value=>Math.min(4,value+1));}
+  async function save(){const problem=validate();if(problem)return setError(problem);setSaving(true);setError("");try{await api("/jobs",{method:"POST",body:JSON.stringify({
+    jobTypeId:form.jobTypeId,reference:form.reference||undefined,title:form.title,description:form.description||undefined,priority:form.priority,source:form.source,
+    customerId:form.customerId||undefined,customerName:form.customerId?undefined:form.customerName,accountReference:form.accountReference||undefined,siteId:form.siteId||undefined,siteName:form.siteId?undefined:form.siteName,siteAddress:form.siteId?undefined:form.siteAddress,sitePostcode:form.sitePostcode||undefined,assetId:form.assetId||undefined,
+    contactName:form.contactName||undefined,contactPhone:form.contactPhone||undefined,contactEmail:form.contactEmail||undefined,accessNotes:form.accessNotes||undefined,scheduledStart:form.scheduledStart||undefined,scheduledEnd:form.scheduledEnd||undefined,dueAt:form.dueAt||undefined,estimatedDurationMinutes:Number(form.estimatedDurationMinutes)||undefined,personIds:form.personIds,vehicleId:form.vehicleId||undefined,purchaseOrderNumber:form.purchaseOrderNumber||undefined,quotePence:money(form.quote),estimatedCostPence:money(form.estimatedCost),customFields:form.customFields,
+  })});onComplete();}catch(reason){setError(reason instanceof Error?reason.message:"Could not create the job.");}finally{setSaving(false);}}
+  return <section className="panel job-wizard"><div className="job-wizard-head"><div><p className="eyebrow">Configurable field service</p><h2>Create job / work order</h2><p className="subtle">The selected job type controls its workflow, risk checks and field worksheet.</p></div><BriefcaseBusiness/></div>
+    <div className="job-steps">{steps.map((name,index)=><button key={name} type="button" className={index===step?"active":index<step?"done":""} onClick={()=>index<step&&setStep(index)}><span>{index+1}</span>{name}</button>)}</div>
+    <div className="job-wizard-body">{error&&<p role="alert" className="form-message error">{error}</p>}
+      {step===0&&<><div className="job-type-picker">{config.jobTypes.map(item=><button type="button" key={item.id} className={form.jobTypeId===item.id?"selected":""} style={{"--job-colour":item.colour} as React.CSSProperties} onClick={()=>chooseType(item.id)}><strong>{item.name}</strong><span>{item.trade}</span><small>{item.description}</small></button>)}</div><div className="form-grid"><label>Job title *<input autoFocus value={form.title} onChange={e=>set("title",e.target.value)} placeholder="Boiler breakdown, site survey, installation…"/></label><label>Your reference<input value={form.reference} onChange={e=>set("reference",e.target.value)} placeholder="Generated if left blank"/></label><label>Priority<select value={form.priority} onChange={e=>set("priority",e.target.value)}>{["LOW","NORMAL","HIGH","URGENT","EMERGENCY"].map(value=><option key={value}>{value}</option>)}</select></label><label>Source<select value={form.source} onChange={e=>set("source",e.target.value)}>{["OFFICE","PHONE","EMAIL","CUSTOMER","PORTAL","PLANNED","REACTIVE","OTHER"].map(value=><option key={value}>{value}</option>)}</select></label></div><label>Scope / problem description<textarea rows={5} value={form.description} onChange={e=>set("description",e.target.value)} placeholder="What needs doing, reported fault, scope and important instructions"/></label></>}
+      {step===1&&<><div className="form-grid"><label>Existing customer<select value={form.customerId} onChange={e=>setForm(current=>({...current,customerId:e.target.value,siteId:"",assetId:""}))}><option value="">Create / enter customer</option>{config.customers.map(customer=><option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label>{!form.customerId&&<><label>Customer name *<input value={form.customerName} onChange={e=>set("customerName",e.target.value)}/></label><label>Account / contract reference<input value={form.accountReference} onChange={e=>set("accountReference",e.target.value)}/></label></>}<label>Existing site<select value={form.siteId} onChange={e=>setForm(current=>({...current,siteId:e.target.value,assetId:""}))}><option value="">Create / enter site</option>{sites.map(site=><option key={site.id} value={site.id}>{site.name} · {site.postcode}</option>)}</select></label>{!form.siteId&&<><label>Site name<input value={form.siteName} onChange={e=>set("siteName",e.target.value)}/></label><label>Site postcode<input value={form.sitePostcode} onChange={e=>set("sitePostcode",e.target.value)}/></label></>}</div>{!form.siteId&&<label>Site address *<textarea value={form.siteAddress} onChange={e=>set("siteAddress",e.target.value)}/></label>}<div className="form-grid"><label>Site asset / equipment<select value={form.assetId} onChange={e=>set("assetId",e.target.value)}><option value="">No linked asset</option>{assets.map(asset=><option key={asset.id} value={asset.id}>{asset.name}{asset.assetReference?` · ${asset.assetReference}`:""}</option>)}</select></label><label>Contact name<input value={form.contactName} onChange={e=>set("contactName",e.target.value)}/></label><label>Contact phone<input value={form.contactPhone} onChange={e=>set("contactPhone",e.target.value)}/></label><label>Contact email<input type="email" value={form.contactEmail} onChange={e=>set("contactEmail",e.target.value)}/></label></div><label>Access, permit or parking notes<textarea value={form.accessNotes} onChange={e=>set("accessNotes",e.target.value)}/></label></>}
+      {step===2&&<><div className="form-grid"><label>Scheduled start<input type="datetime-local" value={form.scheduledStart} onChange={e=>set("scheduledStart",e.target.value)}/></label><label>Scheduled end<input type="datetime-local" min={form.scheduledStart||undefined} value={form.scheduledEnd} onChange={e=>set("scheduledEnd",e.target.value)}/></label><label>Target / SLA due<input type="datetime-local" value={form.dueAt} onChange={e=>set("dueAt",e.target.value)}/></label><label>Expected minutes<input type="number" min="5" value={form.estimatedDurationMinutes} onChange={e=>set("estimatedDurationMinutes",e.target.value)}/></label><label>Vehicle / plant<select value={form.vehicleId} onChange={e=>set("vehicleId",e.target.value)}><option value="">No vehicle allocated</option>{config.vehicles.map(vehicle=><option key={vehicle.id} value={vehicle.id}>{vehicle.registration} · {vehicle.type}</option>)}</select></label></div><div><h3>Assign people</h3><p className="subtle">Allocate one person or a whole multi-trade team.</p><div className="people-picker">{config.people.length?config.people.map(person=><label key={person.id}><input type="checkbox" checked={form.personIds.includes(person.id)} onChange={e=>set("personIds",e.target.checked?[...form.personIds,person.id]:form.personIds.filter(id=>id!==person.id))}/><span><strong>{person.firstName} {person.lastName}</strong><small>{label(person.personType)}{person.skills.length?` · ${person.skills.join(", ")}`:""}</small></span></label>):<p className="subtle">Add staff in Personal before allocating the job.</p>}</div></div></>}
+      {step===3&&<><div className="job-requirements"><span><ClipboardList/> {type?.formSchema.length??0} worksheet fields</span><span><Users/> {type?.requiredSkills.length?type.requiredSkills.join(", "):"No fixed skill rule"}</span><span><Check/> {type?.riskAssessmentRequired?"Risk sign-off required":"Risk sign-off optional"}</span></div>{type?.formSchema.length?<div className="job-sheet-preview">{type.formSchema.map(field=><span key={field.key}><strong>{field.label}</strong><small>{label(field.type)}{field.required?" · required":" · optional"}</small></span>)}</div>:<p className="subtle">This job type has no field worksheet.</p>}<h3>Commercial details</h3><div className="form-grid"><label>Customer PO / order number<input value={form.purchaseOrderNumber} onChange={e=>set("purchaseOrderNumber",e.target.value)}/></label><label>Quoted sell value (£)<input type="number" min="0" step="0.01" value={form.quote} onChange={e=>set("quote",e.target.value)}/></label><label>Estimated cost (£)<input type="number" min="0" step="0.01" value={form.estimatedCost} onChange={e=>set("estimatedCost",e.target.value)}/></label></div></>}
+      {step===4&&<div className="job-review"><article><BriefcaseBusiness/><div><span>{type?.trade}</span><h3>{form.title}</h3><p>{type?.name} · {label(form.priority)} priority</p></div></article><dl><div><dt>Customer</dt><dd>{config.customers.find(c=>c.id===form.customerId)?.name||form.customerName}</dd></div><div><dt>Site</dt><dd>{config.sites.find(s=>s.id===form.siteId)?.name||form.siteName} · {config.sites.find(s=>s.id===form.siteId)?.address||form.siteAddress}</dd></div><div><dt>Schedule</dt><dd>{form.scheduledStart?new Date(form.scheduledStart).toLocaleString("en-GB"):"Unscheduled"}</dd></div><div><dt>Team</dt><dd>{form.personIds.length?config.people.filter(p=>form.personIds.includes(p.id)).map(p=>`${p.firstName} ${p.lastName}`).join(", "):"Unallocated"}</dd></div><div><dt>Workflow</dt><dd>{type?.workflow.map(label).join(" → ")}</dd></div><div><dt>Controls</dt><dd>{type?.riskAssessmentRequired?"Risk sign-off · ":""}{type?.customerSignatureRequired?"Customer signature":"Standard completion"}</dd></div></dl></div>}
+      <div className="wizard-actions"><button type="button" className="secondary-button" disabled={saving} onClick={step===0?onCancel:()=>{setError("");setStep(value=>value-1);}}><ArrowLeft/> {step===0?"Cancel":"Back"}</button>{step<4?<button type="button" className="primary-button" onClick={next}>Next <ArrowRight/></button>:<button type="button" className="primary-button" disabled={saving} onClick={()=>void save()}><Check/> {saving?"Creating…":"Create work order"}</button>}</div>
     </div>
   </section>;
 }

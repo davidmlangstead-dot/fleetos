@@ -15,6 +15,11 @@ const roleMap: Record<string, string> = {
   ADMIN: "COMPANY_ADMIN",
 };
 
+const personTypes = new Set([
+  "DRIVER", "ENGINEER", "TECHNICIAN", "OPERATIVE", "SUBCONTRACTOR",
+  "OFFICE", "WORKSHOP", "SUPERVISOR", "MANAGER", "ADMIN",
+]);
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -40,6 +45,7 @@ Deno.serve(async (req) => {
       companyId, firstName, lastName, email, phone, personType, accessRole, startDate, dateOfBirth,
       address, postcode, emergencyContact, emergencyPhone, licenceNumber, licenceExpiry,
       cpcExpiry, tachoCardNumber, tachoCardExpiry, medicalDue, inviteAccount, onboardingKey, depotId,
+      skills,
     } = body;
 
     if (typeof companyId !== "string" || !companyId.trim()) return json({ error: "Active company workspace is required" }, 400);
@@ -47,7 +53,12 @@ Deno.serve(async (req) => {
       return json({ error: "Name, person type and access role are required" }, 400);
     }
     if (!roleMap[accessRole]) return json({ error: "Invalid access role" }, 400);
+    if (!personTypes.has(personType)) return json({ error: "Invalid person type" }, 400);
     if (inviteAccount && !email?.trim()) return json({ error: "Email is required to create an account" }, 400);
+
+    const cleanSkills = Array.isArray(skills)
+      ? skills.filter((skill): skill is string => typeof skill === "string").map((skill) => skill.trim()).filter(Boolean).slice(0, 30)
+      : [];
 
     const admin = createClient(url, service, { auth: { autoRefreshToken: false, persistSession: false } });
 
@@ -105,6 +116,7 @@ Deno.serve(async (req) => {
         phone: phone?.trim() || null,
         personType,
         accessRole,
+        skills: cleanSkills,
         startDate: startDate || null,
         dateOfBirth: dateOfBirth || null,
         address: address?.trim() || null,
@@ -235,4 +247,5 @@ Deno.serve(async (req) => {
     return json({ error: "Unexpected error creating staff record" }, 500);
   }
 });
+
 

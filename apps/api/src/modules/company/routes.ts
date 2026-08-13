@@ -12,7 +12,8 @@ const allowedSchemes = new Set(["FORS", "CLOCS", "DVSA_EARNED_RECOGNITION", "ISO
 const allowedLicenceTypes = new Set(["RESTRICTED", "STANDARD_NATIONAL", "STANDARD_INTERNATIONAL"]);
 const managerRoles = ["TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"] as const;
 const backupTables = [
-  "Depot", "Person", "Vehicle", "Driver", "Job", "Defect", "ComplianceItem", "RegisterItem",
+  "Depot", "Person", "Vehicle", "Driver", "JobType", "Customer", "CustomerSite", "SiteAsset", "Job",
+  "JobAssignment", "JobVisit", "JobTimelineEntry", "JobCostLine", "Defect", "ComplianceItem", "RegisterItem",
   "MaintenancePlan", "MaintenanceWorkOrder", "Document", "DriverActivity", "Conversation",
   "ConversationMember", "Message", "MarketplaceListing", "MarketplaceInquiry",
   "DriverWalkaroundCheck", "DriverBreakdown", "StaffAbsenceRequest", "DriverTrainingRecord",

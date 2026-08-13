@@ -8,7 +8,7 @@ import { OfflineStatus } from "./OfflineStatus";
 type Role = "DRIVER" | "WORKSHOP_TECHNICIAN" | "TRANSPORT_PLANNER" | "TRANSPORT_MANAGER" | "OFFICE_STAFF" | "FINANCE" | "COMPANY_ADMIN" | "PLATFORM_ADMIN";
 type Workspace = { id: string; name: string; slug: string; role: Role };
 type NavItem = readonly [string, string, typeof Gauge, readonly Role[]];
-type AlertItem = { id: string; kind: "COMPLIANCE" | "DEFECT" | "MAINTENANCE" | "MEDIC" | "DRIVER"; severity: "INFO" | "WARNING" | "CRITICAL"; title: string; detail: string | null; occurredAt: string; href: string };
+type AlertItem = { id: string; kind: "COMPLIANCE" | "DEFECT" | "MAINTENANCE" | "MEDIC" | "DRIVER" | "JOB"; severity: "INFO" | "WARNING" | "CRITICAL"; title: string; detail: string | null; occurredAt: string; href: string };
 type AlertFeed = { total: number; critical: number; items: AlertItem[] };
 
 const management: readonly Role[] = ["TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
@@ -25,6 +25,7 @@ const everyone: readonly Role[] = ["DRIVER", "WORKSHOP_TECHNICIAN", "TRANSPORT_P
 const nav: readonly NavItem[] = [
   ["/", "Today", Gauge, management],
   ["/driver", "Driver Today", Gauge, ["DRIVER"]],
+  ["/my-work", "My Work", ClipboardList, ["DRIVER", "WORKSHOP_TECHNICIAN"]],
   ["/hours", "Hours Board", Clock3, management],
   ["/driver-operations", "Driver Ops", ClipboardList, management],
   ["/jobs", "Jobs", ClipboardList, management],
