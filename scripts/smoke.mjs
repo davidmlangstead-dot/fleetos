@@ -23,7 +23,7 @@ async function check(name, url, expectedStatuses, validate) {
 await check("API health", `${API}/health`, [200], (body) => body && body.status === "ok");
 await check("API root", `${API}/api`, [200], (body) => body && body.status === "ok");
 await check("Protected company route", `${API}/api/company`, [401]);
-await check("Protected Medic route", `${API}/api/medic`, [401]);
+await check("Protected Medic route", `${API}/api/medic/status`, [401]);
 await check("Unknown API route", `${API}/api/__fleetos_smoke_missing__`, [404]);
 await check("Web app", WEB, [200]);
 
