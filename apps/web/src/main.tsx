@@ -8,7 +8,9 @@ import { api, ACTIVE_WORKSPACE_KEY, clearOfflineData, startOfflineSync } from ".
 import { AuthPage } from "./modules/auth/AuthPage";
 import { LandingPage } from "./modules/landing/LandingPage";
 import { OnboardingPage } from "./modules/onboarding/OnboardingPage";
+import { StaffInvitePage } from "./modules/auth/StaffInvitePage";
 import "./styles.css";
+import "./shell-fixes.css";
 
 const client = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1 } } });
 type AppState = "loading" | "landing" | "auth" | "onboarding" | "ready" | "error";
@@ -102,6 +104,7 @@ function FleetOSApp() {
     return () => { mounted = false; stopSync(); subscription.unsubscribe(); };
   }, []);
 
+  if (window.location.pathname === "/staff-invite") return <StaffInvitePage onComplete={() => { setState("loading"); void resolveWorkspace(); }} />;
   if (state === "loading") return <main className="loading-page">FleetOS Medic is checking your connectionâ€¦</main>;
   if (state === "landing") return <LandingPage onLogin={() => { setAuthMode("login"); setState("auth"); }} onSignup={() => { setAuthMode("signup"); setState("auth"); }} />;
   if (state === "auth") return <AuthPage initialMode={authMode} onBack={() => setState("landing")} />;
@@ -119,4 +122,5 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
     void navigator.serviceWorker.register("/sw.js").catch((error) => console.error("FleetOS service worker registration failed", error));
   });
 }
+
 

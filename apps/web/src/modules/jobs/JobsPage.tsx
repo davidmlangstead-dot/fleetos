@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Search, Plus } from "lucide-react";
 import { api } from "../../lib/api";
+import { JobWizard } from "./JobWizard";
 
 type JobRow = {
   id: string;
@@ -18,18 +19,20 @@ export function JobsPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showWizard, setShowWizard] = useState(false);
+
+  async function load() {
+    try {
+      setJobs(await api<JobRow[]>("/jobs"));
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load jobs");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function load() {
-      try {
-        setJobs(await api<JobRow[]>("/jobs"));
-        setError("");
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Could not load jobs");
-      } finally {
-        setLoading(false);
-      }
-    }
     void load();
   }, []);
 
@@ -46,10 +49,11 @@ export function JobsPage() {
           <h1>Jobs</h1>
           <p className="subtle">Track collections and deliveries in the active company workspace.</p>
         </div>
-        <button className="primary-button"><Plus size={18} /> Create job</button>
+        <button className="primary-button" onClick={() => setShowWizard(true)}><Plus size={18} /> Create job</button>
       </div>
       {error && <div className="panel" style={{ padding: 14, marginBottom: 16, color: "#991b1b" }}>{error}</div>}
-      <section className="panel">
+      {showWizard && <JobWizard onCancel={() => setShowWizard(false)} onComplete={() => { setShowWizard(false); setLoading(true); void load(); }} />}
+      {!showWizard && <section className="panel">
         <div className="search" style={{ padding: 16 }}>
           <Search size={19} />
           <input placeholder="Search jobs…" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -59,7 +63,7 @@ export function JobsPage() {
           <div className="empty-state">
             <h2>No jobs yet</h2>
             <p>Create your first delivery or collection job.</p>
-            <button className="primary-button"><Plus size={18} /> Create job</button>
+            <button className="primary-button" onClick={() => setShowWizard(true)}><Plus size={18} /> Create job</button>
           </div>
         )}
         {!loading && filtered.length > 0 && (
@@ -75,7 +79,8 @@ export function JobsPage() {
             ))}
           </div>
         )}
-      </section>
+      </section>}
     </section>
   );
 }
+

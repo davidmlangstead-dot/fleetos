@@ -12,6 +12,9 @@ function createNoopClient() {
       async getUser() {
         return { data: { user: null }, error: null };
       },
+      async refreshSession() {
+        return { data: { user: null, session: null }, error: null };
+      },
       async signInWithPassword() {
         return { data: { user: null, session: null }, error: { message: "Supabase has not been configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel." } };
       },
@@ -30,3 +33,4 @@ function createNoopClient() {
 
 export const supabaseConfigError = !url || !key ? "Supabase has not been configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel." : null;
 export const supabase = url && key ? createClient(url, key) : createNoopClient();
+

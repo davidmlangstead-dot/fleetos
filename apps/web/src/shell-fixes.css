@@ -1,0 +1,59 @@
+.avatar { cursor: pointer; }
+.mobile-close,
+.mobile-overlay { display: none; }
+.account-menu {
+  position: absolute;
+  right: 0;
+  top: 42px;
+  width: 190px;
+  z-index: 60;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, .18);
+}
+.account-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.account-menu button:hover { background: #f1f5f9; }
+
+@media (max-width: 900px) {
+  .sidebar {
+    display: flex;
+    z-index: 80;
+    transform: translateX(-105%);
+    transition: transform .2s ease;
+    box-shadow: 8px 0 30px rgba(0, 0, 0, .2);
+  }
+  .sidebar.mobile-open { transform: translateX(0); }
+  .mobile-menu,
+  .mobile-close {
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: none;
+  }
+  .mobile-close {
+    margin-left: auto;
+    padding: 2px;
+    color: #d7e0ea;
+  }
+  .mobile-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    border: 0;
+    background: rgba(7, 16, 29, .5);
+  }
+}
