@@ -42,10 +42,10 @@ documentsRouter.get("/link-options", readers, asyncHandler(async (req, res) => {
   res.json({
     vehicles: vehicles.map(v => ({ id: v.id, label: v.registration })),
     drivers: drivers.map(d => ({ id: d.id, label: `${d.firstName} ${d.lastName}` })),
-    jobs: jobs.map(j => ({ id: j.id, label: `${j.jobNumber || "Job"} Â· ${j.customerName}` })),
-    defects: defects.map(d => ({ id: d.id, label: `${d.vehicle?.registration || "No vehicle"} Â· ${d.title}` })),
-    compliance: compliance.map(c => ({ id: c.id, label: `${c.title} Â· ${c.dueDate.toISOString().slice(0, 10)}` })),
-    workOrders: workOrders.map(w => ({ id: w.id, label: `${w.registration} Â· ${w.title}` })),
+    jobs: jobs.map(j => ({ id: j.id, label: `${j.jobNumber || "Job"} · ${j.customerName}` })),
+    defects: defects.map(d => ({ id: d.id, label: `${d.vehicle?.registration || "No vehicle"} · ${d.title}` })),
+    compliance: compliance.map(c => ({ id: c.id, label: `${c.title} · ${c.dueDate.toISOString().slice(0, 10)}` })),
+    workOrders: workOrders.map(w => ({ id: w.id, label: `${w.registration} · ${w.title}` })),
   });
 }));
 
