@@ -29,6 +29,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @fleetros/api exec prisma generate
       - run: pnpm build
+      - name: Role policy contract
+        run: node scripts/check-role-contract.mjs
       - name: Web bundle performance budget
         run: node scripts/check-web-bundle.mjs
       - name: PWA installability contract
