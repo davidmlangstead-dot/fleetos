@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { AlertTriangle, ArrowRight, CircleAlert, MessageSquare, Users, Truck, Wrench, BriefcaseBusiness } from "lucide-react";
+import { AlertTriangle, ArrowRight, CircleAlert, Mail, MessageSquare, Users, Truck, Wrench, BriefcaseBusiness } from "lucide-react";
 import { api } from "../../lib/api";
 
 type Job = { id: string; reference: string; collectionAddress: string; deliveryAddress: string; scheduledAt: string; status: string; driver: { firstName: string; lastName: string } | null };
@@ -34,6 +34,10 @@ export function DashboardPageClean() {
 
   return <section className="page">
     <div className="page-heading"><div><p className="eyebrow">Fleet operations</p><h1>Your dashboard</h1><p className="subtle">Your company workspace, with every core FleetOS module one click away.</p></div></div>
+    <div className="panel" style={{ marginBottom: 18, padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}><span className="metric-icon blue" style={{ width: 34, height: 34 }}><Mail size={17}/></span><div><strong>Email</strong><div className="subtle" style={{ fontSize: 12 }}>Quick shortcut to your normal email app. FleetOS does not read or store your email.</div></div></div>
+      <a className="secondary-button" href="mailto:">Open email</a>
+    </div>
     {error && <p role="alert" className="form-message error">{error}</p>}
     <div className="metric-grid">{metrics.map(([label, value, note, Icon, tone, to]) => <Link to={to} key={label} className="metric-card" style={{ textDecoration: "none", color: "inherit" }}><div className={`metric-icon ${tone}`}><Icon size={21} /></div><div><p>{label}</p><strong>{value}</strong><small>{note}</small></div></Link>)}</div>
 
