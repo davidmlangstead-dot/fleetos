@@ -22,6 +22,7 @@ import { marketplaceRouter } from "./modules/marketplace/routes.js";
 import { medicRouter } from "./modules/medic/routes.js";
 import { notificationsRouter } from "./modules/notifications/routes.js";
 import { driverOperationsRouter } from "./modules/driver-operations/routes.js";
+import { tachographRouter } from "./modules/tachograph/routes.js";
 
 export const app = express();
 app.disable("x-powered-by");
@@ -85,6 +86,7 @@ app.use("/api/organisation", sensitiveRateLimit, organisationRouter);
 app.use("/api/registers", requireAuth, idempotencyMiddleware, registersRouter);
 app.use("/api/messages", requireAuth, idempotencyMiddleware, messagesRouter);
 app.use("/api/documents", sensitiveRateLimit, documentsRouter);
+app.use("/api/tachograph", sensitiveRateLimit, idempotencyMiddleware, tachographRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/marketplace", marketplaceRouter);
 app.use("/api/medic", sensitiveRateLimit, medicRouter);
