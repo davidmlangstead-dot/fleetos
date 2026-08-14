@@ -9,7 +9,7 @@ import { BrandLogo, PoweredBy, useBranding } from "../lib/branding";
 type Role = "DRIVER" | "WORKSHOP_TECHNICIAN" | "TRANSPORT_PLANNER" | "TRANSPORT_MANAGER" | "OFFICE_STAFF" | "FINANCE" | "COMPANY_ADMIN" | "PLATFORM_ADMIN";
 type Workspace = { id: string; name: string; slug: string; role: Role };
 type NavItem = readonly [string, string, typeof Gauge, readonly Role[]];
-type AlertItem = { id: string; kind: "COMPLIANCE" | "DEFECT" | "MAINTENANCE" | "MEDIC" | "DRIVER" | "JOB"; severity: "INFO" | "WARNING" | "CRITICAL"; title: string; detail: string | null; occurredAt: string; href: string };
+type AlertItem = { id: string; kind: "COMPLIANCE" | "DEFECT" | "MAINTENANCE" | "MEDIC" | "DRIVER" | "JOB" | "TACHOGRAPH"; severity: "INFO" | "WARNING" | "CRITICAL"; title: string; detail: string | null; occurredAt: string; href: string };
 type AlertFeed = { total: number; critical: number; items: AlertItem[] };
 
 const management: readonly Role[] = ["TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
@@ -19,6 +19,7 @@ const peopleManagers: readonly Role[] = ["TRANSPORT_MANAGER", "COMPANY_ADMIN", "
 const companyManagers: readonly Role[] = ["TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const registerUsers: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const documentUsers: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
+const tachographUsers: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const reportUsers: readonly Role[] = ["TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const marketplaceUsers: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const everyone: readonly Role[] = ["DRIVER", "WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
@@ -28,6 +29,7 @@ const nav: readonly NavItem[] = [
   ["/driver", "Driver Today", Gauge, ["DRIVER"]],
   ["/my-work", "My Work", ClipboardList, ["DRIVER", "WORKSHOP_TECHNICIAN"]],
   ["/hours", "Hours Board", Clock3, management],
+  ["/tachograph", "Tachograph", Clock3, tachographUsers],
   ["/driver-operations", "Driver Ops", ClipboardList, management],
   ["/jobs", "Jobs", ClipboardList, management],
   ["/vehicles", "Vehicles", Truck, vehicleReaders],
