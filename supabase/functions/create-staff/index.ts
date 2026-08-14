@@ -141,6 +141,7 @@ Deno.serve(async (req) => {
     let linkedUserId: string | null = null;
     let invited = false;
     let inviteWarning: string | null = null;
+    let createdMembershipId: string | null = null;
 
     try {
       if (inviteAccount) {
@@ -190,14 +191,15 @@ Deno.serve(async (req) => {
             .maybeSingle();
 
           if (!existingMembership) {
-            const { error: membershipError } = await admin.from("CompanyMembership").insert({
+            const { data: createdMembership, error: membershipError } = await admin.from("CompanyMembership").insert({
               id: crypto.randomUUID(),
               userId: linkedUserId,
               companyId,
               role: roleMap[accessRole],
               updatedAt: new Date().toISOString(),
-            });
+            }).select("id").single();
             if (membershipError) throw membershipError;
+            createdMembershipId = createdMembership.id;
           }
 
           const { error: personUserError } = await admin
@@ -244,6 +246,20 @@ Deno.serve(async (req) => {
         inviteAccount: !!inviteAccount,
         error: error instanceof Error ? error.message : String(error),
       });
+      if (createdMembershipId) {
+        const { error: rollbackMembershipError } = await admin
+          .from("CompanyMembership")
+          .delete()
+          .eq("id", createdMembershipId)
+          .eq("companyId", companyId);
+        if (rollbackMembershipError) {
+          console.error("create-staff membership rollback failed", {
+            companyId,
+            createdMembershipId,
+            error: rollbackMembershipError.message,
+          });
+        }
+      }
       await admin.from("Driver").delete().eq("id", person.id).eq("companyId", companyId);
       await admin.from("Person").delete().eq("id", person.id).eq("companyId", companyId);
       return json({ error: error instanceof Error ? error.message : "Could not create staff record" }, 400);
@@ -255,5 +271,3 @@ Deno.serve(async (req) => {
     return json({ error: "Unexpected error creating staff record" }, 500);
   }
 });
-
-
