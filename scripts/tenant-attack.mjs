@@ -4,8 +4,20 @@ const tokenB = process.env.FLEETOS_SECURITY_TOKEN_B;
 const companyA = process.env.FLEETOS_SECURITY_COMPANY_A;
 const companyB = process.env.FLEETOS_SECURITY_COMPANY_B;
 
-if (!tokenA || !tokenB || !companyA || !companyB) {
-  console.log("SKIP authenticated cross-tenant probes: isolated test-account secrets are not configured.");
+const missing = [
+  ["FLEETOS_SECURITY_TOKEN_A", tokenA],
+  ["FLEETOS_SECURITY_TOKEN_B", tokenB],
+  ["FLEETOS_SECURITY_COMPANY_A", companyA],
+  ["FLEETOS_SECURITY_COMPANY_B", companyB],
+].filter(([, value]) => !value).map(([name]) => name);
+
+if (missing.length) {
+  const message = `Authenticated cross-tenant probes cannot run; missing: ${missing.join(", ")}.`;
+  if (process.env.CI === "true") {
+    console.error(`FAIL ${message}`);
+    process.exit(1);
+  }
+  console.log(`SKIP ${message}`);
   process.exit(0);
 }
 
@@ -30,5 +42,3 @@ for (const attempt of attempts) {
 }
 if (failures) process.exit(1);
 console.log("FleetOS authenticated cross-tenant probes passed.");
-
-
