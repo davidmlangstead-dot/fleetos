@@ -25,6 +25,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @fleetros/api exec prisma generate
       - run: pnpm build
+      - name: Web bundle performance budget
+        run: node scripts/check-web-bundle.mjs
       - name: Dependency vulnerability audit
         run: pnpm audit:deps
 
