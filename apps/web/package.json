@@ -3,15 +3,26 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "scripts": { "dev": "vite", "build": "tsc -b && vite build", "typecheck": "tsc -b", "lint": "tsc -b" },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b",
+    "lint": "tsc -b"
+  },
   "dependencies": {
     "@fleetros/shared": "workspace:*",
-    "@supabase/supabase-js": "^2.48.1",
-    "@tanstack/react-query": "^5.66.8",
+    "@supabase/supabase-js": "^2.110.9",
+    "@tanstack/react-query": "^5.101.4",
     "lucide-react": "^0.475.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-router-dom": "^7.1.5"
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.2"
   },
-  "devDependencies": { "@types/react": "^19.0.8", "@types/react-dom": "^19.0.3", "@vitejs/plugin-react": "^4.3.4", "typescript": "^5.7.3", "vite": "^6.1.0" }
+  "devDependencies": {
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.7.0",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.3"
+  }
 }
