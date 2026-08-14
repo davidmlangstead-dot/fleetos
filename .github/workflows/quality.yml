@@ -29,6 +29,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @fleetros/api exec prisma generate
       - run: pnpm build
+      - name: Text encoding contract
+        run: node scripts/check-text-encoding.mjs
       - name: Role policy contract
         run: node scripts/check-role-contract.mjs
       - name: Staff rollback safety contract
