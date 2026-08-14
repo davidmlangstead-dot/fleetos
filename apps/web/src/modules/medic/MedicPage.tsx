@@ -84,20 +84,20 @@ export function MedicPage() {
 
   return <section className="page">
     <div className="page-heading"><div><p className="eyebrow">Reliability & diagnostics</p><h1>FleetOS Medic</h1><p className="subtle">Medic observes, diagnoses and performs only pre-approved safe recovery. It cannot delete customer data, change security, rewrite code or deploy production by itself.</p></div>
-      <button className="primary-button" onClick={() => void load()} disabled={busy}><RefreshCw size={16}/> {busy ? "Checkingâ€¦" : "Run diagnosis"}</button>
+      <button className="primary-button" onClick={() => void load()} disabled={busy}><RefreshCw size={16}/> {busy ? "Checking…" : "Run diagnosis"}</button>
     </div>
 
     {error && <div className="panel" style={{padding:14,marginBottom:16,borderColor:"#dc2626",color:"#991b1b"}}>{error}</div>}
 
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:14,marginBottom:18}}>
-      <article className="panel" style={{padding:18}}><div style={{display:"flex",gap:12,alignItems:"center"}}>{overallIcon}<div><p className="eyebrow">Overall health</p><h2 style={{margin:0}}>{status?.overall ?? "CHECKING"}</h2></div></div><p className="subtle">{status ? `${status.openIncidents} open incident${status.openIncidents === 1 ? "" : "s"}.` : "Running checksâ€¦"}</p></article>
+      <article className="panel" style={{padding:18}}><div style={{display:"flex",gap:12,alignItems:"center"}}>{overallIcon}<div><p className="eyebrow">Overall health</p><h2 style={{margin:0}}>{status?.overall ?? "CHECKING"}</h2></div></div><p className="subtle">{status ? `${status.openIncidents} open incident${status.openIncidents === 1 ? "" : "s"}.` : "Running checks…"}</p></article>
       <article className="panel" style={{padding:18}}><div style={{display:"flex",gap:12,alignItems:"center"}}><Stethoscope size={28}/><div><p className="eyebrow">Medic authority</p><h2 style={{margin:0}}>Controlled</h2></div></div><p className="subtle">Observe + safe recovery enabled. Destructive recovery, automatic deployments and security changes are blocked.</p></article>
-      <article className="panel" style={{padding:18}}><div style={{display:"flex",gap:12,alignItems:"center"}}>{syncHealthy ? <CheckCircle2 size={28}/> : <CloudOff size={28}/>}<div><p className="eyebrow">This device</p><h2 style={{margin:0}}>{!localSync.online ? "OFFLINE" : localSync.failed ? "ATTENTION" : localSync.pending ? "SYNCING" : "SYNCED"}</h2></div></div><p className="subtle">{localSync.pending} queued Â· {localSync.failed} needs attention.</p>{(localSync.pending > 0 || localSync.failed > 0) && <button disabled={busy || !localSync.online} onClick={() => void retrySync()}><RefreshCw size={15}/> Retry sync</button>}</article>
+      <article className="panel" style={{padding:18}}><div style={{display:"flex",gap:12,alignItems:"center"}}>{syncHealthy ? <CheckCircle2 size={28}/> : <CloudOff size={28}/>}<div><p className="eyebrow">This device</p><h2 style={{margin:0}}>{!localSync.online ? "OFFLINE" : localSync.failed ? "ATTENTION" : localSync.pending ? "SYNCING" : "SYNCED"}</h2></div></div><p className="subtle">{localSync.pending} queued · {localSync.failed} needs attention.</p>{(localSync.pending > 0 || localSync.failed > 0) && <button disabled={busy || !localSync.online} onClick={() => void retrySync()}><RefreshCw size={15}/> Retry sync</button>}</article>
     </div>
 
     <section className="panel" style={{marginBottom:18}}><div className="panel-heading"><div><h2>Live checks</h2><p className="subtle">A green check means Medic actually exercised that dependency for this request.</p></div></div>
       <div style={{display:"grid",gap:10,padding:16}}>{status?.checks.map(check => <article key={check.key} style={{display:"flex",gap:12,alignItems:"flex-start",border:"1px solid #e5e7eb",borderRadius:12,padding:14}}>
-        {check.status === "HEALTHY" ? <CheckCircle2 size={20}/> : <TriangleAlert size={20}/>}<div><strong>{check.label} Â· {check.status}</strong><div className="subtle">{check.detail}{check.latencyMs !== undefined ? ` Â· ${check.latencyMs} ms` : ""}</div></div>
+        {check.status === "HEALTHY" ? <CheckCircle2 size={20}/> : <TriangleAlert size={20}/>}<div><strong>{check.label} · {check.status}</strong><div className="subtle">{check.detail}{check.latencyMs !== undefined ? ` · ${check.latencyMs} ms` : ""}</div></div>
       </article>) ?? <p className="subtle">Waiting for diagnosis.</p>}</div>
     </section>
 
@@ -107,11 +107,10 @@ export function MedicPage() {
 
     <section className="panel"><div className="panel-heading"><div><h2>Incident ledger</h2><p className="subtle">What Medic saw, what recovered, and what still needs human attention.</p></div></div>
       <div style={{display:"grid",gap:10,padding:16}}>{status?.recentIncidents.length ? status.recentIncidents.map(item => <article key={item.id} style={{border:"1px solid #e5e7eb",borderRadius:12,padding:14}}>
-        <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"flex-start"}}><div><strong>{item.summary}</strong><div className="subtle">{item.source} Â· {item.code} Â· {new Date(item.createdAt).toLocaleString("en-GB")}</div></div><span className="presence">{item.severity} Â· {item.status}</span></div>
+        <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"flex-start"}}><div><strong>{item.summary}</strong><div className="subtle">{item.source} · {item.code} · {new Date(item.createdAt).toLocaleString("en-GB")}</div></div><span className="presence">{item.severity} · {item.status}</span></div>
         {item.detail && <p>{item.detail}</p>}{item.recovery && <p className="subtle"><strong>Recovery:</strong> {item.recovery}</p>}
         {item.status === "OPEN" && <button disabled={busy} onClick={() => void resolveIncident(item.id)}>Mark resolved</button>}
       </article>) : <p className="subtle">No Medic incidents recorded for this company yet.</p>}</div>
     </section>
   </section>;
 }
-
