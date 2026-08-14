@@ -27,6 +27,7 @@ const everyone: readonly Role[] = ["DRIVER", "WORKSHOP_TECHNICIAN", "TRANSPORT_P
 const nav: readonly NavItem[] = [
   ["/", "Today", Gauge, management],
   ["/driver", "Driver Today", Gauge, ["DRIVER"]],
+  ["/driver/tachograph", "My Tacho", Clock3, ["DRIVER"]],
   ["/my-work", "My Work", ClipboardList, ["DRIVER", "WORKSHOP_TECHNICIAN"]],
   ["/hours", "Hours Board", Clock3, management],
   ["/tachograph", "Tachograph", Clock3, tachographUsers],
