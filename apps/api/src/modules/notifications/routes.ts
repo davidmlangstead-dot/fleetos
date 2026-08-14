@@ -110,7 +110,7 @@ notificationsRouter.get("/", asyncHandler(async (req, res) => {
   }
   for (const defect of defects) {
     const high = ["HIGH", "CRITICAL", "DANGEROUS"].includes((defect.severity ?? "").toUpperCase());
-    alerts.push({ id: `defect:${defect.id}`, kind: "DEFECT", severity: high ? "CRITICAL" : "WARNING", title: defect.vehicle?.registration ? `${defect.vehicle.registration}: ${defect.title}` : defect.title, detail: defect.severity ? `Open defect Â· ${defect.severity}` : "Open defect", occurredAt: defect.createdAt.toISOString(), href: "/workshop" });
+    alerts.push({ id: `defect:${defect.id}`, kind: "DEFECT", severity: high ? "CRITICAL" : "WARNING", title: defect.vehicle?.registration ? `${defect.vehicle.registration}: ${defect.title}` : defect.title, detail: defect.severity ? `Open defect · ${defect.severity}` : "Open defect", occurredAt: defect.createdAt.toISOString(), href: "/workshop" });
   }
   for (const plan of plans) {
     const overdue = plan.nextDueAt < now;
@@ -118,7 +118,7 @@ notificationsRouter.get("/", asyncHandler(async (req, res) => {
   }
   for (const work of workOrders) {
     const when = work.dueAt ?? work.scheduledFor ?? work.createdAt;
-    alerts.push({ id: `work-order:${work.id}`, kind: "MAINTENANCE", severity: "CRITICAL", title: `${work.registration}: vehicle off road`, detail: `${work.title} Â· ${work.status.replaceAll("_", " ")}`, occurredAt: when.toISOString(), href: "/workshop" });
+    alerts.push({ id: `work-order:${work.id}`, kind: "MAINTENANCE", severity: "CRITICAL", title: `${work.registration}: vehicle off road`, detail: `${work.title} · ${work.status.replaceAll("_", " ")}`, occurredAt: when.toISOString(), href: "/workshop" });
   }
   for (const incident of medic) {
     alerts.push({ id: `medic:${incident.id}`, kind: "MEDIC", severity: incident.severity === "CRITICAL" ? "CRITICAL" : "WARNING", title: incident.summary, detail: incident.detail, occurredAt: incident.createdAt.toISOString(), href: "/settings/medic" });
@@ -134,5 +134,3 @@ notificationsRouter.get("/", asyncHandler(async (req, res) => {
   alerts.sort((a, b) => severityRank[a.severity] - severityRank[b.severity] || b.occurredAt.localeCompare(a.occurredAt));
   res.json({ total: alerts.length, critical: alerts.filter((item) => item.severity === "CRITICAL").length, items: alerts.slice(0, 30) });
 }));
-
-
