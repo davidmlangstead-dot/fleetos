@@ -31,6 +31,8 @@ jobs:
         run: pnpm --filter @fleetros/api up prisma@6.19.2 @prisma/client@6.19.2
       - name: Override remaining vulnerable transitive packages
         run: pnpm audit --fix=override || true
+      - name: Regenerate lockfile after override
+        run: pnpm install --no-frozen-lockfile
       - name: Generate Prisma client
         run: pnpm --filter @fleetros/api exec prisma generate
       - name: Build after fixes
