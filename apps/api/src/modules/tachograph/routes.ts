@@ -20,6 +20,7 @@ type DownloadRow = {
   id: string;
   driverId: string;
   documentId: string;
+  storagePath: string;
   originalFilename: string;
   fileSize: number | null;
   downloadedAt: Date;
@@ -40,6 +41,7 @@ function asPayload(row: DownloadRow) {
     driverId: row.driverId,
     driverName: `${row.firstName} ${row.lastName}`,
     documentId: row.documentId,
+    storagePath: row.storagePath,
     originalFilename: row.originalFilename,
     fileSize: row.fileSize,
     downloadedAt: row.downloadedAt.toISOString(),
@@ -57,10 +59,11 @@ tachographRouter.use(requireAuth);
 
 tachographRouter.get("/", officeReaders, asyncHandler(async (req, res) => {
   const rows = await prisma.$queryRaw<DownloadRow[]>`
-    SELECT t.id::text,t."driverId",t."documentId",t."originalFilename",t."fileSize",t."downloadedAt",t."nextDueAt",t.source,t.status,t."createdAt",
+    SELECT t.id::text,t."driverId",t."documentId",doc."fileUrl" AS "storagePath",t."originalFilename",t."fileSize",t."downloadedAt",t."nextDueAt",t.source,t.status,t."createdAt",
       d."firstName",d."lastName"
     FROM "TachographDownload" t
     JOIN "Driver" d ON d.id=t."driverId" AND d."companyId"=t."companyId"
+    JOIN "Document" doc ON doc.id=t."documentId" AND doc."companyId"=t."companyId"
     WHERE t."companyId"=${req.user!.companyId}
     ORDER BY t."downloadedAt" DESC
     LIMIT 500
@@ -70,11 +73,12 @@ tachographRouter.get("/", officeReaders, asyncHandler(async (req, res) => {
 
 tachographRouter.get("/me", asyncHandler(async (req, res) => {
   const rows = await prisma.$queryRaw<DownloadRow[]>`
-    SELECT t.id::text,t."driverId",t."documentId",t."originalFilename",t."fileSize",t."downloadedAt",t."nextDueAt",t.source,t.status,t."createdAt",
+    SELECT t.id::text,t."driverId",t."documentId",doc."fileUrl" AS "storagePath",t."originalFilename",t."fileSize",t."downloadedAt",t."nextDueAt",t.source,t.status,t."createdAt",
       d."firstName",d."lastName"
     FROM "TachographDownload" t
     JOIN "Driver" d ON d.id=t."driverId" AND d."companyId"=t."companyId"
     JOIN "Person" p ON p.id=d."personId" AND p."companyId"=d."companyId"
+    JOIN "Document" doc ON doc.id=t."documentId" AND doc."companyId"=t."companyId"
     WHERE t."companyId"=${req.user!.companyId} AND p."userId"=${req.user!.id}
     ORDER BY t."downloadedAt" DESC
     LIMIT 25
@@ -109,7 +113,7 @@ tachographRouter.post("/", officeWriters, asyncHandler(async (req, res) => {
     const rows = await tx.$queryRaw<DownloadRow[]>`
       INSERT INTO "TachographDownload" ("companyId","driverId","documentId","originalFilename","fileSize","downloadedAt","nextDueAt","createdById")
       VALUES (${companyId},${driver.id},${document.id},${input.originalFilename},${input.fileSize},${downloadedAt},${nextDueAt},${req.user!.id})
-      RETURNING id::text,"driverId","documentId","originalFilename","fileSize","downloadedAt","nextDueAt",source,status,"createdAt",${driver.firstName}::text AS "firstName",${driver.lastName}::text AS "lastName"
+      RETURNING id::text,"driverId","documentId",${input.storagePath}::text AS "storagePath","originalFilename","fileSize","downloadedAt","nextDueAt",source,status,"createdAt",${driver.firstName}::text AS "firstName",${driver.lastName}::text AS "lastName"
     `;
     return rows[0];
   });
