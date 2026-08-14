@@ -27,6 +27,8 @@ jobs:
       - run: pnpm build
       - name: Web bundle performance budget
         run: node scripts/check-web-bundle.mjs
+      - name: PWA installability contract
+        run: node scripts/check-pwa.mjs
       - name: Dependency vulnerability audit
         run: pnpm audit:deps
 
