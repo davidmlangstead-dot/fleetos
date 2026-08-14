@@ -46,6 +46,24 @@ await probe("Forged-session attack /api/company/branding/current", "/api/company
 }, [401, 404]);
 
 try {
+  const response = await fetch(`${API}/api`, { redirect: "manual", signal: AbortSignal.timeout(20_000) });
+  const expectedHeaders = [
+    ["x-content-type-options", "nosniff"],
+    ["x-frame-options", "DENY"],
+    ["referrer-policy", "no-referrer"],
+    ["permissions-policy", "camera=(), microphone=(), geolocation=()"],
+  ];
+  for (const [header, expected] of expectedHeaders) {
+    const actual = response.headers.get(header);
+    results.push({ name: `Security header ${header}`, ok: actual === expected, status: actual ?? "MISSING", ms: 0 });
+  }
+  const poweredBy = response.headers.get("x-powered-by");
+  results.push({ name: "Express fingerprint hidden", ok: poweredBy === null, status: poweredBy ?? "HIDDEN", ms: 0 });
+} catch (error) {
+  results.push({ name: "Security response headers", ok: false, status: "ERROR", ms: 0, error: error instanceof Error ? error.message : String(error) });
+}
+
+try {
   const response = await fetch(`${API}/api`, {
     headers: { origin: "https://attacker.invalid" },
     redirect: "manual",
@@ -60,5 +78,3 @@ try {
 for (const result of results) console.log(`${result.ok ? "PASS" : "FAIL"} ${result.name} (${result.status}, ${result.ms}ms)`);
 if (results.some((result) => !result.ok)) process.exit(1);
 console.log(`FleetOS security probes passed: ${results.length}/${results.length}`);
-
-
