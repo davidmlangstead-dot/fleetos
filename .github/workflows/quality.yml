@@ -31,6 +31,8 @@ jobs:
       - run: pnpm build
       - name: Role policy contract
         run: node scripts/check-role-contract.mjs
+      - name: Staff rollback safety contract
+        run: node scripts/check-staff-rollback.mjs
       - name: Web bundle performance budget
         run: node scripts/check-web-bundle.mjs
       - name: PWA installability contract
