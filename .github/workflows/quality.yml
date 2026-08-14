@@ -6,9 +6,13 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  build:
+  build-and-dependencies:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -21,24 +25,31 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @fleetros/api exec prisma generate
       - run: pnpm build
+      - name: Dependency vulnerability audit
+        run: pnpm audit:deps
 
-  production-smoke:
+  production-assurance:
     runs-on: ubuntu-latest
-    needs: build
+    needs: build-and-dependencies
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - run: node scripts/smoke.mjs
-      - run: node scripts/security-smoke.mjs
-      - run: node scripts/tenant-attack.mjs
+      - name: Production smoke test
+        run: node scripts/smoke.mjs
+      - name: Security perimeter test
+        run: node scripts/security-smoke.mjs
+      - name: Authenticated tenant isolation
+        run: node scripts/tenant-attack.mjs
         env:
           FLEETOS_SECURITY_TOKEN_A: ${{ secrets.FLEETOS_SECURITY_TOKEN_A }}
           FLEETOS_SECURITY_TOKEN_B: ${{ secrets.FLEETOS_SECURITY_TOKEN_B }}
           FLEETOS_SECURITY_COMPANY_A: ${{ secrets.FLEETOS_SECURITY_COMPANY_A }}
           FLEETOS_SECURITY_COMPANY_B: ${{ secrets.FLEETOS_SECURITY_COMPANY_B }}
-      - run: node scripts/authenticated-load.mjs
+      - name: Authenticated read load
+        run: node scripts/authenticated-load.mjs
         env:
           FLEETOS_SECURITY_TOKEN_A: ${{ secrets.FLEETOS_SECURITY_TOKEN_A }}
           FLEETOS_SECURITY_COMPANY_A: ${{ secrets.FLEETOS_SECURITY_COMPANY_A }}
