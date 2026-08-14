@@ -42,8 +42,6 @@ function FleetOSApp() {
       return;
     }
 
-    // Keep a valid cached session while offline. A remote identity check is only safe
-    // when a connection exists; otherwise it could incorrectly sign the driver out.
     if (navigator.onLine) {
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError || !userData.user) {
@@ -69,7 +67,7 @@ function FleetOSApp() {
       }
 
       try { setBranding(await loadCurrentBranding()); }
-      catch { /* Keep the public/default brand if the connection is degraded. */ }
+      catch { }
 
       if (active.role === "DRIVER" && window.location.pathname === "/") {
         window.history.replaceState(null, "", "/driver");
@@ -81,8 +79,6 @@ function FleetOSApp() {
       console.error("FleetOS workspace bootstrap failed", err);
       const status = err instanceof Error && "status" in err ? (err as Error & { status?: number }).status : undefined;
       if (status === 401 && navigator.onLine) {
-        // Confirm whether the token itself is dead before clearing it. API/database failures
-        // must never silently log a valid user out.
         const { data: verified, error: verifyError } = await supabase.auth.getUser();
         if (verifyError || !verified.user) {
           await clearDeadLocalSession();
@@ -132,8 +128,6 @@ createRoot(document.getElementById("root")!).render(
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {
-    void navigator.serviceWorker.register("/sw.js").catch((error) => console.error("FleetOS service worker registration failed", error));
+    void navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).then((registration) => registration.update()).catch((error) => console.error("FleetOS service worker registration failed", error));
   });
 }
-
-
