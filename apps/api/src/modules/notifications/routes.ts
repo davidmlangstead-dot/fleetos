@@ -5,7 +5,7 @@ import { requireAuth } from "../../middleware/auth.js";
 
 type Alert = {
   id: string;
-  kind: "COMPLIANCE" | "DEFECT" | "MAINTENANCE" | "MEDIC" | "DRIVER" | "JOB";
+  kind: "COMPLIANCE" | "DEFECT" | "MAINTENANCE" | "MEDIC" | "DRIVER" | "JOB" | "TACHOGRAPH";
   severity: "INFO" | "WARNING" | "CRITICAL";
   title: string;
   detail: string | null;
@@ -17,6 +17,7 @@ type PlanRow = { id: string; title: string; category: string; nextDueAt: Date; r
 type WorkRow = { id: string; title: string; status: string; priority: string; dueAt: Date | null; scheduledFor: Date | null; createdAt: Date; registration: string };
 type DriverOpsAlertRow = { id: string; severity: "WARNING" | "CRITICAL"; title: string; detail: string; occurredAt: Date };
 type JobAlertRow = { id: string; severity: "WARNING" | "CRITICAL"; title: string; detail: string; occurredAt: Date };
+type TachoAlertRow = { id: string; severity: "WARNING" | "CRITICAL"; title: string; detail: string; occurredAt: Date; href: string };
 
 const complianceRoles = new Set(["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
 const defectRoles = new Set(["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
@@ -24,6 +25,7 @@ const workshopRoles = new Set(["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRAN
 const medicRoles = new Set(["TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
 const driverOpsRoles = new Set(["TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
 const jobOpsRoles = new Set(["TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
+const tachographOfficeRoles = new Set(["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
 
 export const notificationsRouter = Router();
 notificationsRouter.use(requireAuth);
@@ -34,7 +36,45 @@ notificationsRouter.get("/", asyncHandler(async (req, res) => {
   const now = new Date();
   const soon = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-  const [compliance, defects, plans, workOrders, medic, driverOps, jobOps] = await Promise.all([
+  const tachoPromise = tachographOfficeRoles.has(role)
+    ? prisma.$queryRaw<TachoAlertRow[]>`
+        WITH latest AS (
+          SELECT DISTINCT ON (t."driverId") t.id,t."driverId",t."nextDueAt",t."downloadedAt"
+          FROM "TachographDownload" t
+          WHERE t."companyId"=${companyId}
+          ORDER BY t."driverId",t."downloadedAt" DESC
+        )
+        SELECT 'tachograph:'||latest.id::text AS id,
+          CASE WHEN latest."nextDueAt"<NOW() THEN 'CRITICAL' ELSE 'WARNING' END AS severity,
+          d."firstName"||' '||d."lastName"||': driver card download '||CASE WHEN latest."nextDueAt"<NOW() THEN 'overdue' ELSE 'due soon' END AS title,
+          'Next download due '||to_char(latest."nextDueAt",'DD Mon YYYY') AS detail,
+          latest."nextDueAt" AS "occurredAt",
+          '/tachograph'::text AS href
+        FROM latest JOIN "Driver" d ON d.id=latest."driverId" AND d."companyId"=${companyId}
+        WHERE latest."nextDueAt"<=NOW()+INTERVAL '7 days'
+        ORDER BY latest."nextDueAt" ASC LIMIT 30
+      `
+    : role === "DRIVER"
+      ? prisma.$queryRaw<TachoAlertRow[]>`
+          WITH linked_driver AS (
+            SELECT d.id FROM "Driver" d JOIN "Person" p ON p.id=d."personId" AND p."companyId"=d."companyId"
+            WHERE d."companyId"=${companyId} AND p."userId"=${req.user!.id} LIMIT 1
+          ), latest AS (
+            SELECT t.id,t."driverId",t."nextDueAt",t."downloadedAt"
+            FROM "TachographDownload" t JOIN linked_driver ld ON ld.id=t."driverId"
+            ORDER BY t."downloadedAt" DESC LIMIT 1
+          )
+          SELECT 'tachograph:'||latest.id::text AS id,
+            CASE WHEN latest."nextDueAt"<NOW() THEN 'CRITICAL' ELSE 'WARNING' END AS severity,
+            'Your driver card download is '||CASE WHEN latest."nextDueAt"<NOW() THEN 'overdue' ELSE 'due soon' END AS title,
+            'Next download due '||to_char(latest."nextDueAt",'DD Mon YYYY') AS detail,
+            latest."nextDueAt" AS "occurredAt",
+            '/driver/tachograph'::text AS href
+          FROM latest WHERE latest."nextDueAt"<=NOW()+INTERVAL '7 days'
+        `
+      : Promise.resolve([] as TachoAlertRow[]);
+
+  const [compliance, defects, plans, workOrders, medic, driverOps, jobOps, tacho] = await Promise.all([
     complianceRoles.has(role)
       ? prisma.complianceItem.findMany({ where: { companyId, status: { not: "RESOLVED" }, dueDate: { lte: soon } }, select: { id: true, title: true, dueDate: true, description: true }, orderBy: { dueDate: "asc" }, take: 20 })
       : Promise.resolve([]),
@@ -101,6 +141,7 @@ notificationsRouter.get("/", asyncHandler(async (req, res) => {
           ORDER BY "occurredAt" ASC LIMIT 20
         `
       : Promise.resolve([] as JobAlertRow[]),
+    tachoPromise,
   ]);
 
   const alerts: Alert[] = [];
@@ -128,6 +169,9 @@ notificationsRouter.get("/", asyncHandler(async (req, res) => {
   }
   for (const item of jobOps) {
     alerts.push({ id: item.id, kind: "JOB", severity: item.severity, title: item.title, detail: item.detail, occurredAt: item.occurredAt.toISOString(), href: "/jobs" });
+  }
+  for (const item of tacho) {
+    alerts.push({ id: item.id, kind: "TACHOGRAPH", severity: item.severity, title: item.title, detail: item.detail, occurredAt: item.occurredAt.toISOString(), href: item.href });
   }
 
   const severityRank = { CRITICAL: 0, WARNING: 1, INFO: 2 } as const;
