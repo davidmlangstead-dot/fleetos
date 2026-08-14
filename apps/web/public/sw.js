@@ -1,4 +1,4 @@
-const CACHE = "fleetos-shell-v3";
+const CACHE = "fleetos-shell-v4";
 const SHELL = ["/", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
@@ -31,7 +31,19 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (!["script", "style", "image", "font", "manifest"].includes(request.destination)) return;
+  if (["script", "style"].includes(request.destination)) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) caches.open(CACHE).then((cache) => cache.put(request, response.clone()));
+          return response;
+        })
+        .catch(() => caches.match(request).then((cached) => cached || Response.error())),
+    );
+    return;
+  }
+
+  if (!["image", "font", "manifest"].includes(request.destination)) return;
   event.respondWith(
     caches.match(request).then((cached) => cached || fetch(request).then((response) => {
       if (response.ok) caches.open(CACHE).then((cache) => cache.put(request, response.clone()));
@@ -52,4 +64,3 @@ self.addEventListener("sync", (event) => {
 self.addEventListener("message", (event) => {
   if (event.data?.type === "FLEETOS_REQUEST_SYNC") event.waitUntil(requestClientSync());
 });
-
