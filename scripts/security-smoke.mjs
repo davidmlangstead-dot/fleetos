@@ -10,6 +10,8 @@ const routes = [
   "/api/registers/FUEL",
   "/api/messages",
   "/api/documents/link-options",
+  "/api/tachograph",
+  "/api/tachograph/me",
   "/api/reports",
   "/api/marketplace",
   "/api/medic/status",
