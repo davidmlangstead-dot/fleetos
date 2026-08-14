@@ -1,0 +1,63 @@
+name: FleetOS Nightly Assurance
+
+on:
+  schedule:
+    - cron: "30 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-assurance:
+    name: Public reliability and security
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.18.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @fleetros/api exec prisma generate
+      - run: pnpm build
+      - name: Dependency vulnerability audit
+        run: pnpm audit:deps
+      - name: Production smoke test
+        run: node scripts/smoke.mjs
+      - name: Security perimeter test
+        run: node scripts/security-smoke.mjs
+      - name: Safe public load test
+        run: node scripts/load-test.mjs
+        env:
+          FLEETOS_LOAD_STAGES: "5,10,25,50"
+          FLEETOS_LOAD_MAX_ERROR_RATE: "0.01"
+          FLEETOS_LOAD_MAX_P95_MS: "2500"
+
+  authenticated-assurance:
+    name: Authenticated tenant assurance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Cross-tenant isolation attacks
+        run: node scripts/tenant-attack.mjs
+        env:
+          FLEETOS_SECURITY_TOKEN_A: ${{ secrets.FLEETOS_SECURITY_TOKEN_A }}
+          FLEETOS_SECURITY_TOKEN_B: ${{ secrets.FLEETOS_SECURITY_TOKEN_B }}
+          FLEETOS_SECURITY_COMPANY_A: ${{ secrets.FLEETOS_SECURITY_COMPANY_A }}
+          FLEETOS_SECURITY_COMPANY_B: ${{ secrets.FLEETOS_SECURITY_COMPANY_B }}
+      - name: Authenticated read load
+        run: node scripts/authenticated-load.mjs
+        env:
+          FLEETOS_SECURITY_TOKEN_A: ${{ secrets.FLEETOS_SECURITY_TOKEN_A }}
+          FLEETOS_SECURITY_COMPANY_A: ${{ secrets.FLEETOS_SECURITY_COMPANY_A }}
+          FLEETOS_AUTH_LOAD_MAX_ERROR_RATE: "0.01"
+          FLEETOS_AUTH_LOAD_MAX_P95_MS: "2500"
