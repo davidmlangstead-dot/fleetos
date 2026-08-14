@@ -21,7 +21,7 @@ if (missing.length) {
   process.exit(0);
 }
 
-const targets = ["/api/company", "/api/vehicles", "/api/drivers", "/api/jobs", "/api/operations/maintenance", "/api/messages", "/api/driver-operations/office"];
+const targets = ["/api/company", "/api/vehicles", "/api/drivers", "/api/jobs", "/api/operations/maintenance", "/api/messages", "/api/tachograph", "/api/tachograph/me", "/api/driver-operations/office"];
 const attempts = [
   { name: "Tenant A token against tenant B", token: tokenA, company: companyB },
   { name: "Tenant B token against tenant A", token: tokenB, company: companyA },
