@@ -10,6 +10,8 @@
     "load:test": "node scripts/load-test.mjs",
     "load:auth": "node scripts/authenticated-load.mjs",
     "security": "node scripts/security-smoke.mjs && node scripts/tenant-attack.mjs",
+    "audit:deps": "pnpm audit --audit-level high",
+    "assure:public": "pnpm build && pnpm audit:deps && node scripts/smoke.mjs && node scripts/security-smoke.mjs && node scripts/load-test.mjs",
     "verify": "pnpm build && pnpm smoke && pnpm security",
     "db:gen": "pnpm --filter @fleetros/api prisma generate"
   }
