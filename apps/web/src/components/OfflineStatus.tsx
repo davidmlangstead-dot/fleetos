@@ -64,7 +64,7 @@ export function OfflineStatus() {
   }
 
   const attention = state.failed > 0;
-  const label = !state.online ? "Offline" : state.syncing ? "Syncingâ€¦" : attention ? `${state.failed} needs attention` : state.pending ? `${state.pending} queued` : "Synced";
+  const label = !state.online ? "Offline" : state.syncing ? "Syncing…" : attention ? `${state.failed} needs attention` : state.pending ? `${state.pending} queued` : "Synced";
   const Icon = !state.online ? CloudOff : attention ? TriangleAlert : state.syncing || state.pending ? RefreshCw : CheckCircle2;
   const colour = !state.online ? "#92400e" : attention ? "#b91c1c" : "#166534";
 
@@ -76,12 +76,10 @@ export function OfflineStatus() {
       <strong>{state.online ? `${branding.name} sync` : "Working offline"}</strong>
       <p style={{ margin: "6px 0 12px", color: "#64748b", fontSize: 12 }}>{state.online ? "Saved changes sync automatically and are protected from duplicates." : "Your changes stay safely on this device and will send when the connection returns."}</p>
       {items.length === 0 ? <p style={{ color: "#166534", fontSize: 13 }}>Everything is up to date.</p> : items.map((item) => <div key={item.id} style={{ borderTop: "1px solid #f1f5f9", padding: "10px 0", display: "flex", justifyContent: "space-between", gap: 10 }}>
-        <div><strong style={{ fontSize: 13 }}>{friendlyPath(item)}</strong><div style={{ color: item.state === "failed" ? "#b91c1c" : "#64748b", fontSize: 11 }}>{item.state === "failed" ? item.lastError ?? "Needs attention" : `Waiting to sync Â· ${new Date(item.createdAt).toLocaleString("en-GB")}`}</div></div>
+        <div><strong style={{ fontSize: 13 }}>{friendlyPath(item)}</strong><div style={{ color: item.state === "failed" ? "#b91c1c" : "#64748b", fontSize: 11 }}>{item.state === "failed" ? item.lastError ?? "Needs attention" : `Waiting to sync · ${new Date(item.createdAt).toLocaleString("en-GB")}`}</div></div>
         <button aria-label={`Discard ${friendlyPath(item)}`} onClick={() => void discard(item)} style={{ border: 0, background: "transparent", color: "#64748b", padding: 4 }}><Trash2 size={15}/></button>
       </div>)}
       {(state.pending > 0 || state.failed > 0) && <button onClick={() => void retryAll()} disabled={!state.online || state.syncing} style={{ width: "100%", marginTop: 10 }}><RefreshCw size={15}/> Retry now</button>}
     </div>}
   </div>;
 }
-
-
