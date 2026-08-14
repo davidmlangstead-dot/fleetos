@@ -38,4 +38,9 @@ jobs:
           FLEETOS_SECURITY_TOKEN_B: ${{ secrets.FLEETOS_SECURITY_TOKEN_B }}
           FLEETOS_SECURITY_COMPANY_A: ${{ secrets.FLEETOS_SECURITY_COMPANY_A }}
           FLEETOS_SECURITY_COMPANY_B: ${{ secrets.FLEETOS_SECURITY_COMPANY_B }}
-
+      - run: node scripts/authenticated-load.mjs
+        env:
+          FLEETOS_SECURITY_TOKEN_A: ${{ secrets.FLEETOS_SECURITY_TOKEN_A }}
+          FLEETOS_SECURITY_COMPANY_A: ${{ secrets.FLEETOS_SECURITY_COMPANY_A }}
+          FLEETOS_AUTH_LOAD_MAX_ERROR_RATE: "0.01"
+          FLEETOS_AUTH_LOAD_MAX_P95_MS: "2500"
