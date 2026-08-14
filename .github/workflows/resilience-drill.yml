@@ -1,0 +1,30 @@
+name: FleetOS Resilience Drill
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  resilience:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Safe spike test
+        run: node scripts/load-test.mjs
+        env:
+          FLEETOS_LOAD_STAGES: "5,10,25,50"
+          FLEETOS_LOAD_MAX_ERROR_RATE: "0.01"
+          FLEETOS_LOAD_MAX_P95_MS: "2500"
+      - name: Ten minute soak test
+        run: node scripts/soak-test.mjs
+        env:
+          FLEETOS_SOAK_CONCURRENCY: "10"
+          FLEETOS_SOAK_DURATION_MS: "600000"
+          FLEETOS_SOAK_MAX_ERROR_RATE: "0.01"
+          FLEETOS_SOAK_MAX_P95_MS: "2500"
