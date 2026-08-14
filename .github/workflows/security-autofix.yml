@@ -29,6 +29,8 @@ jobs:
         run: pnpm --filter @fleetros/web up react-router-dom@7.18.2
       - name: Patch Prisma within current major
         run: pnpm --filter @fleetros/api up prisma@6.19.2 @prisma/client@6.19.2
+      - name: Override remaining vulnerable transitive packages
+        run: pnpm audit --fix=override || true
       - name: Generate Prisma client
         run: pnpm --filter @fleetros/api exec prisma generate
       - name: Build after fixes
@@ -43,6 +45,6 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json pnpm-lock.yaml apps/*/package.json packages/*/package.json
+          git add package.json pnpm-lock.yaml pnpm-workspace.yaml apps/*/package.json packages/*/package.json
           git commit -m "fix high severity dependency vulnerabilities"
           git push origin HEAD:main
