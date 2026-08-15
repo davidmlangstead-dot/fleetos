@@ -35,7 +35,7 @@
   position: absolute;
   right: 0;
   top: 42px;
-  width: 190px;
+  width: 220px;
   z-index: 60;
   padding: 6px;
   background: #fff;
@@ -56,6 +56,21 @@
   cursor: pointer;
 }
 .account-menu button:hover { background: #f1f5f9; }
+
+html[data-large-text="true"] { font-size: 118%; }
+html[data-large-text="true"] button,
+html[data-large-text="true"] input,
+html[data-large-text="true"] select,
+html[data-large-text="true"] textarea { min-height: 46px; font-size: 1rem; }
+html[data-high-contrast="true"] { filter: contrast(1.18); }
+html[data-high-contrast="true"] a,
+html[data-high-contrast="true"] button { text-decoration-thickness: 2px; }
+html[data-reduced-motion="true"] *,
+html[data-reduced-motion="true"] *::before,
+html[data-reduced-motion="true"] *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+html[data-easy-read="true"] .page-shell p,
+html[data-easy-read="true"] .page-shell span { line-height: 1.7; max-width: 72ch; }
+html[data-easy-read="true"] .action-card { padding: 22px; }
 
 @media (max-width: 900px) {
   .sidebar {
