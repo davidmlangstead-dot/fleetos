@@ -121,7 +121,7 @@ commercialRouter.get("/portfolio", requirePlatformOwner, asyncHandler(async (_re
     FROM "CompanyControl" cc JOIN "Company" c ON c.id=cc."companyId"
     LEFT JOIN "CompanyMembership" cm ON cm."companyId"=c.id
     LEFT JOIN "Vehicle" v ON v."companyId"=c.id
-    GROUP BY cc."companyId",c.name,c.slug,cc."subscriptionPlan",cc."subscriptionStatus",cc."betaEnabled",cc."trialStartedAt",cc."trialEndsAt",cc."vehicleLimit",cc."featureFlags",
+    GROUP BY cc."companyId",c.name,c.slug,c."createdAt",cc."subscriptionPlan",cc."subscriptionStatus",cc."betaEnabled",cc."trialStartedAt",cc."trialEndsAt",cc."vehicleLimit",cc."featureFlags",
       cc."commitmentMonths",cc."commitmentStartedAt",cc."commitmentEndsAt",cc."resellerId",cc."wholesaleMonthlyPence",cc."retailMonthlyPence"
     ORDER BY c."createdAt" DESC
   `;
