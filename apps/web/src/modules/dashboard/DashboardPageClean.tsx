@@ -5,7 +5,7 @@ import { api } from "../../lib/api";
 
 type Job = { id: string; reference: string | null; collectionAddress: string | null; deliveryAddress: string | null; scheduledAt: string; status: string; driver: { firstName: string; lastName: string } | null };
 type Attention = { critical: number; dueSoon: number; vehicleDates: { overdue: number; dueSoon: number }; driverDates: { overdue: number; dueSoon: number }; tachograph: { overdue: number; dueSoon: number } };
-type Commercial = { subscriptionStatus: string; betaEnabled: boolean; trialEndsAt: string | null; trialDaysRemaining: number | null };
+type Commercial = { subscriptionStatus: string; betaEnabled: boolean; trialEndsAt: string | null; trialDaysRemaining: number | null; vehicleLimit: number; vehicleUsage: number; vehiclesAvailable: number; vehicleLimitReached: boolean };
 type Dashboard = { vehicles: number; activeJobs: number; overdueCompliance: number; openDefects: number; jobs: Job[]; attention: Attention; commercial: Commercial | null };
 
 const modules = [
@@ -31,7 +31,7 @@ export function DashboardPageClean() {
   }, []);
 
   const metrics = [
-    ["Vehicles on road", data.vehicles, "Active vehicle records", Truck, "blue", "/vehicles"],
+    ["Vehicles on road", data.vehicles, data.commercial ? `${data.commercial.vehicleUsage} of ${data.commercial.vehicleLimit} vehicle slots used` : "Active vehicle records", Truck, "blue", "/vehicles"],
     ["Live jobs", data.activeJobs, "Planned, assigned or moving", ArrowRight, "violet", "/jobs"],
     ["Open defects", data.openDefects, "Need workshop attention", CircleAlert, "orange", "/workshop"],
     ["Compliance overdue", data.overdueCompliance, "Requires attention", AlertTriangle, "red", "/compliance"],
@@ -39,7 +39,7 @@ export function DashboardPageClean() {
 
   return <section className="page">
     <div className="page-heading"><div><p className="eyebrow">Fleet operations</p><h1>Your dashboard</h1><p className="subtle">Your company workspace, with every core FleetOS module one click away.</p></div></div>
-    {data.commercial?.betaEnabled && <div className="panel" style={{ marginBottom: 18, padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><span className="metric-icon violet" style={{ width: 34, height: 34 }}><FlaskConical size={17}/></span><div><strong>Beta workspace</strong><div className="subtle" style={{ fontSize: 12 }}>{data.commercial.subscriptionStatus === "TRIAL" ? `${data.commercial.trialDaysRemaining ?? 0} trial day(s) remaining. Operational records are preserved when the trial state changes.` : `Subscription status: ${data.commercial.subscriptionStatus.toLowerCase().replaceAll("_", " ")}.`}</div></div></div><Link className="secondary-button" to="/settings/beta">Beta controls</Link></div>}
+    {data.commercial?.betaEnabled && <div className="panel" style={{ marginBottom: 18, padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><span className="metric-icon violet" style={{ width: 34, height: 34 }}><FlaskConical size={17}/></span><div><strong>{data.commercial.subscriptionStatus === "TRIAL" ? "90-day FleetOS trial" : "Beta workspace"}</strong><div className="subtle" style={{ fontSize: 12 }}>{data.commercial.subscriptionStatus === "TRIAL" ? `${data.commercial.trialDaysRemaining ?? 0} trial day(s) remaining · ${data.commercial.vehicleUsage}/${data.commercial.vehicleLimit} vehicles used.` : `Subscription status: ${data.commercial.subscriptionStatus.toLowerCase().replaceAll("_", " ")} · ${data.commercial.vehicleUsage}/${data.commercial.vehicleLimit} vehicles used.`}</div></div></div><Link className="secondary-button" to="/settings/beta">Plan & trial</Link></div>}
     <div className="panel" style={{ marginBottom: 18, padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}><span className="metric-icon blue" style={{ width: 34, height: 34 }}><Mail size={17}/></span><div><strong>Email</strong><div className="subtle" style={{ fontSize: 12 }}>Quick shortcut to your normal email app. FleetOS does not read or store your email.</div></div></div>
       <a className="secondary-button" href="mailto:">Open email</a>
