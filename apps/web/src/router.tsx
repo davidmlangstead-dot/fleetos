@@ -44,6 +44,8 @@ const HoursBoardPage = lazy(() => loadWithChunkRecovery(() => import("./modules/
 const WorkshopPage = lazy(() => loadWithChunkRecovery(() => import("./modules/workshop/WorkshopPage").then(module => ({ default: module.WorkshopPage }))));
 const ComplianceGuardianPage = lazy(() => loadWithChunkRecovery(() => import("./modules/compliance/ComplianceGuardianPage").then(module => ({ default: module.ComplianceGuardianPage }))));
 const CompanySettingsPage = lazy(() => loadWithChunkRecovery(() => import("./modules/company/CompanySettingsPage").then(module => ({ default: module.CompanySettingsPage }))));
+const BetaControlsPage = lazy(() => loadWithChunkRecovery(() => import("./modules/company/BetaControlsPage").then(module => ({ default: module.BetaControlsPage }))));
+const SpreadsheetImportPage = lazy(() => loadWithChunkRecovery(() => import("./modules/imports/SpreadsheetImportPage").then(module => ({ default: module.SpreadsheetImportPage }))));
 const DepotsPage = lazy(() => loadWithChunkRecovery(() => import("./modules/organisation/DepotsPage").then(module => ({ default: module.DepotsPage }))));
 const AuditPage = lazy(() => loadWithChunkRecovery(() => import("./modules/organisation/AuditPage").then(module => ({ default: module.AuditPage }))));
 const RegistersHubPage = lazy(() => loadWithChunkRecovery(() => import("./modules/registers/RegisterPages").then(module => ({ default: module.RegistersHubPage }))));
@@ -89,8 +91,10 @@ export const router = createBrowserRouter([{ element: <AppShell />, errorElement
   { path: "/registers/:module", element: load(<RegisterModulePage />) },
   { path: "/reports", element: load(<ReportsPage />) },
   { path: "/marketplace", element: load(<MarketplacePage />) },
+  { path: "/imports", element: load(<SpreadsheetImportPage />) },
   { path: "/organisation/depots", element: load(<DepotsPage />) },
   { path: "/settings/company", element: load(<CompanySettingsPage />) },
+  { path: "/settings/beta", element: load(<BetaControlsPage />) },
   { path: "/settings/audit", element: load(<AuditPage />) },
   { path: "/settings/medic", element: load(<MedicPage />) },
   { path: "/messages", element: load(<MessagesPage />) },
