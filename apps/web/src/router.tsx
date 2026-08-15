@@ -62,6 +62,8 @@ const DriverOperationsOfficePage = lazy(() => loadWithChunkRecovery(() => import
 const JobsPage = lazy(() => loadWithChunkRecovery(() => import("./modules/jobs/JobsPage").then(module => ({ default: module.JobsPage }))));
 const MyWorkPage = lazy(() => loadWithChunkRecovery(() => import("./modules/jobs/MyWorkPage").then(module => ({ default: module.MyWorkPage }))));
 const PlatformControlPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/PlatformControlPage").then(module => ({ default: module.PlatformControlPage }))));
+const PlatformCustomersPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/PlatformControlPage").then(module => ({ default: module.PlatformCustomersPage }))));
+const PlatformMoneyPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/PlatformControlPage").then(module => ({ default: module.PlatformMoneyPage }))));
 const ResellerPortalPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/ResellerPortalPage").then(module => ({ default: module.ResellerPortalPage }))));
 const AccountsPage = lazy(() => loadWithChunkRecovery(() => import("./modules/accounts/AccountsPage").then(module => ({ default: module.AccountsPage }))));
 const AccessibilityPage = lazy(() => loadWithChunkRecovery(() => import("./modules/settings/AccessibilityPage").then(module => ({ default: module.AccessibilityPage }))));
@@ -98,6 +100,8 @@ export const router = createBrowserRouter([{ element: <AppShell />, errorElement
   { path: "/imports", element: load(<SpreadsheetImportPage />) },
   { path: "/accounts", element: load(<AccountsPage />) },
   { path: "/control", element: load(<PlatformControlPage />) },
+  { path: "/control/customers", element: load(<PlatformCustomersPage />) },
+  { path: "/control/money", element: load(<PlatformMoneyPage />) },
   { path: "/reseller", element: load(<ResellerPortalPage />) },
   { path: "/organisation/depots", element: load(<DepotsPage />) },
   { path: "/settings/company", element: load(<CompanySettingsPage />) },
