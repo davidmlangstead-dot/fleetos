@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
 import { asyncHandler } from "../../lib/asyncHandler.js";
-import { requireAuth, requireRoles } from "../../middleware/auth.js";
+import { requireAuth, requirePlatformOwner, requireRoles } from "../../middleware/auth.js";
 import { writeAuditEvent } from "../../lib/audit.js";
 
 export const commercialRouter = Router();
@@ -72,7 +72,7 @@ commercialRouter.get("/", requireRoles(...viewers), asyncHandler(async (req, res
   res.json(payload(row, vehicles));
 }));
 
-commercialRouter.patch("/", requireRoles("PLATFORM_ADMIN"), asyncHandler(async (req, res) => {
+commercialRouter.patch("/", requirePlatformOwner, asyncHandler(async (req, res) => {
   const input = patchSchema.parse(req.body);
   const companyId = req.user!.companyId;
   const current = await getControl(companyId);
@@ -113,7 +113,7 @@ commercialRouter.patch("/", requireRoles("PLATFORM_ADMIN"), asyncHandler(async (
   res.json(payload(rows[0], vehicles));
 }));
 
-commercialRouter.get("/portfolio", requireRoles("PLATFORM_ADMIN"), asyncHandler(async (_req, res) => {
+commercialRouter.get("/portfolio", requirePlatformOwner, asyncHandler(async (_req, res) => {
   const rows = await prisma.$queryRaw<Array<ControlRow & { companyName: string; slug: string; members: bigint; vehicles: bigint }>>`
     SELECT cc."companyId",c.name AS "companyName",c.slug,cc."subscriptionPlan",cc."subscriptionStatus",cc."betaEnabled",
       cc."trialStartedAt",cc."trialEndsAt",cc."vehicleLimit",cc."featureFlags",cc."commitmentMonths",cc."commitmentStartedAt",cc."commitmentEndsAt",
