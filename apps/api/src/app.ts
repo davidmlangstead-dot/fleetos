@@ -29,6 +29,7 @@ import { tachographRouter } from "./modules/tachograph/routes.js";
 import { preferencesRouter } from "./modules/preferences/routes.js";
 import { accountsRouter } from "./modules/accounts/routes.js";
 import { resellersRouter } from "./modules/resellers/routes.js";
+import { platformRouter } from "./modules/platform/routes.js";
 
 export const app = express();
 app.disable("x-powered-by");
@@ -82,6 +83,7 @@ app.get("/", (_req, res) => res.json({ name: "FleetOS API", status: "ok" }));
 app.get("/health", (_req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));
 app.get("/api", (_req, res) => res.json({ name: "FleetOS API", status: "ok" }));
 app.use("/api", apiRateLimit);
+app.use("/api/platform", sensitiveRateLimit, platformRouter);
 app.use("/api/company", sensitiveRateLimit, companyRouter);
 app.use("/api/commercial", sensitiveRateLimit, commercialRouter);
 app.use("/api/preferences", sensitiveRateLimit, preferencesRouter);
