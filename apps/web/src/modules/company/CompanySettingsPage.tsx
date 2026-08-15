@@ -1,7 +1,6 @@
-import { CSSProperties, FormEvent, useEffect, useState } from "react";
-import { ArchiveRestore, Building2, Database, Download, Eye, Globe2, MailCheck, Palette, Receipt, Save, ShieldCheck, Trash2, UserCheck } from "lucide-react";
+import { FormEvent, useEffect, useState } from "react";
+import { Building2, Database, Download, Save, ShieldCheck, Trash2, UserCheck } from "lucide-react";
 import { api } from "../../lib/api";
-import { loadCurrentBranding, useBranding } from "../../lib/branding";
 
 type CompanyProfile = {
   id: string; name: string; slug: string; address: string | null; postcode: string | null; phone: string | null;
@@ -9,20 +8,14 @@ type CompanyProfile = {
   complianceSchemes: string[]; homeDepotName: string | null; countryCode: string; usesHgv: boolean;
 };
 type Control = {
-  subscriptionPlan: string; subscriptionStatus: string; billingEmail: string | null; seatLimit: number; retentionDays: number;
-  privacyContactEmail: string | null; customDomain: string | null; customDomainVerified: boolean;
-  emailSenderDomain: string | null; emailDomainVerified: boolean;
-  brandName: string | null; brandTagline: string | null; brandLogoUrl: string | null;
-  brandPrimaryColor: string; brandAccentColor: string; brandSidebarColor: string;
-  brandSupportEmail: string | null; brandSupportPhone: string | null;
-  showPoweredBy: boolean; marketplaceEnabled: boolean;
+  billingEmail: string | null; privacyContactEmail: string | null; retentionDays: number; marketplaceEnabled: boolean;
+  subscriptionPlan: string; subscriptionStatus: string; seatLimit: number;
 };
 type Backup = { id: string; label: string; recordCounts: Record<string, number>; createdAt: string; expiresAt: string };
 type Governance = { id: string; type: string; status: string; subjectName: string; subjectEmail: string | null; notes: string | null; dueAt: string; completedAt: string | null; createdAt: string };
 type Admin = {
   control: Control;
   usage: { members: number; seatsAvailable: number; vehicles: number; activeDrivers: number; documents: number };
-  readiness: { productionUrl: string; authenticationRedirect: string; databaseRegion: string; portableBackup: string; customDomain: string; emailSender: string };
   backups: Backup[];
   governance: Governance[];
 };
@@ -37,13 +30,7 @@ function downloadJson(value: unknown, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function Ready({ label, status, detail }: { label: string; status: string; detail: string }) {
-  const ready = status === "READY";
-  return <article style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 14 }}><div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}><strong>{label}</strong><span style={{ color: ready ? "#166534" : status === "VERIFY_DNS" ? "#a16207" : "#64748b", fontSize: 12, fontWeight: 800 }}>{ready ? "READY" : status === "VERIFY_DNS" ? "VERIFY DNS" : "SET UP"}</span></div><p className="subtle" style={{ marginBottom: 0 }}>{detail}</p></article>;
-}
-
 export function CompanySettingsPage() {
-  const { setBranding } = useBranding();
   const [form, setForm] = useState<CompanyProfile | null>(null);
   const [admin, setAdmin] = useState<Admin | null>(null);
   const [requestForm, setRequestForm] = useState({ type: "ACCESS", subjectName: "", subjectEmail: "", notes: "" });
@@ -55,10 +42,10 @@ export function CompanySettingsPage() {
     try {
       const [profile, controls] = await Promise.all([api<CompanyProfile>("/company"), api<Admin>("/company/admin")]);
       setForm(profile); setAdmin(controls); setError("");
-    } catch (e) { setError(e instanceof Error ? e.message : "Could not load company controls."); }
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not load company settings."); }
   }
   useEffect(() => { void load(); }, []);
-  if (!form || !admin) return <section className="page"><div className="panel" style={{padding:24}}>{error || "Loading company controls…"}</div></section>;
+  if (!form || !admin) return <section className="page"><div className="panel" style={{padding:24}}>{error || "Loading company settings…"}</div></section>;
 
   const update = (key: keyof CompanyProfile, value: unknown) => setForm((current) => current ? ({ ...current, [key]: value }) : current);
   const updateControl = (key: keyof Control, value: unknown) => setAdmin((current) => current ? ({ ...current, control: { ...current.control, [key]: value } }) : current);
@@ -67,48 +54,26 @@ export function CompanySettingsPage() {
   const fail = (e: unknown, fallback: string) => { setError(e instanceof Error ? e.message : fallback); setMessage(""); };
 
   async function save() {
-    const currentForm = form;
-    const currentAdmin = admin;
-    if (!currentForm || !currentAdmin) return;
-    setBusy(true); setError(""); setMessage("");
+    setBusy(true); setMessage(""); setError("");
     try {
       const [profile, control] = await Promise.all([
-        api<CompanyProfile>("/company", { method: "PATCH", body: JSON.stringify(currentForm) }),
+        api<CompanyProfile>("/company", { method: "PATCH", body: JSON.stringify(form) }),
         api<Control>("/company/admin", { method: "PATCH", body: JSON.stringify({
-          billingEmail: currentAdmin.control.billingEmail ?? "", privacyContactEmail: currentAdmin.control.privacyContactEmail ?? "",
-          retentionDays: currentAdmin.control.retentionDays, customDomain: currentAdmin.control.customDomain ?? "",
-          emailSenderDomain: currentAdmin.control.emailSenderDomain ?? "",
-          brandName: currentAdmin.control.brandName ?? "", brandTagline: currentAdmin.control.brandTagline ?? "",
-          brandLogoUrl: currentAdmin.control.brandLogoUrl ?? "", brandPrimaryColor: currentAdmin.control.brandPrimaryColor,
-          brandAccentColor: currentAdmin.control.brandAccentColor, brandSidebarColor: currentAdmin.control.brandSidebarColor,
-          brandSupportEmail: currentAdmin.control.brandSupportEmail ?? "", brandSupportPhone: currentAdmin.control.brandSupportPhone ?? "",
-          showPoweredBy: currentAdmin.control.showPoweredBy, marketplaceEnabled: currentAdmin.control.marketplaceEnabled,
+          billingEmail: admin.control.billingEmail ?? "",
+          privacyContactEmail: admin.control.privacyContactEmail ?? "",
+          retentionDays: admin.control.retentionDays,
+          marketplaceEnabled: admin.control.marketplaceEnabled,
         }) }),
       ]);
-      setForm(profile); setAdmin((current) => current ? ({ ...current, control }) : current);
-      setBranding(await loadCurrentBranding());
-      complete("Company, branding and business controls saved.");
+      setForm(profile); setAdmin((current) => current ? ({ ...current, control: { ...current.control, ...control } }) : current);
+      complete("Company settings saved.");
     } catch (e) { fail(e, "Could not save company settings."); }
     finally { setBusy(false); }
   }
 
-  async function copyBrandLink() {
-    const currentForm = form;
-    if (!currentForm) return;
-    const link = `${window.location.origin}/?company=${currentForm.slug}`;
-    try {
-      await navigator.clipboard.writeText(link);
-      complete("Branded sign-in link copied.");
-    } catch {
-      window.prompt("Copy this branded sign-in link", link);
-    }
-  }
-
   async function portableExport() {
-    const currentForm = form;
-    if (!currentForm) return;
     setBusy(true);
-    try { const data = await api<unknown>("/company/export"); downloadJson(data, `fleetos-${currentForm.slug}-${new Date().toISOString().slice(0,10)}.json`); complete("Portable company export downloaded."); }
+    try { const data = await api<unknown>("/company/export"); downloadJson(data, `fleetos-${form.slug}-${new Date().toISOString().slice(0,10)}.json`); complete("Portable company export downloaded."); }
     catch (e) { fail(e, "Could not create the company export."); }
     finally { setBusy(false); }
   }
@@ -117,86 +82,55 @@ export function CompanySettingsPage() {
     const label = window.prompt("Backup name", `Before changes ${new Date().toLocaleDateString("en-GB")}`);
     if (label === null) return;
     setBusy(true);
-    try { await api("/company/backups", { method: "POST", body: JSON.stringify({ label: label.trim() || undefined, keepDays: 90 }) }); await load(); complete("Company backup created and kept for 90 days."); }
+    try { await api("/company/backups", { method: "POST", body: JSON.stringify({ label: label.trim() || undefined, keepDays: 90 }) }); await load(); complete("Company backup created."); }
     catch (e) { fail(e, "Could not create the backup."); }
     finally { setBusy(false); }
   }
 
   async function downloadBackup(item: Backup) {
-    try { const data = await api<unknown>(`/company/backups/${item.id}`); downloadJson(data, `fleetos-backup-${item.id}.json`); complete("Backup downloaded."); }
+    try { const data = await api<unknown>(`/company/backups/${item.id}`); downloadJson(data, `fleetos-backup-${item.id}.json`); }
     catch (e) { fail(e, "Could not download the backup."); }
   }
 
-  async function restoreBackup(item: Backup) {
-    const confirmation = window.prompt("This only restores missing records and never overwrites newer data. Type RESTORE MISSING RECORDS to continue.");
-    if (confirmation !== "RESTORE MISSING RECORDS") return;
-    setBusy(true);
-    try { const result = await api<{ note: string }>(`/company/backups/${item.id}/restore`, { method: "POST", body: JSON.stringify({ confirmation }) }); await load(); complete(result.note); }
-    catch (e) { fail(e, "Could not restore the backup."); }
-    finally { setBusy(false); }
-  }
-
   async function deleteBackup(item: Backup) {
-    if (!window.confirm(`Delete backup “${item.label}”? The downloaded copies you hold are unaffected.`)) return;
+    if (!window.confirm(`Delete backup “${item.label}”?`)) return;
     try { await api(`/company/backups/${item.id}`, { method: "DELETE" }); await load(); complete("Backup deleted."); }
     catch (e) { fail(e, "Could not delete the backup."); }
   }
 
   async function addGovernance(event: FormEvent) {
     event.preventDefault(); setBusy(true);
-    try { await api("/company/governance-requests", { method: "POST", body: JSON.stringify(requestForm) }); setRequestForm({ type: "ACCESS", subjectName: "", subjectEmail: "", notes: "" }); await load(); complete("Data request added with a 30-day deadline."); }
+    try { await api("/company/governance-requests", { method: "POST", body: JSON.stringify(requestForm) }); setRequestForm({ type: "ACCESS", subjectName: "", subjectEmail: "", notes: "" }); await load(); complete("Data request added."); }
     catch (e) { fail(e, "Could not add the data request."); }
     finally { setBusy(false); }
   }
 
-  async function updateGovernance(id: string, status: string) {
-    try { await api(`/company/governance-requests/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }); await load(); complete(`Request marked ${status.replaceAll("_", " ").toLowerCase()}.`); }
-    catch (e) { fail(e, "Could not update the data request."); }
-  }
-
-  async function applyRetention() {
-    setBusy(true);
-    try {
-      const preview = await api<{ retentionDays: number; records: Record<string, number> }>("/company/retention-preview");
-      const total = Object.values(preview.records).reduce((sum, count) => sum + count, 0);
-      if (!total) { complete("Nothing has reached the retention limit."); return; }
-      const confirmation = window.prompt(`${total} expired administrative record(s) can be removed under the ${preview.retentionDays}-day policy. Type APPLY RETENTION to continue.`);
-      if (confirmation !== "APPLY RETENTION") return;
-      await api("/company/retention-run", { method: "POST", body: JSON.stringify({ confirmation }) });
-      complete("The retention policy was applied and recorded in the audit trail.");
-    } catch (e) { fail(e, "Could not apply the retention policy."); }
-    finally { setBusy(false); }
-  }
-
   return <section className="page">
-    <div className="page-heading"><div><p className="eyebrow">Company administration</p><h1>Business controls</h1><p className="subtle">Operating profile, billing visibility, backup recovery, privacy work and production readiness in one place.</p></div></div>
+    <div className="page-heading"><div><p className="eyebrow">Company administration</p><h1>Company settings</h1><p className="subtle">Settings for this customer company only. FleetOS owner, reseller and white-label controls are kept outside customer workspaces.</p></div></div>
     {error && <p className="form-message error">{error}</p>}{message && <p className="form-message">{message}</p>}
-    <div style={{display:"grid",gap:18}}>
-      <section className="panel"><div className="panel-heading"><div><h2><Building2 size={19}/> Company</h2><p>Identity and operating centre.</p></div></div><div style={{display:"grid",gap:12,padding:16}}><label>Company name<input required value={form.name} onChange={e=>update("name",e.target.value)}/></label><label>Home depot / operating centre<input value={form.homeDepotName ?? ""} onChange={e=>update("homeDepotName",e.target.value)}/></label><label>Address<input value={form.address ?? ""} onChange={e=>update("address",e.target.value)}/></label><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}><label>Postcode<input value={form.postcode ?? ""} onChange={e=>update("postcode",e.target.value)}/></label><label>Phone<input value={form.phone ?? ""} onChange={e=>update("phone",e.target.value)}/></label></div></div></section>
 
-      <section className="panel"><div className="panel-heading"><div><h2><Palette size={19}/> White-label branding</h2><p>Give this company its own product identity without changing the shared secure platform.</p></div></div><div style={{display:"grid",gap:16,padding:16}}>
-        <div className="brand-preview" style={{"--preview-primary":admin.control.brandPrimaryColor,"--preview-accent":admin.control.brandAccentColor,"--preview-sidebar":admin.control.brandSidebarColor} as CSSProperties}><div className="brand-preview-sidebar"><div className="brand">{admin.control.brandLogoUrl?<img className="brand-logo" src={admin.control.brandLogoUrl} alt=""/>:<span className="brand-mark">{(admin.control.brandName||"FleetOS").split(/\s+/).map(word=>word[0]).join("").slice(0,2).toUpperCase()}</span>}<span>{admin.control.brandName||"FleetOS"}</span></div><small>{admin.control.showPoweredBy && (admin.control.brandName||"FleetOS")!=="FleetOS"?"Powered by FleetOS":"Secure operations platform"}</small></div><div><p className="eyebrow"><Eye size={14}/> Live preview</p><h2>{admin.control.brandTagline||"Transport operations, made simpler"}</h2><button type="button" className="brand-preview-button">Primary action</button></div></div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}><label>Product name<input maxLength={80} placeholder="e.g. Acme Operations" value={admin.control.brandName??""} onChange={e=>updateControl("brandName",e.target.value)}/></label><label>Short strapline<input maxLength={160} placeholder="Work, people and fleet in one place" value={admin.control.brandTagline??""} onChange={e=>updateControl("brandTagline",e.target.value)}/></label></div>
-        <label>Logo URL<input type="url" placeholder="https://yourcompany.co.uk/logo.png" value={admin.control.brandLogoUrl??""} onChange={e=>updateControl("brandLogoUrl",e.target.value)}/><span className="subtle">Use a public HTTPS PNG, JPG, WebP or SVG. If it cannot load, the product initials are shown safely.</span></label>
-        <div className="colour-grid"><label>Primary colour<input type="color" value={admin.control.brandPrimaryColor} onChange={e=>updateControl("brandPrimaryColor",e.target.value.toUpperCase())}/><input aria-label="Primary colour hex" value={admin.control.brandPrimaryColor} onChange={e=>updateControl("brandPrimaryColor",e.target.value.toUpperCase())}/></label><label>Accent colour<input type="color" value={admin.control.brandAccentColor} onChange={e=>updateControl("brandAccentColor",e.target.value.toUpperCase())}/><input aria-label="Accent colour hex" value={admin.control.brandAccentColor} onChange={e=>updateControl("brandAccentColor",e.target.value.toUpperCase())}/></label><label>Navigation colour<input type="color" value={admin.control.brandSidebarColor} onChange={e=>updateControl("brandSidebarColor",e.target.value.toUpperCase())}/><input aria-label="Navigation colour hex" value={admin.control.brandSidebarColor} onChange={e=>updateControl("brandSidebarColor",e.target.value.toUpperCase())}/></label></div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}><label>Support email<input type="email" placeholder="support@yourcompany.co.uk" value={admin.control.brandSupportEmail??""} onChange={e=>updateControl("brandSupportEmail",e.target.value)}/></label><label>Support phone<input maxLength={40} placeholder="Optional" value={admin.control.brandSupportPhone??""} onChange={e=>updateControl("brandSupportPhone",e.target.value)}/></label></div>
-        <div className="toggle-grid"><label><input type="checkbox" checked={admin.control.showPoweredBy} onChange={e=>updateControl("showPoweredBy",e.target.checked)}/> Show “Powered by FleetOS”</label><label><input type="checkbox" checked={admin.control.marketplaceEnabled} onChange={e=>updateControl("marketplaceEnabled",e.target.checked)}/> Show shared marketplace</label></div>
-        <div><strong>Branded sign-in link</strong><div className="copy-link"><code>{`${window.location.origin}/?company=${form.slug}`}</code><button type="button" onClick={()=>void copyBrandLink()}>Copy</button></div><p className="subtle">Use this link until the optional custom domain has been verified.</p></div>
-      </div></section>
+    <section className="panel" style={{marginBottom:18}}><div className="panel-heading"><div><h2><Building2 size={19}/> Company profile</h2><p>Identity and operating details.</p></div></div><div style={{display:"grid",gap:12,padding:16}}>
+      <label>Company name<input required value={form.name} onChange={e=>update("name",e.target.value)}/></label>
+      <label>Home depot / operating centre<input value={form.homeDepotName ?? ""} onChange={e=>update("homeDepotName",e.target.value)}/></label>
+      <label>Address<input value={form.address ?? ""} onChange={e=>update("address",e.target.value)}/></label>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}><label>Postcode<input value={form.postcode ?? ""} onChange={e=>update("postcode",e.target.value)}/></label><label>Phone<input value={form.phone ?? ""} onChange={e=>update("phone",e.target.value)}/></label></div>
+      <div><strong>Industry</strong><div className="chip-grid">{industries.map(([value,label])=><label key={value} className="chip-check"><input type="checkbox" checked={form.industries.includes(value)} onChange={()=>toggle("industries",value)}/><span>{label}</span></label>)}</div></div>
+      <div><strong>Compliance schemes used</strong><div className="chip-grid">{schemes.map(([value,label])=><label key={value} className="chip-check"><input type="checkbox" checked={form.complianceSchemes.includes(value)} onChange={()=>toggle("complianceSchemes",value)}/><span>{label}</span></label>)}</div></div>
+    </div></section>
 
-      <section className="panel"><div className="panel-heading"><div><h2>Operation</h2><p>Used to tailor FleetOS around the work you actually do.</p></div></div><div style={{padding:16}}><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:10,marginBottom:16}}>{industries.map(([value,label])=><button type="button" key={value} className={form.industries.includes(value)?"primary-button":"secondary-button"} onClick={()=>toggle("industries",value)} style={{justifyContent:"center"}}>{label}</button>)}</div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}><label>Team size<select value={form.teamSize ?? ""} onChange={e=>update("teamSize",e.target.value)}><option value="">Not set</option>{["Just me","2–5","6–10","11–20","21–50","51–100","100+"].map(value=><option key={value}>{value}</option>)}</select></label><label>HGV operation<select value={form.usesHgv?"yes":"no"} onChange={e=>update("usesHgv",e.target.value==="yes")}><option value="no">No HGVs</option><option value="yes">We operate HGVs</option></select></label></div></div></section>
+    <section className="panel" style={{marginBottom:18}}><div className="panel-heading"><div><h2><ShieldCheck size={19}/> Business & privacy</h2><p>Customer-controlled contact and retention settings.</p></div></div><div style={{display:"grid",gap:12,padding:16}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}><label>Billing email<input type="email" value={admin.control.billingEmail ?? ""} onChange={e=>updateControl("billingEmail",e.target.value)}/></label><label>Privacy contact email<input type="email" value={admin.control.privacyContactEmail ?? ""} onChange={e=>updateControl("privacyContactEmail",e.target.value)}/></label></div>
+      <label>Administrative data retention days<input type="number" min={365} max={3650} value={admin.control.retentionDays} onChange={e=>updateControl("retentionDays",Number(e.target.value))}/></label>
+      <label className="toggle-row"><input type="checkbox" checked={admin.control.marketplaceEnabled} onChange={e=>updateControl("marketplaceEnabled",e.target.checked)}/><span><strong>Marketplace enabled</strong><small>Allow this company to use the FleetOS marketplace.</small></span></label>
+      <div className="stat-grid"><article className="stat-card"><span>Members</span><strong>{admin.usage.members}</strong></article><article className="stat-card"><span>Vehicles</span><strong>{admin.usage.vehicles}</strong></article><article className="stat-card"><span>Active drivers</span><strong>{admin.usage.activeDrivers}</strong></article><article className="stat-card"><span>Plan</span><strong>{admin.control.subscriptionPlan.replaceAll("_"," ")}</strong><small>{admin.control.subscriptionStatus.replaceAll("_"," ")}</small></article></div>
+    </div></section>
 
-      <section className="panel"><div className="panel-heading"><div><h2><ShieldCheck size={19}/> Compliance profile</h2><p>Manage frameworks and operator-licence details without claiming accreditation.</p></div></div><div style={{display:"grid",gap:14,padding:16}}>{form.usesHgv && <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}><label>Operator licence number<input value={form.operatorLicenceNumber ?? ""} onChange={e=>update("operatorLicenceNumber",e.target.value)}/></label><label>Licence type<select value={form.operatorLicenceType ?? ""} onChange={e=>update("operatorLicenceType",e.target.value)}><option value="">Not set</option><option value="RESTRICTED">Restricted</option><option value="STANDARD_NATIONAL">Standard national</option><option value="STANDARD_INTERNATIONAL">Standard international</option></select></label></div>}<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:10}}>{schemes.map(([value,label])=><button type="button" key={value} className={form.complianceSchemes.includes(value)?"primary-button":"secondary-button"} onClick={()=>toggle("complianceSchemes",value)} style={{justifyContent:"center"}}>{label}</button>)}</div></div></section>
+    <section className="panel" style={{marginBottom:18}}><div className="panel-heading"><div><h2><Database size={19}/> Data & backups</h2><p>Portable copies of this company’s own FleetOS records.</p></div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button className="secondary-button" onClick={()=>void portableExport()} disabled={busy}><Download size={16}/> Export</button><button className="secondary-button" onClick={()=>void createBackup()} disabled={busy}><Database size={16}/> Create backup</button></div></div>
+      <div style={{padding:16,display:"grid",gap:10}}>{admin.backups.length===0?<p className="subtle">No saved backups.</p>:admin.backups.map(item=><div key={item.id} style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"center",borderBottom:"1px solid #e2e8f0",paddingBottom:10}}><div><strong>{item.label}</strong><div className="subtle">{new Date(item.createdAt).toLocaleString("en-GB")}</div></div><div style={{display:"flex",gap:8}}><button className="secondary-button" onClick={()=>void downloadBackup(item)}><Download size={15}/></button><button className="secondary-button" onClick={()=>void deleteBackup(item)}><Trash2 size={15}/></button></div></div>)}</div>
+    </section>
 
-      <section className="panel"><div className="panel-heading"><div><h2><Receipt size={19}/> Plan & seats</h2><p>Commercial status and contact details. Plan changes remain protected as platform-admin actions.</p></div></div><div style={{padding:16,display:"grid",gap:14}}><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}><div><span className="subtle">Plan</span><h3>{admin.control.subscriptionPlan.replaceAll("_"," ")}</h3></div><div><span className="subtle">Status</span><h3>{admin.control.subscriptionStatus}</h3></div><div><span className="subtle">Seats</span><h3>{admin.usage.members}/{admin.control.seatLimit}</h3><span className="subtle">{admin.usage.seatsAvailable} available</span></div></div><label>Billing email<input type="email" value={admin.control.billingEmail ?? ""} onChange={e=>updateControl("billingEmail",e.target.value)}/></label></div></section>
+    <section className="panel" style={{marginBottom:18}}><div className="panel-heading"><div><h2><UserCheck size={19}/> Data requests</h2><p>Record access, erasure, rectification or restriction requests.</p></div></div><form onSubmit={addGovernance} style={{padding:16,display:"grid",gap:10}}><select value={requestForm.type} onChange={e=>setRequestForm({...requestForm,type:e.target.value})}><option value="ACCESS">Access</option><option value="ERASURE">Erasure</option><option value="RECTIFICATION">Rectification</option><option value="RESTRICTION">Restriction</option></select><input required placeholder="Person name" value={requestForm.subjectName} onChange={e=>setRequestForm({...requestForm,subjectName:e.target.value})}/><input type="email" placeholder="Email (optional)" value={requestForm.subjectEmail} onChange={e=>setRequestForm({...requestForm,subjectEmail:e.target.value})}/><textarea placeholder="Notes" value={requestForm.notes} onChange={e=>setRequestForm({...requestForm,notes:e.target.value})}/><button disabled={busy}>Add request</button></form></section>
 
-      <section className="panel"><div className="panel-heading"><div><h2><Database size={19}/> Backup & recovery</h2><p>Portable downloads plus server-side snapshots. Restore only fills missing records; it never overwrites newer live work.</p></div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button type="button" onClick={()=>void portableExport()} disabled={busy}><Download size={16}/> Download full export</button><button type="button" className="primary-button" onClick={()=>void createBackup()} disabled={busy}><Database size={16}/> Create backup</button></div></div><div style={{padding:16,display:"grid",gap:10}}>{admin.backups.length===0?<p className="subtle">No active server-side backups yet.</p>:admin.backups.map(item=><article key={item.id} style={{border:"1px solid #e2e8f0",borderRadius:12,padding:14,display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}><div><strong>{item.label}</strong><div className="subtle">Created {new Date(item.createdAt).toLocaleString("en-GB")} · expires {new Date(item.expiresAt).toLocaleDateString("en-GB")} · {Object.values(item.recordCounts).reduce((sum,count)=>sum+count,0)} records</div></div><div style={{display:"flex",gap:8}}><button type="button" onClick={()=>void downloadBackup(item)}><Download size={15}/> Download</button><button type="button" onClick={()=>void restoreBackup(item)}><ArchiveRestore size={15}/> Restore missing</button><button type="button" aria-label={`Delete ${item.label}`} onClick={()=>void deleteBackup(item)}><Trash2 size={15}/></button></div></article>)}</div></section>
-
-      <section className="panel"><div className="panel-heading"><div><h2><UserCheck size={19}/> Privacy & GDPR work</h2><p>Track access, erasure, correction and restriction requests against a 30-day deadline.</p></div></div><div style={{padding:16,display:"grid",gap:16}}><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}><label>Privacy contact email<input type="email" value={admin.control.privacyContactEmail ?? ""} onChange={e=>updateControl("privacyContactEmail",e.target.value)}/></label><label>Administrative retention<select value={admin.control.retentionDays} onChange={e=>updateControl("retentionDays",Number(e.target.value))}><option value={365}>1 year</option><option value={1095}>3 years</option><option value={2190}>6 years</option><option value={2555}>7 years</option><option value={3650}>10 years</option></select></label></div><button type="button" style={{justifySelf:"start"}} onClick={()=>void applyRetention()} disabled={busy}>Preview & apply retention</button><form onSubmit={addGovernance} style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10,alignItems:"end"}}><label>Request type<select value={requestForm.type} onChange={e=>setRequestForm(current=>({...current,type:e.target.value}))}><option value="ACCESS">Data access</option><option value="ERASURE">Erasure review</option><option value="RECTIFICATION">Correction</option><option value="RESTRICTION">Processing restriction</option></select></label><label>Person / subject<input required value={requestForm.subjectName} onChange={e=>setRequestForm(current=>({...current,subjectName:e.target.value}))}/></label><label>Email<input type="email" value={requestForm.subjectEmail} onChange={e=>setRequestForm(current=>({...current,subjectEmail:e.target.value}))}/></label><button className="primary-button" disabled={busy}>Add request</button></form>{admin.governance.length>0&&<div style={{display:"grid",gap:8}}>{admin.governance.map(item=><article key={item.id} style={{border:"1px solid #e2e8f0",borderRadius:12,padding:12,display:"flex",justifyContent:"space-between",gap:12,alignItems:"center",flexWrap:"wrap"}}><div><strong>{item.type} · {item.subjectName}</strong><div className="subtle">{item.status.replaceAll("_"," ")} · due {new Date(item.dueAt).toLocaleDateString("en-GB")}</div></div>{!['COMPLETED','CANCELLED'].includes(item.status)&&<div style={{display:"flex",gap:8}}><button type="button" onClick={()=>void updateGovernance(item.id,"IN_REVIEW")}>In review</button><button type="button" onClick={()=>void updateGovernance(item.id,"COMPLETED")}>Complete</button><button type="button" onClick={()=>void updateGovernance(item.id,"CANCELLED")}>Cancel</button></div>}</article>)}</div>}</div></section>
-
-      <section className="panel"><div className="panel-heading"><div><h2><Globe2 size={19}/> Production readiness</h2><p>The existing FleetOS address stays live while optional business domains are verified.</p></div></div><div style={{padding:16,display:"grid",gap:14}}><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:10}}><Ready label="Production app" status="READY" detail={admin.readiness.productionUrl}/><Ready label="Email confirmations" status={admin.readiness.authenticationRedirect} detail="Confirmed users return to the production FleetOS app."/><Ready label="Portable backup" status={admin.readiness.portableBackup} detail="Download and server-side recovery are available."/><Ready label="Database region" status="READY" detail={admin.readiness.databaseRegion}/><Ready label="Custom domain" status={admin.readiness.customDomain} detail={admin.control.customDomain || "Use the FleetOS address until a business domain is chosen."}/><Ready label="Sender email" status={admin.readiness.emailSender} detail={admin.control.emailSenderDomain || "Authentication continues through Supabase until a sender domain is verified."}/></div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}><label><Globe2 size={15}/> Desired app domain<input placeholder="app.yourcompany.co.uk" value={admin.control.customDomain ?? ""} onChange={e=>updateControl("customDomain",e.target.value.toLowerCase())}/></label><label><MailCheck size={15}/> Desired email domain<input placeholder="mail.yourcompany.co.uk" value={admin.control.emailSenderDomain ?? ""} onChange={e=>updateControl("emailSenderDomain",e.target.value.toLowerCase())}/></label></div><p className="subtle">Saving a domain records the request; DNS verification and activation remain protected platform actions.</p></div></section>
-
-      <button type="button" className="primary-button" disabled={busy} onClick={()=>void save()} style={{justifySelf:"start"}}><Save size={17}/>{busy?" Saving…":" Save company controls"}</button>
-    </div>
+    <div style={{display:"flex",justifyContent:"flex-end"}}><button onClick={()=>void save()} disabled={busy}><Save size={16}/> {busy?"Saving…":"Save company settings"}</button></div>
   </section>;
 }
