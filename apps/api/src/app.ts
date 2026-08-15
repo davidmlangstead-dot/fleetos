@@ -8,6 +8,8 @@ import { errorHandler } from "./middleware/errors.js";
 import { idempotencyMiddleware } from "./middleware/idempotency.js";
 import { apiRateLimit, sensitiveRateLimit } from "./middleware/rateLimit.js";
 import { companyRouter } from "./modules/company/routes.js";
+import { commercialRouter } from "./modules/commercial/routes.js";
+import { importsRouter } from "./modules/imports/routes.js";
 import { dashboardRouter } from "./modules/dashboard/routes.js";
 import { driversRouter } from "./modules/drivers/routes.js";
 import { vehiclesRouter } from "./modules/vehicles/routes.js";
@@ -77,6 +79,8 @@ app.get("/health", (_req, res) => res.json({ status: "ok", timestamp: new Date()
 app.get("/api", (_req, res) => res.json({ name: "FleetOS API", status: "ok" }));
 app.use("/api", apiRateLimit);
 app.use("/api/company", sensitiveRateLimit, companyRouter);
+app.use("/api/commercial", sensitiveRateLimit, commercialRouter);
+app.use("/api/imports", sensitiveRateLimit, idempotencyMiddleware, importsRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/drivers", sensitiveRateLimit, requireAuth, idempotencyMiddleware, driversRouter);
 app.use("/api/vehicles", requireAuth, idempotencyMiddleware, vehiclesRouter);
