@@ -89,21 +89,30 @@ export function AppShell() {
   }), [activeWorkspace, branding.marketplaceEnabled, platformOwner, resellerAccess]);
 
   async function load() {
-    const [current, all, platform, resellerMemberships] = await Promise.all([
-      api<{ id: string; name: string }>("/company"),
-      api<Workspace[]>("/company/workspaces"),
+    const [platform, resellerMemberships] = await Promise.all([
       api<PlatformIdentity>("/platform/me"),
       api<ResellerMembership[]>("/resellers/mine"),
     ]);
-    setCompany(current);
-    setWorkspaces(all);
     setPlatformOwner(platform.isPlatformOwner);
     setResellerAccess(resellerMemberships.length > 0);
-    if (!localStorage.getItem(ACTIVE_WORKSPACE_KEY)) localStorage.setItem(ACTIVE_WORKSPACE_KEY, current.id);
-    setAlerts(await api<AlertFeed>("/notifications"));
+
+    try {
+      const [current, all] = await Promise.all([
+        api<{ id: string; name: string }>("/company"),
+        api<Workspace[]>("/company/workspaces"),
+      ]);
+      setCompany(current);
+      setWorkspaces(all);
+      if (!localStorage.getItem(ACTIVE_WORKSPACE_KEY)) localStorage.setItem(ACTIVE_WORKSPACE_KEY, current.id);
+      try { setAlerts(await api<AlertFeed>("/notifications")); } catch { setAlerts({ total: 0, critical: 0, items: [] }); }
+    } catch {
+      setCompany(null);
+      setWorkspaces([]);
+      setAlerts({ total: 0, critical: 0, items: [] });
+    }
   }
 
-  useEffect(() => { void load().catch((error) => console.error("FleetOS workspace load failed:", error)); }, []);
+  useEffect(() => { void load().catch((error) => console.error("FleetOS identity load failed:", error)); }, []);
 
   function switchWorkspace(id: string) {
     const selected = workspaces.find((item) => item.id === id);
@@ -118,7 +127,7 @@ export function AppShell() {
     switchWorkspace(created.id);
   }
 
-  const companyName = company?.name ?? branding.name;
+  const companyName = company?.name ?? (resellerAccess ? "Reseller portal" : branding.name);
   const initials = companyName.split(" ").map((word) => word[0]).join("").slice(0, 2).toUpperCase();
   const role = activeWorkspace?.role;
   const allowedRoles = routeRoles(location.pathname);
@@ -130,12 +139,12 @@ export function AppShell() {
   return <div className="app-shell">
     <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
       <div className="brand"><BrandLogo /><button className="mobile-close" aria-label="Close navigation" onClick={() => setMobileOpen(false)}><X /></button></div>
-      <div style={{ padding: "0 12px 14px" }}>
+      {workspaces.length > 0 && <div style={{ padding: "0 12px 14px" }}>
         <select aria-label="Company workspace" value={company?.id ?? ""} onChange={(event) => switchWorkspace(event.target.value)} style={{ width: "100%", padding: 10, borderRadius: 8 }}>{workspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}</select>
         {role !== "DRIVER" && <button onClick={() => void addWorkspace()} style={{ width: "100%", marginTop: 8 }}><Plus size={15} /> Add company</button>}
-      </div>
+      </div>}
       <nav>{visibleNav.map(([to, label, Icon]) => <NavLink key={to} to={to} end={to === "/"} onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}><Icon size={20} /><span>{label}</span></NavLink>)}</nav>
-      <div className="sidebar-bottom"><div className="company-dot">{initials}</div><div><strong>{companyName}</strong><small>{role ? roleLabels[role] : "Company workspace"}</small><PoweredBy /></div></div>
+      <div className="sidebar-bottom"><div className="company-dot">{initials}</div><div><strong>{companyName}</strong><small>{role ? roleLabels[role] : resellerAccess ? "Reseller account" : platformOwner ? "FleetOS owner" : "Account"}</small><PoweredBy /></div></div>
     </aside>
     {mobileOpen && <button className="mobile-overlay" aria-label="Close navigation" onClick={() => setMobileOpen(false)} />}
     <main>
@@ -145,7 +154,7 @@ export function AppShell() {
         <div className="top-actions" style={{ position: "relative" }}>
           {platformOwner && <button className="secondary-button" onClick={() => { window.location.href = "/control"; }}><ShieldCheck size={16}/> Owner Control</button>}
           <OfflineStatus />
-          <button className="icon-button" aria-label={`Notifications${alerts.total ? ` (${alerts.total})` : ""}`} onClick={() => { setAccountOpen(false); setAlertsOpen((open) => !open); }} style={{ position: "relative" }}><Bell size={20} />{alerts.total > 0 && <span style={{ position: "absolute", top: -5, right: -5, minWidth: 17, height: 17, borderRadius: 9, padding: "0 4px", fontSize: 10, lineHeight: "17px", background: alerts.critical > 0 ? "#b91c1c" : "#334155", color: "white" }}>{Math.min(alerts.total, 99)}</span>}</button>
+          {company && <button className="icon-button" aria-label={`Notifications${alerts.total ? ` (${alerts.total})` : ""}`} onClick={() => { setAccountOpen(false); setAlertsOpen((open) => !open); }} style={{ position: "relative" }}><Bell size={20} />{alerts.total > 0 && <span style={{ position: "absolute", top: -5, right: -5, minWidth: 17, height: 17, borderRadius: 9, padding: "0 4px", fontSize: 10, lineHeight: "17px", background: alerts.critical > 0 ? "#b91c1c" : "#334155", color: "white" }}>{Math.min(alerts.total, 99)}</span>}</button>}
           {alertsOpen && <div style={{ position: "absolute", right: 44, top: 42, width: 340, maxWidth: "85vw", maxHeight: 430, overflowY: "auto", background: "white", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 12, boxShadow: "0 18px 45px rgba(15,23,42,.18)", zIndex: 50, padding: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 8px 10px" }}><strong>Fleet alerts</strong><small>{alerts.total ? `${alerts.total} active` : "All clear"}</small></div>
             {alerts.items.length === 0 ? <p style={{ margin: 8, color: "#64748b" }}>No active alerts for your role.</p> : alerts.items.map((item) => <button key={item.id} onClick={() => { setAlertsOpen(false); window.location.href = item.href; }} style={{ display: "block", width: "100%", textAlign: "left", border: 0, borderTop: "1px solid #f1f5f9", background: "transparent", padding: "10px 8px", cursor: "pointer" }}><div style={{ display: "flex", gap: 8, alignItems: "center" }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".04em", color: item.severity === "CRITICAL" ? "#b91c1c" : "#a16207" }}>{item.severity}</span><strong style={{ fontSize: 13 }}>{item.title}</strong></div>{item.detail && <div style={{ marginTop: 4, color: "#64748b", fontSize: 12 }}>{item.detail}</div>}</button>)}
@@ -154,7 +163,7 @@ export function AppShell() {
           {accountOpen && <div className="account-menu">{platformOwner && <button onClick={() => { setAccountOpen(false); window.location.href = "/control"; }}><ShieldCheck size={16}/> FleetOS owner control</button>}{role && companyManagers.includes(role) && <button onClick={() => { setAccountOpen(false); window.location.href = "/settings/company"; }}><Building2 size={16} /> Company settings</button>}<button onClick={() => { setAccountOpen(false); window.location.href = "/settings/accessibility"; }}><UserRound size={16} /> Accessibility & language</button><button onClick={() => { setAccountOpen(false); void supabase.auth.signOut(); }}><LogOut size={16} /> Sign out</button></div>}
         </div>
       </header>
-      {accessDenied ? <main className="loading-page"><div><h1>Access denied</h1><p>This account does not have permission to open this area.</p><button onClick={() => { window.location.href = role === "DRIVER" ? "/driver" : "/"; }}>Return to your dashboard</button></div></main> : <Outlet />}
+      {accessDenied ? <main className="loading-page"><div><h1>Access denied</h1><p>This account does not have permission to open this area.</p><button onClick={() => { window.location.href = role === "DRIVER" ? "/driver" : resellerAccess ? "/reseller" : "/"; }}>Return</button></div></main> : <Outlet />}
     </main>
   </div>;
 }
