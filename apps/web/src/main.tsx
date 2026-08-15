@@ -16,6 +16,7 @@ import "./shell-fixes.css";
 import "./driver-operations.css";
 import "./jobs.css";
 import "./branding.css";
+import "./accessibility.css";
 
 bootstrapAccessibilityPreferences();
 
