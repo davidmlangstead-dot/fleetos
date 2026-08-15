@@ -25,6 +25,11 @@ const client = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000,
 type AppState = "loading" | "landing" | "auth" | "onboarding" | "ready" | "error";
 type Workspace = { id: string; name: string; slug: string; role: string };
 
+function setResolvedRole(role?: string) {
+  if (role) document.documentElement.dataset.fleetosRole = role;
+  else delete document.documentElement.dataset.fleetosRole;
+}
+
 function FleetOSApp() {
   const { branding, setBranding } = useBranding();
   const [state, setState] = useState<AppState>("loading");
@@ -33,6 +38,7 @@ function FleetOSApp() {
 
   async function clearDeadLocalSession() {
     localStorage.removeItem(ACTIVE_WORKSPACE_KEY);
+    setResolvedRole();
     await clearOfflineData().catch(() => undefined);
     await supabase.auth.signOut({ scope: "local" });
     setError("");
@@ -42,6 +48,7 @@ function FleetOSApp() {
   async function resolveWorkspace() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
+      setResolvedRole();
       setBranding(await loadPublicBranding());
       setState("landing");
       return;
@@ -59,6 +66,7 @@ function FleetOSApp() {
       const workspaces = await api<Workspace[]>("/company/workspaces");
       if (!workspaces.length) {
         localStorage.removeItem(ACTIVE_WORKSPACE_KEY);
+        setResolvedRole();
         setError("");
         setState("onboarding");
         return;
@@ -71,6 +79,7 @@ function FleetOSApp() {
         localStorage.setItem(ACTIVE_WORKSPACE_KEY, active.id);
       }
 
+      setResolvedRole(active.role);
       try { setBranding(await loadCurrentBranding()); }
       catch { }
 
@@ -107,6 +116,7 @@ function FleetOSApp() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
       if (event === "SIGNED_OUT") {
+        setResolvedRole();
         void clearOfflineData().catch(() => undefined);
         void loadPublicBranding().then(setBranding);
         setState("landing");
@@ -122,7 +132,7 @@ function FleetOSApp() {
   if (state === "loading") return <main className="loading-page">{branding.name} is checking your connection…</main>;
   if (state === "landing") return <LandingPage onLogin={() => { setAuthMode("login"); setState("auth"); }} onSignup={() => { setAuthMode("signup"); setState("auth"); }} />;
   if (state === "auth") return <AuthPage initialMode={authMode} onBack={() => setState("landing")} />;
-  if (state === "onboarding") return <OnboardingPage onComplete={(workspace) => { localStorage.setItem(ACTIVE_WORKSPACE_KEY, workspace.id); setState("ready"); }} />;
+  if (state === "onboarding") return <OnboardingPage onComplete={(workspace) => { localStorage.setItem(ACTIVE_WORKSPACE_KEY, workspace.id); setResolvedRole(workspace.role); setState("ready"); }} />;
   if (state === "error") return <main className="loading-page"><div><p className="eyebrow">{branding.name} Medic</p><h1>We couldn't open your workspace</h1><p>{error}</p><button onClick={() => { setState("loading"); void resolveWorkspace(); }}>Run check again</button><button onClick={() => void supabase.auth.signOut()} style={{ marginLeft: 8 }}>Sign out</button></div></main>;
   return <RouterProvider router={router} />;
 }
