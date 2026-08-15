@@ -12,15 +12,16 @@ const readers = requireRoles("TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "CO
 const writers = requireRoles("TRANSPORT_MANAGER", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN");
 const types = ["QUOTE","SALES_INVOICE","PURCHASE_ORDER","SUPPLIER_INVOICE","EXPENSE","CREDIT_NOTE","PAYMENT","FUEL_COST","WORKSHOP_COST"] as const;
 const statuses = ["DRAFT","ISSUED","APPROVED","PART_PAID","PAID","VOID","CANCELLED"] as const;
-const inputSchema = z.object({
+const baseSchema = z.object({
   type: z.enum(types), status: z.enum(statuses).default("DRAFT"), reference: z.string().trim().max(120).optional(),
   counterparty: z.string().trim().max(240).optional(), description: z.string().trim().max(3000).optional(),
   netPence: z.number().int().min(0), vatPence: z.number().int().min(0), grossPence: z.number().int().min(0),
   jobId: z.string().trim().max(120).optional(), vehicleId: z.string().trim().max(120).optional(),
   occurredAt: z.coerce.date().optional(), dueAt: z.coerce.date().nullable().optional(), paidAt: z.coerce.date().nullable().optional(),
   externalReference: z.string().trim().max(240).optional(), notes: z.string().trim().max(5000).optional(),
-}).superRefine((v, ctx) => { if (v.grossPence !== v.netPence + v.vatPence) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["grossPence"], message: "Gross must equal net plus VAT" }); });
-const patchSchema = inputSchema.partial();
+});
+const inputSchema = baseSchema.superRefine((v, ctx) => { if (v.grossPence !== v.netPence + v.vatPence) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["grossPence"], message: "Gross must equal net plus VAT" }); });
+const patchSchema = baseSchema.partial();
 
 type Row = { id:string; companyId:string; type:string; status:string; reference:string|null; counterparty:string|null; description:string|null; netPence:number; vatPence:number; grossPence:number; jobId:string|null; vehicleId:string|null; occurredAt:Date; dueAt:Date|null; paidAt:Date|null; externalReference:string|null; notes:string|null; createdBy:string|null; createdAt:Date; updatedAt:Date };
 
