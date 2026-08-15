@@ -5,6 +5,7 @@ import { api, ACTIVE_WORKSPACE_KEY } from "../lib/api";
 import { supabase } from "../lib/supabase";
 import { OfflineStatus } from "./OfflineStatus";
 import { BrandLogo, PoweredBy, useBranding } from "../lib/branding";
+import { useI18n } from "../lib/i18n";
 
 type Role = "DRIVER" | "WORKSHOP_TECHNICIAN" | "TRANSPORT_PLANNER" | "TRANSPORT_MANAGER" | "OFFICE_STAFF" | "FINANCE" | "COMPANY_ADMIN" | "PLATFORM_ADMIN";
 type Workspace = { id: string; name: string; slug: string; role: Role };
@@ -68,6 +69,7 @@ function routeRoles(pathname: string) {
 
 export function AppShell() {
   const { branding } = useBranding();
+  const { t } = useI18n();
   const location = useLocation();
   const [company, setCompany] = useState<{ id: string; name: string } | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -145,7 +147,7 @@ export function AppShell() {
         {role !== "DRIVER" && <button onClick={() => void addWorkspace()} style={{ width: "100%", marginTop: 8 }}><Plus size={15} /> Add company</button>}
       </div>}
       <nav>
-        {visibleNav.map(([to, label, Icon]) => <NavLink key={to} to={to} end={to === "/"} onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}><Icon size={20} /><span>{label}</span></NavLink>)}
+        {visibleNav.map(([to, label, Icon]) => { const translated = to === "/driver" ? t("nav.today") : to === "/driver/tachograph" ? t("nav.tacho") : to === "/my-work" ? t("nav.work") : to === "/messages" ? t("nav.messages") : to === "/settings/accessibility" ? t("nav.settings") : label; return <NavLink key={to} to={to} end={to === "/"} onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}><Icon size={20} /><span>{translated}</span></NavLink>; })}
         {!company && resellerAccess && onResellerHost && <NavLink to="/reseller" onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}><Building2 size={20}/><span>Reseller Portal</span></NavLink>}
       </nav>
       <div className="sidebar-bottom"><div className="company-dot">{initials}</div><div><strong>{companyName}</strong><small>{role ? roleLabels[role] : resellerAccess ? "Reseller account" : platformOwner ? "FleetOS owner" : "Account"}</small><PoweredBy /></div></div>
@@ -153,7 +155,7 @@ export function AppShell() {
     {mobileOpen && <button className="mobile-overlay" aria-label="Close navigation" onClick={() => setMobileOpen(false)} />}
     <main>
       <header className="topbar">
-        <button className="mobile-menu" aria-label="Open navigation" onClick={() => setMobileOpen(true)}><Menu /></button>
+        <button className="mobile-menu" aria-label={t("shell.openNav")} onClick={() => setMobileOpen(true)}><Menu /></button>
         <div className="presence">{companyName}{role ? ` · ${roleLabels[role]}` : ""}</div>
         <div className="top-actions" style={{ position: "relative" }}>
           <OfflineStatus />
@@ -163,10 +165,11 @@ export function AppShell() {
             {alerts.items.length === 0 ? <p style={{ margin: 8, color: "#64748b" }}>No active alerts for your role.</p> : alerts.items.map((item) => <button key={item.id} onClick={() => { setAlertsOpen(false); window.location.href = item.href; }} style={{ display: "block", width: "100%", textAlign: "left", border: 0, borderTop: "1px solid #f1f5f9", background: "transparent", padding: "10px 8px", cursor: "pointer" }}><div style={{ display: "flex", gap: 8, alignItems: "center" }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".04em", color: item.severity === "CRITICAL" ? "#b91c1c" : "#a16207" }}>{item.severity}</span><strong style={{ fontSize: 13 }}>{item.title}</strong></div>{item.detail && <div style={{ marginTop: 4, color: "#64748b", fontSize: 12 }}>{item.detail}</div>}</button>)}
           </div>}
           <button className="avatar" aria-label="Account menu" aria-expanded={accountOpen} onClick={() => { setAlertsOpen(false); setAccountOpen((open) => !open); }}>{initials || "FO"}</button>
-          {accountOpen && <div className="account-menu">{role && companyManagers.includes(role) && <button onClick={() => { setAccountOpen(false); window.location.href = "/settings/company"; }}><Building2 size={16} /> Company settings</button>}<button onClick={() => { setAccountOpen(false); window.location.href = "/settings/accessibility"; }}><UserRound size={16} /> Accessibility & language</button><button onClick={() => { setAccountOpen(false); void supabase.auth.signOut(); }}><LogOut size={16} /> Sign out</button></div>}
+          {accountOpen && <div className="account-menu">{role && companyManagers.includes(role) && <button onClick={() => { setAccountOpen(false); window.location.href = "/settings/company"; }}><Building2 size={16} /> {t("shell.companySettings")}</button>}<button onClick={() => { setAccountOpen(false); window.location.href = "/settings/accessibility"; }}><UserRound size={16} /> {t("shell.accessibility")}</button><button onClick={() => { setAccountOpen(false); void supabase.auth.signOut(); }}><LogOut size={16} /> {t("shell.signOut")}</button></div>}
         </div>
       </header>
-      {accessDenied ? <main className="loading-page"><div><h1>Access denied</h1><p>This area is not available from this FleetOS entry point.</p><button onClick={() => { window.location.href = role === "DRIVER" ? "/driver" : resellerAccess && !company && onResellerHost ? "/reseller" : "/"; }}>Return</button></div></main> : <Outlet />}
+      {accessDenied ? <main className="loading-page"><div><h1>{t("shell.accessDenied")}</h1><p>{t("shell.accessDeniedDetail")}</p><button onClick={() => { window.location.href = role === "DRIVER" ? "/driver" : resellerAccess && !company && onResellerHost ? "/reseller" : "/"; }}>{t("shell.return")}</button></div></main> : <Outlet />}
     </main>
   </div>;
 }
+
