@@ -14,6 +14,8 @@ type AlertFeed = { total: number; critical: number; items: AlertItem[] };
 type PlatformIdentity = { isPlatformOwner: boolean };
 type ResellerMembership = { id: string; role: string };
 
+const OWNER_HOST = "fleetos-davidmlangstead-dots-projects.vercel.app";
+const RESELLER_HOST = "fleetos-git-main-davidmlangstead-dots-projects.vercel.app";
 const management: readonly Role[] = ["TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const workshop: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const vehicleReaders: readonly Role[] = ["WORKSHOP_TECHNICIAN", ...management];
@@ -127,7 +129,13 @@ export function AppShell() {
   const ownerRoute = location.pathname === "/control" || location.pathname.startsWith("/control/");
   const resellerJoinRoute = location.pathname.startsWith("/reseller/join");
   const resellerRoute = !resellerJoinRoute && (location.pathname === "/reseller" || location.pathname.startsWith("/reseller/"));
-  const accessDenied = ownerRoute ? !platformOwner : resellerRoute ? !(platformOwner || resellerAccess) : !!role && !!allowedRoles && !allowedRoles.includes(role);
+  const onOwnerHost = window.location.hostname === OWNER_HOST;
+  const onResellerHost = window.location.hostname === RESELLER_HOST;
+  const accessDenied = ownerRoute
+    ? !(onOwnerHost && platformOwner)
+    : resellerRoute
+      ? !(onResellerHost && (platformOwner || resellerAccess))
+      : !!role && !!allowedRoles && !allowedRoles.includes(role);
 
   return <div className="app-shell">
     <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}>
@@ -138,7 +146,7 @@ export function AppShell() {
       </div>}
       <nav>
         {visibleNav.map(([to, label, Icon]) => <NavLink key={to} to={to} end={to === "/"} onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}><Icon size={20} /><span>{label}</span></NavLink>)}
-        {!company && resellerAccess && <NavLink to="/reseller" onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}><Building2 size={20}/><span>Reseller Portal</span></NavLink>}
+        {!company && resellerAccess && onResellerHost && <NavLink to="/reseller" onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}><Building2 size={20}/><span>Reseller Portal</span></NavLink>}
       </nav>
       <div className="sidebar-bottom"><div className="company-dot">{initials}</div><div><strong>{companyName}</strong><small>{role ? roleLabels[role] : resellerAccess ? "Reseller account" : platformOwner ? "FleetOS owner" : "Account"}</small><PoweredBy /></div></div>
     </aside>
@@ -148,7 +156,6 @@ export function AppShell() {
         <button className="mobile-menu" aria-label="Open navigation" onClick={() => setMobileOpen(true)}><Menu /></button>
         <div className="presence">{companyName}{role ? ` · ${roleLabels[role]}` : ""}</div>
         <div className="top-actions" style={{ position: "relative" }}>
-          {platformOwner && <button className="secondary-button" onClick={() => { window.location.href = "/control"; }}><ShieldCheck size={16}/> Owner Control</button>}
           <OfflineStatus />
           {company && <button className="icon-button" aria-label={`Notifications${alerts.total ? ` (${alerts.total})` : ""}`} onClick={() => { setAccountOpen(false); setAlertsOpen((open) => !open); }} style={{ position: "relative" }}><Bell size={20} />{alerts.total > 0 && <span style={{ position: "absolute", top: -5, right: -5, minWidth: 17, height: 17, borderRadius: 9, padding: "0 4px", fontSize: 10, lineHeight: "17px", background: alerts.critical > 0 ? "#b91c1c" : "#334155", color: "white" }}>{Math.min(alerts.total, 99)}</span>}</button>}
           {alertsOpen && <div style={{ position: "absolute", right: 44, top: 42, width: 340, maxWidth: "85vw", maxHeight: 430, overflowY: "auto", background: "white", color: "#0f172a", border: "1px solid #e2e8f0", borderRadius: 12, boxShadow: "0 18px 45px rgba(15,23,42,.18)", zIndex: 50, padding: 10 }}>
@@ -156,10 +163,10 @@ export function AppShell() {
             {alerts.items.length === 0 ? <p style={{ margin: 8, color: "#64748b" }}>No active alerts for your role.</p> : alerts.items.map((item) => <button key={item.id} onClick={() => { setAlertsOpen(false); window.location.href = item.href; }} style={{ display: "block", width: "100%", textAlign: "left", border: 0, borderTop: "1px solid #f1f5f9", background: "transparent", padding: "10px 8px", cursor: "pointer" }}><div style={{ display: "flex", gap: 8, alignItems: "center" }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".04em", color: item.severity === "CRITICAL" ? "#b91c1c" : "#a16207" }}>{item.severity}</span><strong style={{ fontSize: 13 }}>{item.title}</strong></div>{item.detail && <div style={{ marginTop: 4, color: "#64748b", fontSize: 12 }}>{item.detail}</div>}</button>)}
           </div>}
           <button className="avatar" aria-label="Account menu" aria-expanded={accountOpen} onClick={() => { setAlertsOpen(false); setAccountOpen((open) => !open); }}>{initials || "FO"}</button>
-          {accountOpen && <div className="account-menu">{platformOwner && <button onClick={() => { setAccountOpen(false); window.location.href = "/control"; }}><ShieldCheck size={16}/> FleetOS owner control</button>}{role && companyManagers.includes(role) && <button onClick={() => { setAccountOpen(false); window.location.href = "/settings/company"; }}><Building2 size={16} /> Company settings</button>}<button onClick={() => { setAccountOpen(false); window.location.href = "/settings/accessibility"; }}><UserRound size={16} /> Accessibility & language</button><button onClick={() => { setAccountOpen(false); void supabase.auth.signOut(); }}><LogOut size={16} /> Sign out</button></div>}
+          {accountOpen && <div className="account-menu">{role && companyManagers.includes(role) && <button onClick={() => { setAccountOpen(false); window.location.href = "/settings/company"; }}><Building2 size={16} /> Company settings</button>}<button onClick={() => { setAccountOpen(false); window.location.href = "/settings/accessibility"; }}><UserRound size={16} /> Accessibility & language</button><button onClick={() => { setAccountOpen(false); void supabase.auth.signOut(); }}><LogOut size={16} /> Sign out</button></div>}
         </div>
       </header>
-      {accessDenied ? <main className="loading-page"><div><h1>Access denied</h1><p>This account does not have permission to open this area.</p><button onClick={() => { window.location.href = role === "DRIVER" ? "/driver" : resellerAccess && !company ? "/reseller" : "/"; }}>Return</button></div></main> : <Outlet />}
+      {accessDenied ? <main className="loading-page"><div><h1>Access denied</h1><p>This area is not available from this FleetOS entry point.</p><button onClick={() => { window.location.href = role === "DRIVER" ? "/driver" : resellerAccess && !company && onResellerHost ? "/reseller" : "/"; }}>Return</button></div></main> : <Outlet />}
     </main>
   </div>;
 }
