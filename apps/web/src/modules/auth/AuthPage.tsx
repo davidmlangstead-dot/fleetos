@@ -38,7 +38,11 @@ export function AuthPage({ initialMode = "login", onBack }: Props) {
       return;
     }
 
-    window.location.reload();
+    // Do not force a full-page reload here. Supabase emits SIGNED_IN after the
+    // session is persisted, and FleetOSApp resolves the workspace from that event.
+    // A forced reload can race persisted session storage on Safari/PWA clients and
+    // briefly return a successfully authenticated user to the public landing page.
+    setMessage("Signed in. Opening your workspace…");
   }
 
   return (
@@ -64,4 +68,3 @@ export function AuthPage({ initialMode = "login", onBack }: Props) {
     </main>
   );
 }
-
