@@ -4,6 +4,9 @@ import { prisma } from "../lib/prisma.js";
 
 export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
   if (error instanceof ZodError) return res.status(400).json({ error: "Validation failed", details: error.flatten() });
+  if (error instanceof Error && error.message === "Origin not allowed by FleetOS API") {
+    return res.status(403).json({ error: "Origin not allowed" });
+  }
 
   console.error(error);
 
