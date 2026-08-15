@@ -50,7 +50,16 @@ vehiclesRouter.post("/", vehicleWriters, asyncHandler(async (req, res) => {
     if (!depots.length) return res.status(400).json({ error: "Depot is not active in the selected company" });
     depotName = depots[0].name;
   }
-  const vehicle = await prisma.$transaction(async tx => {
+
+  const result = await prisma.$transaction(async tx => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${companyId}))`;
+    const controls = await tx.$queryRaw<Array<{ vehicleLimit: number }>>`
+      SELECT "vehicleLimit" FROM "CompanyControl" WHERE "companyId"=${companyId} LIMIT 1
+    `;
+    const vehicleLimit = controls[0]?.vehicleLimit ?? 10;
+    const vehicleUsage = await tx.vehicle.count({ where: { companyId } });
+    if (vehicleUsage >= vehicleLimit) return { blocked: true as const, vehicleLimit, vehicleUsage };
+
     const created = await tx.vehicle.create({ data: {
       ...rest, depot: depotName, companyId,
       firstRegisteredAt: firstRegisteredAt ? new Date(firstRegisteredAt) : undefined,
@@ -59,8 +68,17 @@ vehiclesRouter.post("/", vehicleWriters, asyncHandler(async (req, res) => {
       tachoCalibrationDue: tachoCalibrationDue ? new Date(tachoCalibrationDue) : undefined,
     } });
     if (depotId) await tx.$executeRaw`UPDATE "Vehicle" SET "depotId"=${depotId}::uuid WHERE id=${created.id} AND "companyId"=${companyId}`;
-    return created;
+    return { blocked: false as const, created, vehicleLimit, vehicleUsage: vehicleUsage + 1 };
   });
+
+  if (result.blocked) return res.status(409).json({
+    error: `Your current plan supports ${result.vehicleLimit} vehicles. Upgrade your FleetOS plan to add another vehicle.`,
+    code: "VEHICLE_LIMIT_REACHED",
+    vehicleLimit: result.vehicleLimit,
+    vehicleUsage: result.vehicleUsage,
+  });
+
+  const vehicle = result.created;
   await writeAuditEvent({ companyId, actorUserId: req.user!.id, actorEmail: req.user!.email, action: "CREATE", entityType: "VEHICLE", entityId: vehicle.id, summary: `Created vehicle ${vehicle.registration}`, metadata: { type: vehicle.type, depotId } });
-  res.status(201).json({ ...vehicle, depotId, depotName });
+  res.status(201).json({ ...vehicle, depotId, depotName, vehicleLimit: result.vehicleLimit, vehicleUsage: result.vehicleUsage });
 }));
