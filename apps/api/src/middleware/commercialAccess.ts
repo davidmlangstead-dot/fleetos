@@ -12,7 +12,8 @@ export const requireCommercialWriteAccess: RequestHandler = async (req,res,next)
   if (SAFE_METHODS.has(req.method.toUpperCase())) return next();
   if (!req.user) return res.status(401).json({error:"Unauthenticated"});
   if (req.user.role === "PLATFORM_ADMIN") return next();
-  if (SAFETY_WRITE_PATHS.some(pattern=>pattern.test(req.path))) return next();
+  const fullPath = req.originalUrl.split("?")[0].replace(/^\/api/, "");
+  if (SAFETY_WRITE_PATHS.some(pattern=>pattern.test(fullPath))) return next();
 
   const rows=await prisma.$queryRaw<Array<{subscriptionStatus:string;trialEndsAt:Date|null}>>`
     SELECT "subscriptionStatus","trialEndsAt" FROM "CompanyControl" WHERE "companyId"=${req.user.companyId} LIMIT 1
