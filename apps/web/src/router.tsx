@@ -67,7 +67,6 @@ const PlatformMoneyPage = lazy(() => loadWithChunkRecovery(() => import("./modul
 const ResellerPortalPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/ResellerPortalPage").then(module => ({ default: module.ResellerPortalPage }))));
 const ResellerJoinPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/ResellerJoinPage").then(module => ({ default: module.ResellerJoinPage }))));
 const ResellerCustomerJoinPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/ResellerCustomerJoinPage").then(module => ({ default: module.ResellerCustomerJoinPage }))));
-const AccountsPage = lazy(() => loadWithChunkRecovery(() => import("./modules/accounts/AccountsPage").then(module => ({ default: module.AccountsPage }))));
 const AccessibilityPage = lazy(() => loadWithChunkRecovery(() => import("./modules/settings/AccessibilityPage").then(module => ({ default: module.AccessibilityPage }))));
 
 const pageFallback = <main className="loading-page"><div><h1>Loading FleetOS</h1></div></main>;
@@ -100,7 +99,6 @@ export const router = createBrowserRouter([{ element: <AppShell />, errorElement
   { path: "/reports", element: load(<ReportsPage />) },
   { path: "/marketplace", element: load(<MarketplacePage />) },
   { path: "/imports", element: load(<SpreadsheetImportPage />) },
-  { path: "/accounts", element: load(<AccountsPage />) },
   { path: "/control", element: load(<PlatformControlPage />) },
   { path: "/control/customers", element: load(<PlatformCustomersPage />) },
   { path: "/control/money", element: load(<PlatformMoneyPage />) },
