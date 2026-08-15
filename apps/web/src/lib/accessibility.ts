@@ -34,6 +34,7 @@ export function loadLocalAccessibilityPreferences(): AccessibilityPreferences {
 
 export function saveLocalAccessibilityPreferences(prefs: AccessibilityPreferences) {
   localStorage.setItem(ACCESSIBILITY_KEY, JSON.stringify(prefs));
+  window.dispatchEvent(new CustomEvent("fleetos:preferences", { detail: prefs }));
 }
 
 export function applyAccessibilityPreferences(prefs: AccessibilityPreferences) {
@@ -65,3 +66,4 @@ export function readPageAloud() {
 export function stopReadingAloud() {
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
 }
+
