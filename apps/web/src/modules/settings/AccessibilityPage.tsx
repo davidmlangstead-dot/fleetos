@@ -10,10 +10,12 @@ import {
   stopReadingAloud,
   type AccessibilityPreferences,
 } from "../../lib/accessibility";
+import { useI18n } from "../../lib/i18n";
 
 type Preferences = AccessibilityPreferences;
 
 export function AccessibilityPage() {
+  const { t } = useI18n();
   const [prefs, setPrefs] = useState<Preferences>(() => loadLocalAccessibilityPreferences());
   const [status, setStatus] = useState("Loading your saved preferences…");
   const [voiceResult, setVoiceResult] = useState("");
@@ -69,17 +71,17 @@ export function AccessibilityPage() {
   }
 
   return <div className="page-shell">
-    <div className="page-heading"><div><p className="eyebrow">Your preferences</p><h1>Accessibility & language</h1><p>These choices belong to your user account and now apply across FleetOS as soon as you change them.</p><small>{status}</small></div></div>
+    <div className="page-heading"><div><p className="eyebrow">{t("prefs.eyebrow")}</p><h1>{t("prefs.title")}</h1><p>{t("prefs.intro")}</p><small>{status}</small></div></div>
     <section className="dashboard-section">
-      <label>Preferred interface language
+      <label>{t("prefs.language")}
         <select value={prefs.language} onChange={(event) => void save({ ...prefs, language: event.target.value as Preferences["language"] })}>
           <option value="en">English</option><option value="pl">Polski</option><option value="ro">Română</option><option value="lt">Lietuvių</option><option value="bg">Български</option><option value="uk">Українська</option><option value="pt">Português</option><option value="es">Español</option>
         </select>
       </label>
-      <p className="subtle">This currently sets your language preference and speech locale. Full translated FleetOS screen text still needs translation packs, so the selector does not pretend the whole app is translated yet.</p>
+      <p className="subtle">{t("prefs.translationReady")}</p>
       <div className="action-grid" style={{ marginTop: 18 }}>
-        <button className="action-card" onClick={() => toggle("largeText")}><strong>Large text</strong><span>{prefs.largeText ? "On" : "Off"}</span></button>
-        <button className="action-card" onClick={() => toggle("largeControls")}><strong>Large controls</strong><span>{prefs.largeControls ? "On" : "Off"}</span></button>
+        <button className="action-card" onClick={() => toggle("largeText")}><strong>{t("prefs.largeText")}</strong><span>{t(prefs.largeText ? "common.on" : "common.off")}</span></button>
+        <button className="action-card" onClick={() => toggle("largeControls")}><strong>{t("prefs.largeControls")}</strong><span>{t(prefs.largeControls ? "common.on" : "common.off")}</span></button>
         <button className="action-card" onClick={() => toggle("highContrast")}><strong>High contrast</strong><span>{prefs.highContrast ? "On" : "Off"}</span></button>
         <button className="action-card" onClick={() => toggle("reducedMotion")}><strong>Reduced motion</strong><span>{prefs.reducedMotion ? "On" : "Off"}</span></button>
         <button className="action-card" onClick={() => toggle("easyRead")}><strong>Easy Read</strong><span>{prefs.easyRead ? "On" : "Off"}</span></button>
@@ -92,3 +94,4 @@ export function AccessibilityPage() {
     <section className="dashboard-section"><p className="eyebrow">Translation model</p><h2>Original records stay original</h2><p>The selected language controls your interface preference and speech locale. Customer-entered evidence and messages retain their original wording; translated viewing copies can be layered on later without replacing the audit record.</p></section>
   </div>;
 }
+
