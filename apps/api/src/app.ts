@@ -26,6 +26,7 @@ import { marketplaceRouter } from "./modules/marketplace/routes.js";
 import { medicRouter } from "./modules/medic/routes.js";
 import { notificationsRouter } from "./modules/notifications/routes.js";
 import { driverOperationsRouter } from "./modules/driver-operations/routes.js";
+import { driverFieldRouter } from "./modules/driver-operations/fieldRoutes.js";
 import { tachographRouter } from "./modules/tachograph/routes.js";
 import { preferencesRouter } from "./modules/preferences/routes.js";
 import { accountsRouter } from "./modules/accounts/routes.js";
@@ -38,7 +39,7 @@ app.use((_req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "no-referrer");
-  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader("Permissions-Policy", "camera=(self), microphone=(), geolocation=(self)");
   next();
 });
 
@@ -79,7 +80,7 @@ app.use(cors({
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Company-Id", "X-Idempotency-Key"],
 }));
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "12mb" }));
 app.get("/", (_req, res) => res.json({ name: "FleetOS API", status: "ok" }));
 app.get("/health", (_req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));
 app.get("/api", (_req, res) => res.json({ name: "FleetOS API", status: "ok" }));
@@ -106,6 +107,7 @@ app.use("/api/reports", reportsRouter);
 app.use("/api/marketplace", requireAuth, requireCommercialWriteAccess, marketplaceRouter);
 app.use("/api/medic", sensitiveRateLimit, medicRouter);
 app.use("/api/notifications", notificationsRouter);
+app.use("/api/driver-operations", sensitiveRateLimit, requireAuth, requireCommercialWriteAccess, idempotencyMiddleware, driverFieldRouter);
 app.use("/api/driver-operations", sensitiveRateLimit, requireAuth, requireCommercialWriteAccess, idempotencyMiddleware, driverOperationsRouter);
 app.use((_req, res) => res.status(404).json({ error: "Route not found" }));
 app.use(errorHandler);
