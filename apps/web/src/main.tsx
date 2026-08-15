@@ -75,9 +75,10 @@ function FleetOSApp() {
       }
 
       const officeEntry = window.location.pathname === "/office";
+      const officeWorkspace = workspaces.find((workspace) => workspace.role !== "DRIVER");
       const selected = localStorage.getItem(ACTIVE_WORKSPACE_KEY);
       let active = officeEntry
-        ? workspaces.find((workspace) => workspace.role !== "DRIVER")
+        ? officeWorkspace
         : workspaces.find((workspace) => workspace.id === selected);
       if (officeEntry && !active) {
         setResolvedRole();
@@ -89,8 +90,16 @@ function FleetOSApp() {
         active = workspaces[0];
         localStorage.setItem(ACTIVE_WORKSPACE_KEY, active.id);
       }
+      if (window.location.pathname === "/" && active.role === "DRIVER" && officeWorkspace) {
+        active = officeWorkspace;
+        localStorage.setItem(ACTIVE_WORKSPACE_KEY, active.id);
+      }
       if (officeEntry) {
         localStorage.setItem(ACTIVE_WORKSPACE_KEY, active.id);
+        window.history.replaceState(null, "", "/");
+      }
+
+      if (active.role !== "DRIVER" && window.location.pathname.startsWith("/driver")) {
         window.history.replaceState(null, "", "/");
       }
 
