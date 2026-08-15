@@ -11,6 +11,7 @@ import { OnboardingPage } from "./modules/onboarding/OnboardingPage";
 import { StaffInvitePage } from "./modules/auth/StaffInvitePage";
 import { BrandingProvider, loadCurrentBranding, loadPublicBranding, useBranding } from "./lib/branding";
 import { bootstrapAccessibilityPreferences } from "./lib/accessibility";
+import { I18nProvider } from "./lib/i18n";
 import "./styles.css";
 import "./shell-fixes.css";
 import "./driver-operations.css";
@@ -139,7 +140,7 @@ function FleetOSApp() {
 }
 
 createRoot(document.getElementById("root")!).render(
-  <StrictMode><QueryClientProvider client={client}><BrandingProvider><FleetOSApp /></BrandingProvider></QueryClientProvider></StrictMode>,
+  <StrictMode><QueryClientProvider client={client}><I18nProvider><BrandingProvider><FleetOSApp /></BrandingProvider></I18nProvider></QueryClientProvider></StrictMode>,
 );
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
@@ -147,3 +148,4 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
     void navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).then((registration) => registration.update()).catch((error) => console.error("FleetOS service worker registration failed", error));
   });
 }
+
