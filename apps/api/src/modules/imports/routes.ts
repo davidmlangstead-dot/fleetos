@@ -100,13 +100,36 @@ importsRouter.post("/commit", asyncHandler(async (req, res) => {
   if (records.length > 2000) return res.status(400).json({ error: "Import a maximum of 2,000 rows at a time." });
   const companyId = req.user!.companyId;
   let imported = 0;
+
   if (input.kind === "vehicles") {
-    const existing = new Set((await prisma.vehicle.findMany({ where: { companyId }, select: { registration: true } })).map((item) => item.registration.toUpperCase()));
-    const data = records.filter((item) => !existing.has(String(item.registration).toUpperCase())).map((item) => ({ ...item, companyId })) as never[];
-    if (data.length) imported = (await prisma.vehicle.createMany({ data, skipDuplicates: true })).count;
+    const result = await prisma.$transaction(async tx => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${companyId}))`;
+      const controls = await tx.$queryRaw<Array<{ vehicleLimit: number }>>`
+        SELECT "vehicleLimit" FROM "CompanyControl" WHERE "companyId"=${companyId} LIMIT 1
+      `;
+      const vehicleLimit = controls[0]?.vehicleLimit ?? 10;
+      const existingRows = await tx.vehicle.findMany({ where: { companyId }, select: { registration: true } });
+      const existing = new Set(existingRows.map((item) => item.registration.toUpperCase()));
+      const data = records.filter((item) => !existing.has(String(item.registration).toUpperCase())).map((item) => ({ ...item, companyId })) as never[];
+      const available = Math.max(0, vehicleLimit - existingRows.length);
+      if (data.length > available) return { blocked: true as const, vehicleLimit, vehicleUsage: existingRows.length, requested: data.length, available };
+      const count = data.length ? (await tx.vehicle.createMany({ data, skipDuplicates: true })).count : 0;
+      return { blocked: false as const, count, vehicleLimit, vehicleUsage: existingRows.length + count };
+    });
+
+    if (result.blocked) return res.status(409).json({
+      error: `This import would exceed the ${result.vehicleLimit}-vehicle allowance. ${result.available} vehicle slot(s) are available on the current plan.`,
+      code: "VEHICLE_LIMIT_REACHED",
+      vehicleLimit: result.vehicleLimit,
+      vehicleUsage: result.vehicleUsage,
+      requested: result.requested,
+      available: result.available,
+    });
+    imported = result.count;
   } else {
     imported = (await prisma.driver.createMany({ data: records.map((item) => ({ ...item, companyId })) as never[] })).count;
   }
+
   await writeAuditEvent({ companyId, actorUserId: req.user!.id, actorEmail: req.user!.email, action: "CREATE", entityType: "SPREADSHEET_IMPORT", entityId: input.kind, summary: `Imported ${imported} ${input.kind} record(s) from spreadsheet data` });
   res.status(201).json({ imported, kind: input.kind });
 }));
