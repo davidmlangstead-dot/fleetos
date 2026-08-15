@@ -17,6 +17,8 @@ const workshop: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "
 const vehicleReaders: readonly Role[] = ["WORKSHOP_TECHNICIAN", ...management];
 const peopleManagers: readonly Role[] = ["TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const companyManagers: readonly Role[] = ["TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
+const financeUsers: readonly Role[] = ["TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
+const platformOnly: readonly Role[] = ["PLATFORM_ADMIN"];
 const registerUsers: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const documentUsers: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const tachographUsers: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
@@ -41,11 +43,15 @@ const nav: readonly NavItem[] = [
   ["/documents", "Documents", ClipboardList, documentUsers],
   ["/registers", "Registers", ClipboardList, registerUsers],
   ["/reports", "Reports", Gauge, reportUsers],
+  ["/accounts", "Accounts", ClipboardList, financeUsers],
   ["/marketplace", "Marketplace", MessageCircle, marketplaceUsers],
   ["/organisation/depots", "Depots & Sites", MapPin, companyManagers],
   ["/settings/company", "Company Settings", Building2, companyManagers],
+  ["/settings/accessibility", "Accessibility & Language", UserRound, everyone],
   ["/settings/audit", "Audit Trail", History, companyManagers],
   ["/settings/medic", "System Medic", Stethoscope, companyManagers],
+  ["/control", "FleetOS Control", ShieldCheck, platformOnly],
+  ["/reseller", "Reseller Portal", Building2, platformOnly],
   ["/messages", "Messages", MessageCircle, everyone],
 ] as const;
 
@@ -127,7 +133,7 @@ export function AppShell() {
             {alerts.items.length === 0 ? <p style={{ margin: 8, color: "#64748b" }}>No active alerts for your role.</p> : alerts.items.map((item) => <button key={item.id} onClick={() => { setAlertsOpen(false); window.location.href = item.href; }} style={{ display: "block", width: "100%", textAlign: "left", border: 0, borderTop: "1px solid #f1f5f9", background: "transparent", padding: "10px 8px", cursor: "pointer" }}><div style={{ display: "flex", gap: 8, alignItems: "center" }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".04em", color: item.severity === "CRITICAL" ? "#b91c1c" : "#a16207" }}>{item.severity}</span><strong style={{ fontSize: 13 }}>{item.title}</strong></div>{item.detail && <div style={{ marginTop: 4, color: "#64748b", fontSize: 12 }}>{item.detail}</div>}</button>)}
           </div>}
           <button className="avatar" aria-label="Account menu" aria-expanded={accountOpen} onClick={() => { setAlertsOpen(false); setAccountOpen((open) => !open); }}>{initials || "FO"}</button>
-          {accountOpen && <div className="account-menu">{role && companyManagers.includes(role) && <button onClick={() => { setAccountOpen(false); window.location.href = "/settings/company"; }}><Building2 size={16} /> Company settings</button>}<button onClick={() => { setAccountOpen(false); void supabase.auth.signOut(); }}><LogOut size={16} /> Sign out</button></div>}
+          {accountOpen && <div className="account-menu">{role && companyManagers.includes(role) && <button onClick={() => { setAccountOpen(false); window.location.href = "/settings/company"; }}><Building2 size={16} /> Company settings</button>}<button onClick={() => { setAccountOpen(false); window.location.href = "/settings/accessibility"; }}><UserRound size={16} /> Accessibility & language</button><button onClick={() => { setAccountOpen(false); void supabase.auth.signOut(); }}><LogOut size={16} /> Sign out</button></div>}
         </div>
       </header>
       {accessDenied ? <main className="loading-page"><div><h1>Access denied</h1><p>Your role does not have access to this area.</p><button onClick={() => { window.location.href = role === "DRIVER" ? "/driver" : "/"; }}>Return to your dashboard</button></div></main> : <Outlet />}
