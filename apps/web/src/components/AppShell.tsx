@@ -19,7 +19,6 @@ const workshop: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "
 const vehicleReaders: readonly Role[] = ["WORKSHOP_TECHNICIAN", ...management];
 const peopleManagers: readonly Role[] = ["TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const companyManagers: readonly Role[] = ["TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
-const financeUsers: readonly Role[] = ["TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const registerUsers: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const documentUsers: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const tachographUsers: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
@@ -44,7 +43,6 @@ const nav: readonly NavItem[] = [
   ["/documents", "Documents", ClipboardList, documentUsers],
   ["/registers", "Registers", ClipboardList, registerUsers],
   ["/reports", "Reports", Gauge, reportUsers],
-  ["/accounts", "Accounts", ClipboardList, financeUsers],
   ["/marketplace", "Marketplace", MessageCircle, marketplaceUsers],
   ["/organisation/depots", "Depots & Sites", MapPin, companyManagers],
   ["/settings/company", "Company Settings", Building2, companyManagers],
