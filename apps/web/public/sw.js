@@ -1,4 +1,4 @@
-const CACHE = "fleetos-shell-v4";
+const CACHE = "fleetos-shell-v5";
 const SHELL = ["/", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
@@ -64,3 +64,4 @@ self.addEventListener("sync", (event) => {
 self.addEventListener("message", (event) => {
   if (event.data?.type === "FLEETOS_REQUEST_SYNC") event.waitUntil(requestClientSync());
 });
+
