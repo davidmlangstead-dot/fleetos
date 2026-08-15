@@ -8,6 +8,7 @@ import { requireCommercialWriteAccess } from "./middleware/commercialAccess.js";
 import { errorHandler } from "./middleware/errors.js";
 import { idempotencyMiddleware } from "./middleware/idempotency.js";
 import { apiRateLimit, sensitiveRateLimit } from "./middleware/rateLimit.js";
+import { protectOwnerCompanyControls } from "./middleware/platformControls.js";
 import { companyRouter } from "./modules/company/routes.js";
 import { commercialRouter } from "./modules/commercial/routes.js";
 import { importsRouter } from "./modules/imports/routes.js";
@@ -84,6 +85,7 @@ app.get("/health", (_req, res) => res.json({ status: "ok", timestamp: new Date()
 app.get("/api", (_req, res) => res.json({ name: "FleetOS API", status: "ok" }));
 app.use("/api", apiRateLimit);
 app.use("/api/platform", sensitiveRateLimit, platformRouter);
+app.use("/api/company/admin", sensitiveRateLimit, protectOwnerCompanyControls);
 app.use("/api/company", sensitiveRateLimit, companyRouter);
 app.use("/api/commercial", sensitiveRateLimit, commercialRouter);
 app.use("/api/preferences", sensitiveRateLimit, preferencesRouter);
