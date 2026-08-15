@@ -13,8 +13,9 @@ dashboardRouter.get(
     const companyId = req.user!.companyId;
     const now = new Date();
     const soon = new Date(now.getTime() + 30 * 86_400_000);
-    const [vehicles, activeJobs, overdueCompliance, openDefects, jobs, vehicleDates, driverDates, tachograph, control] = await Promise.all([
+    const [vehicles, totalVehicles, activeJobs, overdueCompliance, openDefects, jobs, vehicleDates, driverDates, tachograph, control] = await Promise.all([
       prisma.vehicle.count({ where: { companyId, status: "ACTIVE" } }),
+      prisma.vehicle.count({ where: { companyId } }),
       prisma.job.count({ where: { companyId, status: { in: ["PLANNED", "ASSIGNED", "IN_PROGRESS"] } } }),
       prisma.complianceItem.count({ where: { companyId, dueDate: { lt: now }, status: { not: "RESOLVED" } } }),
       prisma.defect.count({ where: { companyId, status: { in: ["OPEN", "IN_PROGRESS"] } } }),
@@ -41,8 +42,8 @@ dashboardRouter.get(
           COUNT(*) FILTER (WHERE "nextDueAt" >= ${now} AND "nextDueAt" <= ${soon})::bigint AS "dueSoon"
         FROM "TachographDownload" WHERE "companyId"=${companyId}
       `,
-      prisma.$queryRaw<Array<{ subscriptionStatus: string; betaEnabled: boolean; trialEndsAt: Date | null }>>`
-        SELECT "subscriptionStatus","betaEnabled","trialEndsAt" FROM "CompanyControl" WHERE "companyId"=${companyId} LIMIT 1
+      prisma.$queryRaw<Array<{ subscriptionStatus: string; betaEnabled: boolean; trialEndsAt: Date | null; vehicleLimit: number }>>`
+        SELECT "subscriptionStatus","betaEnabled","trialEndsAt","vehicleLimit" FROM "CompanyControl" WHERE "companyId"=${companyId} LIMIT 1
       `,
     ]);
 
@@ -65,7 +66,16 @@ dashboardRouter.get(
       overdueCompliance,
       openDefects,
       attention,
-      commercial: c ? { subscriptionStatus: c.subscriptionStatus, betaEnabled: c.betaEnabled, trialEndsAt: c.trialEndsAt?.toISOString() ?? null, trialDaysRemaining } : null,
+      commercial: c ? {
+        subscriptionStatus: c.subscriptionStatus,
+        betaEnabled: c.betaEnabled,
+        trialEndsAt: c.trialEndsAt?.toISOString() ?? null,
+        trialDaysRemaining,
+        vehicleLimit: c.vehicleLimit,
+        vehicleUsage: totalVehicles,
+        vehiclesAvailable: Math.max(0, c.vehicleLimit - totalVehicles),
+        vehicleLimitReached: totalVehicles >= c.vehicleLimit,
+      } : null,
       jobs: jobs.map((job) => ({
         id: job.id,
         reference: job.jobNumber,
