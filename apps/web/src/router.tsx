@@ -65,6 +65,8 @@ const PlatformControlPage = lazy(() => loadWithChunkRecovery(() => import("./mod
 const PlatformCustomersPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/PlatformControlPage").then(module => ({ default: module.PlatformCustomersPage }))));
 const PlatformMoneyPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/PlatformControlPage").then(module => ({ default: module.PlatformMoneyPage }))));
 const ResellerPortalPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/ResellerPortalPage").then(module => ({ default: module.ResellerPortalPage }))));
+const ResellerJoinPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/ResellerJoinPage").then(module => ({ default: module.ResellerJoinPage }))));
+const ResellerCustomerJoinPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/ResellerCustomerJoinPage").then(module => ({ default: module.ResellerCustomerJoinPage }))));
 const AccountsPage = lazy(() => loadWithChunkRecovery(() => import("./modules/accounts/AccountsPage").then(module => ({ default: module.AccountsPage }))));
 const AccessibilityPage = lazy(() => loadWithChunkRecovery(() => import("./modules/settings/AccessibilityPage").then(module => ({ default: module.AccessibilityPage }))));
 
@@ -103,6 +105,8 @@ export const router = createBrowserRouter([{ element: <AppShell />, errorElement
   { path: "/control/customers", element: load(<PlatformCustomersPage />) },
   { path: "/control/money", element: load(<PlatformMoneyPage />) },
   { path: "/reseller", element: load(<ResellerPortalPage />) },
+  { path: "/reseller/join", element: load(<ResellerJoinPage />) },
+  { path: "/join", element: load(<ResellerCustomerJoinPage />) },
   { path: "/organisation/depots", element: load(<DepotsPage />) },
   { path: "/settings/company", element: load(<CompanySettingsPage />) },
   { path: "/settings/beta", element: load(<BetaControlsPage />) },
