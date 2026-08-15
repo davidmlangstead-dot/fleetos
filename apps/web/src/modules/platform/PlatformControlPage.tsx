@@ -1,54 +1,33 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api";
 
-type Commercial = {
-  subscriptionPlan?: string;
-  subscriptionStatus?: string;
-  trialEndsAt?: string | null;
-  vehicleLimit?: number;
-  commitmentMonths?: number;
+type Portfolio = {
+  companyId:string; companyName:string; slug:string; subscriptionPlan:string; subscriptionStatus:string;
+  trialEndsAt:string|null; trialDaysRemaining:number|null; trialExpired:boolean; readOnly:boolean;
+  vehicleLimit:number; vehicleUsage:number; members:number; commitmentMonths:number; commitmentStartedAt:string|null; commitmentEndsAt:string|null;
+  resellerId:string|null; wholesaleMonthlyPence:number|null; retailMonthlyPence:number|null;
 };
-
-type Workspace = { id: string; name: string; slug: string; role: string };
+type Reseller={id:string;name:string;status:string;customers:number;vehicles:number;wholesalePence:number};
+const money=(p:number)=>new Intl.NumberFormat("en-GB",{style:"currency",currency:"GBP",maximumFractionDigits:0}).format(p/100);
 
 export function PlatformControlPage() {
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [commercial, setCommercial] = useState<Commercial | null>(null);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    void Promise.all([
-      api<Workspace[]>("/company/workspaces"),
-      api<Commercial>("/commercial"),
-    ]).then(([companies, billing]) => {
-      setWorkspaces(companies);
-      setCommercial(billing);
-    }).catch((err) => setError(err instanceof Error ? err.message : "Unable to load platform controls"));
-  }, []);
+  const [portfolio,setPortfolio]=useState<Portfolio[]>([]); const [resellers,setResellers]=useState<Reseller[]>([]); const [error,setError]=useState("");
+  useEffect(()=>{void Promise.all([api<Portfolio[]>("/commercial/portfolio"),api<Reseller[]>("/resellers")]).then(([companies,agents])=>{setPortfolio(companies);setResellers(agents);}).catch(err=>setError(err instanceof Error?err.message:"Unable to load platform controls"));},[]);
+  const totals=useMemo(()=>({vehicles:portfolio.reduce((n,c)=>n+c.vehicleUsage,0),active:portfolio.filter(c=>c.subscriptionStatus==="ACTIVE").length,trials:portfolio.filter(c=>c.subscriptionStatus==="TRIAL").length,readOnly:portfolio.filter(c=>c.readOnly).length,wholesale:resellers.reduce((n,r)=>n+r.wholesalePence,0)}),[portfolio,resellers]);
 
   return <div className="page-shell">
-    <div className="page-heading">
-      <div><p className="eyebrow">Platform owner</p><h1>FleetOS Control</h1><p>Your private control room for customers, resellers, subscriptions and platform health.</p></div>
+    <div className="page-heading"><div><p className="eyebrow">Platform owner</p><h1>FleetOS Control</h1><p>Your private control room for customer companies, resellers, subscriptions and platform health.</p></div></div>
+    {error&&<p className="form-message">{error}</p>}
+    <div className="stat-grid">
+      <article className="stat-card"><span>Customer companies</span><strong>{portfolio.length}</strong><small>{totals.active} paid · {totals.trials} trial</small></article>
+      <article className="stat-card"><span>Vehicles managed</span><strong>{totals.vehicles}</strong><small>Across all customer tenants</small></article>
+      <article className="stat-card"><span>Resellers</span><strong>{resellers.length}</strong><small>{resellers.filter(r=>r.status==="ACTIVE").length} active channels</small></article>
+      <article className="stat-card"><span>Wholesale MRR recorded</span><strong>{money(totals.wholesale)}</strong><small>Before Stripe automation</small></article>
+      <article className="stat-card"><span>Read-only companies</span><strong>{totals.readOnly}</strong><small>Expired / past due / cancelled</small></article>
     </div>
-    {error && <p className="form-message">{error}</p>}
-    <div className="stats-grid">
-      <article className="stat-card"><span>Accessible workspaces</span><strong>{workspaces.length}</strong><small>Companies attached to this account</small></article>
-      <article className="stat-card"><span>Current plan</span><strong>{commercial?.subscriptionPlan ?? "—"}</strong><small>{commercial?.subscriptionStatus ?? "Commercial state"}</small></article>
-      <article className="stat-card"><span>Vehicle allowance</span><strong>{commercial?.vehicleLimit ?? "—"}</strong><small>Server-enforced allowance</small></article>
-      <article className="stat-card"><span>Commitment</span><strong>{commercial?.commitmentMonths ? `${commercial.commitmentMonths} months` : "12 months"}</strong><small>Standard paid term</small></article>
-    </div>
-    <section className="dashboard-section">
-      <div className="section-heading"><div><p className="eyebrow">Commercial control</p><h2>What you control here</h2></div></div>
-      <div className="action-grid">
-        <a className="action-card" href="/settings/beta"><strong>Subscriptions & trials</strong><span>90-day trials, plan status and vehicle allowances.</span></a>
-        <a className="action-card" href="/reseller"><strong>Resellers & white label</strong><span>Create agent channels, branding boundaries and wholesale relationships.</span></a>
-        <a className="action-card" href="/settings/medic"><strong>Platform health</strong><span>Open FleetOS Medic and operational safeguards.</span></a>
-        <a className="action-card" href="/settings/audit"><strong>Audit trail</strong><span>Review recorded company activity.</span></a>
-      </div>
-    </section>
-    <section className="dashboard-section">
-      <div className="section-heading"><div><p className="eyebrow">Architecture</p><h2>One platform, separated control planes</h2></div></div>
-      <p>Customers use the normal FleetOS dashboard. Platform owners use <strong>/control</strong>. Resellers use <strong>/reseller</strong>. The routes live in the same application but remain permission-gated by role.</p>
-    </section>
+    <section className="dashboard-section"><div className="section-heading"><div><p className="eyebrow">Customer portfolio</p><h2>Commercial state by company</h2></div></div>{portfolio.length===0?<p>No companies returned.</p>:<div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse"}}><thead><tr><th align="left">Company</th><th align="left">Plan</th><th align="left">Status</th><th align="right">Vehicles</th><th align="left">Trial</th><th align="left">Commitment</th><th align="left">Access</th></tr></thead><tbody>{portfolio.map(c=><tr key={c.companyId}><td><strong>{c.companyName}</strong><br/><small>{c.slug}</small></td><td>{c.subscriptionPlan}</td><td>{c.subscriptionStatus}</td><td align="right">{c.vehicleUsage}/{c.vehicleLimit}</td><td>{c.subscriptionStatus==="TRIAL"?(c.trialExpired?"Expired":`${c.trialDaysRemaining??0} days`):"—"}</td><td>{c.commitmentMonths}m{c.commitmentEndsAt?` · to ${new Date(c.commitmentEndsAt).toLocaleDateString("en-GB")}`:""}</td><td>{c.readOnly?"Read-only":"Writable"}</td></tr>)}</tbody></table></div>}</section>
+    <section className="dashboard-section"><div className="section-heading"><div><p className="eyebrow">Reseller channel</p><h2>White-label partners</h2></div></div>{resellers.length===0?<p>No reseller records yet.</p>:<div className="action-grid">{resellers.map(r=><article className="action-card" key={r.id}><strong>{r.name}</strong><span>{r.customers} customers · {r.vehicles} vehicles · {money(r.wholesalePence)} wholesale/month</span></article>)}</div>}</section>
+    <section className="dashboard-section"><div className="section-heading"><div><p className="eyebrow">Commercial control</p><h2>Owner tools</h2></div></div><div className="action-grid"><a className="action-card" href="/settings/beta"><strong>Subscriptions & trials</strong><span>90-day trials, status, commitment and vehicle allowances.</span></a><a className="action-card" href="/reseller"><strong>Resellers & white label</strong><span>Create agents, grant reseller membership and track wholesale relationships.</span></a><a className="action-card" href="/settings/medic"><strong>Platform health</strong><span>Open FleetOS Medic and operational safeguards.</span></a><a className="action-card" href="/settings/audit"><strong>Audit trail</strong><span>Review recorded company activity.</span></a></div></section>
+    <section className="dashboard-section"><p className="eyebrow">Architecture</p><h2>One application, separated control planes</h2><p>Customers use the normal dashboard. Platform owners use <strong>/control</strong>. Reseller members use <strong>/reseller</strong>. The underlying platform remains shared so fixes and upgrades can be shipped once.</p></section>
   </div>;
 }
