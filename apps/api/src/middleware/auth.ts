@@ -56,6 +56,13 @@ async function ensureUser(identity: Identity) {
   }
 }
 
+export async function isPlatformOwner(userId: string) {
+  const rows = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+    SELECT EXISTS(SELECT 1 FROM "PlatformOwner" WHERE "userId"=${userId}) AS exists
+  `;
+  return rows[0]?.exists === true;
+}
+
 export const requireIdentity: RequestHandler = async (req, res, next) => {
   if (res.locals.identity) return next();
   const token = req.header("authorization")?.replace(/^Bearer\s+/i, "");
@@ -68,6 +75,14 @@ export const requireIdentity: RequestHandler = async (req, res, next) => {
   const user = await ensureUser({ id: data.user.id, email: data.user.email });
   res.locals.identity = { id: user.id, email: user.email };
   next();
+};
+
+export const requirePlatformOwner: RequestHandler = async (req, res, next) => {
+  await requireIdentity(req, res, async () => {
+    if (!(await isPlatformOwner(res.locals.identity.id))) return res.status(403).json({ error: "FleetOS owner access is required" });
+    res.locals.platformOwner = true;
+    next();
+  });
 };
 
 export const requireAuth: RequestHandler = async (req, res, next) => {
@@ -91,4 +106,3 @@ export function requireRoles(...allowed: Role[]): RequestHandler {
     next();
   };
 }
-
