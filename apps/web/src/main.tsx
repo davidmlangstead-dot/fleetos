@@ -74,11 +74,24 @@ function FleetOSApp() {
         return;
       }
 
+      const officeEntry = window.location.pathname === "/office";
       const selected = localStorage.getItem(ACTIVE_WORKSPACE_KEY);
-      let active = workspaces.find((w) => w.id === selected);
+      let active = officeEntry
+        ? workspaces.find((workspace) => workspace.role !== "DRIVER")
+        : workspaces.find((workspace) => workspace.id === selected);
+      if (officeEntry && !active) {
+        setResolvedRole();
+        setError("This account does not have an office workspace. Sign in with a company administrator, manager, planner or office account.");
+        setState("error");
+        return;
+      }
       if (!active) {
         active = workspaces[0];
         localStorage.setItem(ACTIVE_WORKSPACE_KEY, active.id);
+      }
+      if (officeEntry) {
+        localStorage.setItem(ACTIVE_WORKSPACE_KEY, active.id);
+        window.history.replaceState(null, "", "/");
       }
 
       setResolvedRole(active.role);
