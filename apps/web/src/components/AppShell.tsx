@@ -20,7 +20,6 @@ const vehicleReaders: readonly Role[] = ["WORKSHOP_TECHNICIAN", ...management];
 const peopleManagers: readonly Role[] = ["TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const companyManagers: readonly Role[] = ["TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const financeUsers: readonly Role[] = ["TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
-const platformOnly: readonly Role[] = ["PLATFORM_ADMIN"];
 const registerUsers: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const documentUsers: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const tachographUsers: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
@@ -52,8 +51,6 @@ const nav: readonly NavItem[] = [
   ["/settings/accessibility", "Accessibility & Language", UserRound, everyone],
   ["/settings/audit", "Audit Trail", History, companyManagers],
   ["/settings/medic", "System Medic", Stethoscope, companyManagers],
-  ["/control", "FleetOS Control", ShieldCheck, platformOnly],
-  ["/reseller", "Reseller Portal", Building2, platformOnly],
   ["/messages", "Messages", MessageCircle, everyone],
 ] as const;
 
@@ -83,10 +80,8 @@ export function AppShell() {
   const activeWorkspace = useMemo(() => workspaces.find((item) => item.id === company?.id) ?? null, [workspaces, company]);
   const visibleNav = useMemo(() => nav.filter(([path, , , roles]) => {
     if (path === "/marketplace" && !branding.marketplaceEnabled) return false;
-    if (path === "/control") return platformOwner;
-    if (path === "/reseller") return platformOwner || resellerAccess;
     return activeWorkspace ? roles.includes(activeWorkspace.role) : false;
-  }), [activeWorkspace, branding.marketplaceEnabled, platformOwner, resellerAccess]);
+  }), [activeWorkspace, branding.marketplaceEnabled]);
 
   async function load() {
     const [platform, resellerMemberships] = await Promise.all([
@@ -143,7 +138,10 @@ export function AppShell() {
         <select aria-label="Company workspace" value={company?.id ?? ""} onChange={(event) => switchWorkspace(event.target.value)} style={{ width: "100%", padding: 10, borderRadius: 8 }}>{workspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}</select>
         {role !== "DRIVER" && <button onClick={() => void addWorkspace()} style={{ width: "100%", marginTop: 8 }}><Plus size={15} /> Add company</button>}
       </div>}
-      <nav>{visibleNav.map(([to, label, Icon]) => <NavLink key={to} to={to} end={to === "/"} onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}><Icon size={20} /><span>{label}</span></NavLink>)}</nav>
+      <nav>
+        {visibleNav.map(([to, label, Icon]) => <NavLink key={to} to={to} end={to === "/"} onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}><Icon size={20} /><span>{label}</span></NavLink>)}
+        {!company && resellerAccess && <NavLink to="/reseller" onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}><Building2 size={20}/><span>Reseller Portal</span></NavLink>}
+      </nav>
       <div className="sidebar-bottom"><div className="company-dot">{initials}</div><div><strong>{companyName}</strong><small>{role ? roleLabels[role] : resellerAccess ? "Reseller account" : platformOwner ? "FleetOS owner" : "Account"}</small><PoweredBy /></div></div>
     </aside>
     {mobileOpen && <button className="mobile-overlay" aria-label="Close navigation" onClick={() => setMobileOpen(false)} />}
@@ -163,7 +161,7 @@ export function AppShell() {
           {accountOpen && <div className="account-menu">{platformOwner && <button onClick={() => { setAccountOpen(false); window.location.href = "/control"; }}><ShieldCheck size={16}/> FleetOS owner control</button>}{role && companyManagers.includes(role) && <button onClick={() => { setAccountOpen(false); window.location.href = "/settings/company"; }}><Building2 size={16} /> Company settings</button>}<button onClick={() => { setAccountOpen(false); window.location.href = "/settings/accessibility"; }}><UserRound size={16} /> Accessibility & language</button><button onClick={() => { setAccountOpen(false); void supabase.auth.signOut(); }}><LogOut size={16} /> Sign out</button></div>}
         </div>
       </header>
-      {accessDenied ? <main className="loading-page"><div><h1>Access denied</h1><p>This account does not have permission to open this area.</p><button onClick={() => { window.location.href = role === "DRIVER" ? "/driver" : resellerAccess ? "/reseller" : "/"; }}>Return</button></div></main> : <Outlet />}
+      {accessDenied ? <main className="loading-page"><div><h1>Access denied</h1><p>This account does not have permission to open this area.</p><button onClick={() => { window.location.href = role === "DRIVER" ? "/driver" : resellerAccess && !company ? "/reseller" : "/"; }}>Return</button></div></main> : <Outlet />}
     </main>
   </div>;
 }
