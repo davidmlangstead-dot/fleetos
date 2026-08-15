@@ -10,11 +10,14 @@ import { LandingPage } from "./modules/landing/LandingPage";
 import { OnboardingPage } from "./modules/onboarding/OnboardingPage";
 import { StaffInvitePage } from "./modules/auth/StaffInvitePage";
 import { BrandingProvider, loadCurrentBranding, loadPublicBranding, useBranding } from "./lib/branding";
+import { bootstrapAccessibilityPreferences } from "./lib/accessibility";
 import "./styles.css";
 import "./shell-fixes.css";
 import "./driver-operations.css";
 import "./jobs.css";
 import "./branding.css";
+
+bootstrapAccessibilityPreferences();
 
 const client = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1 } } });
 type AppState = "loading" | "landing" | "auth" | "onboarding" | "ready" | "error";
