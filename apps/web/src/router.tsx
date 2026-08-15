@@ -61,6 +61,10 @@ const DriverCockpitPage = lazy(() => loadWithChunkRecovery(() => import("./modul
 const DriverOperationsOfficePage = lazy(() => loadWithChunkRecovery(() => import("./modules/driver/DriverOperationsOfficePage").then(module => ({ default: module.DriverOperationsOfficePage }))));
 const JobsPage = lazy(() => loadWithChunkRecovery(() => import("./modules/jobs/JobsPage").then(module => ({ default: module.JobsPage }))));
 const MyWorkPage = lazy(() => loadWithChunkRecovery(() => import("./modules/jobs/MyWorkPage").then(module => ({ default: module.MyWorkPage }))));
+const PlatformControlPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/PlatformControlPage").then(module => ({ default: module.PlatformControlPage }))));
+const ResellerPortalPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/ResellerPortalPage").then(module => ({ default: module.ResellerPortalPage }))));
+const AccountsPage = lazy(() => loadWithChunkRecovery(() => import("./modules/accounts/AccountsPage").then(module => ({ default: module.AccountsPage }))));
+const AccessibilityPage = lazy(() => loadWithChunkRecovery(() => import("./modules/settings/AccessibilityPage").then(module => ({ default: module.AccessibilityPage }))));
 
 const pageFallback = <main className="loading-page"><div><h1>Loading FleetOS</h1></div></main>;
 const load = (element: React.ReactNode) => <Suspense fallback={pageFallback}>{element}</Suspense>;
@@ -92,11 +96,15 @@ export const router = createBrowserRouter([{ element: <AppShell />, errorElement
   { path: "/reports", element: load(<ReportsPage />) },
   { path: "/marketplace", element: load(<MarketplacePage />) },
   { path: "/imports", element: load(<SpreadsheetImportPage />) },
+  { path: "/accounts", element: load(<AccountsPage />) },
+  { path: "/control", element: load(<PlatformControlPage />) },
+  { path: "/reseller", element: load(<ResellerPortalPage />) },
   { path: "/organisation/depots", element: load(<DepotsPage />) },
   { path: "/settings/company", element: load(<CompanySettingsPage />) },
   { path: "/settings/beta", element: load(<BetaControlsPage />) },
   { path: "/settings/audit", element: load(<AuditPage />) },
   { path: "/settings/medic", element: load(<MedicPage />) },
+  { path: "/settings/accessibility", element: load(<AccessibilityPage />) },
   { path: "/messages", element: load(<MessagesPage />) },
   { path: "*", element: <Navigate to="/" replace /> },
 ]}]);
