@@ -54,15 +54,18 @@ export function CompanySettingsPage() {
   const fail = (e: unknown, fallback: string) => { setError(e instanceof Error ? e.message : fallback); setMessage(""); };
 
   async function save() {
+    const currentForm = form;
+    const currentAdmin = admin;
+    if (!currentForm || !currentAdmin) return;
     setBusy(true); setMessage(""); setError("");
     try {
       const [profile, control] = await Promise.all([
-        api<CompanyProfile>("/company", { method: "PATCH", body: JSON.stringify(form) }),
+        api<CompanyProfile>("/company", { method: "PATCH", body: JSON.stringify(currentForm) }),
         api<Control>("/company/admin", { method: "PATCH", body: JSON.stringify({
-          billingEmail: admin.control.billingEmail ?? "",
-          privacyContactEmail: admin.control.privacyContactEmail ?? "",
-          retentionDays: admin.control.retentionDays,
-          marketplaceEnabled: admin.control.marketplaceEnabled,
+          billingEmail: currentAdmin.control.billingEmail ?? "",
+          privacyContactEmail: currentAdmin.control.privacyContactEmail ?? "",
+          retentionDays: currentAdmin.control.retentionDays,
+          marketplaceEnabled: currentAdmin.control.marketplaceEnabled,
         }) }),
       ]);
       setForm(profile); setAdmin((current) => current ? ({ ...current, control: { ...current.control, ...control } }) : current);
@@ -72,8 +75,10 @@ export function CompanySettingsPage() {
   }
 
   async function portableExport() {
+    const currentForm = form;
+    if (!currentForm) return;
     setBusy(true);
-    try { const data = await api<unknown>("/company/export"); downloadJson(data, `fleetos-${form.slug}-${new Date().toISOString().slice(0,10)}.json`); complete("Portable company export downloaded."); }
+    try { const data = await api<unknown>("/company/export"); downloadJson(data, `fleetos-${currentForm.slug}-${new Date().toISOString().slice(0,10)}.json`); complete("Portable company export downloaded."); }
     catch (e) { fail(e, "Could not create the company export."); }
     finally { setBusy(false); }
   }
