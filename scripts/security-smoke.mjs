@@ -1,6 +1,8 @@
 const API = process.env.FLEETOS_API_URL ?? "https://fleetos-1.onrender.com";
 const routes = [
   "/api/company",
+  "/api/commercial",
+  "/api/imports/preview",
   "/api/dashboard",
   "/api/drivers",
   "/api/vehicles",
