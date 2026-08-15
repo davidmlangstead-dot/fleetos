@@ -55,7 +55,7 @@ try {
     ["x-content-type-options", "nosniff"],
     ["x-frame-options", "DENY"],
     ["referrer-policy", "no-referrer"],
-    ["permissions-policy", "camera=(), microphone=(), geolocation=()"],
+    ["permissions-policy", "camera=(self), microphone=(), geolocation=(self)"],
   ];
   for (const [header, expected] of expectedHeaders) {
     const actual = response.headers.get(header);
