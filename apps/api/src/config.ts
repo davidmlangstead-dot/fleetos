@@ -12,6 +12,8 @@ const schema = z.object({
   SUPABASE_URL: z.string().url(),
   SUPABASE_ANON_KEY: z.string().min(1).optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+  TACHO_PARSER_URL: z.string().url().optional(),
+  TACHO_PARSER_SECRET: z.string().min(1).optional(),
   PORT: z.coerce.number().default(3001),
   CORS_ORIGIN: z.string().url().default("http://localhost:5173"),
 }).superRefine((env, ctx) => {
@@ -20,6 +22,9 @@ const schema = z.object({
   }
   if (!env.SUPABASE_ANON_KEY && !env.SUPABASE_SERVICE_ROLE_KEY) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["SUPABASE_ANON_KEY"], message: "SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY is required" });
+  }
+  if ((env.TACHO_PARSER_URL && !env.TACHO_PARSER_SECRET) || (!env.TACHO_PARSER_URL && env.TACHO_PARSER_SECRET)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["TACHO_PARSER_URL"], message: "TACHO_PARSER_URL and TACHO_PARSER_SECRET must be configured together" });
   }
 });
 
