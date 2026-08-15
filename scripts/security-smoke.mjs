@@ -74,7 +74,7 @@ try {
     signal: AbortSignal.timeout(20_000),
   });
   const allowedOrigin = response.headers.get("access-control-allow-origin");
-  results.push({ name: "Untrusted browser origin", ok: allowedOrigin === null, status: response.status, ms: 0 });
+  results.push({ name: "Untrusted browser origin", ok: response.status === 403 && allowedOrigin === null, status: response.status, ms: 0 });
 } catch (error) {
   results.push({ name: "Untrusted browser origin", ok: true, status: "BLOCKED", ms: 0, detail: error instanceof Error ? error.message : String(error) });
 }
