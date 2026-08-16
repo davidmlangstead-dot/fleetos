@@ -60,6 +60,7 @@ const MedicPage = lazy(() => loadWithChunkRecovery(() => import("./modules/medic
 const DriverFieldPage = lazy(() => loadWithChunkRecovery(() => import("./modules/driver/DriverFieldPage").then(module => ({ default: module.DriverFieldPage }))));
 const DriverOperationsOfficePage = lazy(() => loadWithChunkRecovery(() => import("./modules/driver/DriverOperationsOfficePage").then(module => ({ default: module.DriverOperationsOfficePage }))));
 const JobsPage = lazy(() => loadWithChunkRecovery(() => import("./modules/jobs/JobsPage").then(module => ({ default: module.JobsPage }))));
+const JobPreflightPage = lazy(() => loadWithChunkRecovery(() => import("./modules/jobs/JobPreflightPage").then(module => ({ default: module.JobPreflightPage }))));
 const MyWorkPage = lazy(() => loadWithChunkRecovery(() => import("./modules/jobs/MyWorkPage").then(module => ({ default: module.MyWorkPage }))));
 const PlatformControlPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/PlatformControlPage").then(module => ({ default: module.PlatformControlPage }))));
 const PlatformCustomersPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/PlatformControlPage").then(module => ({ default: module.PlatformCustomersPage }))));
@@ -87,6 +88,7 @@ export const router = createBrowserRouter([{ element: <AppShell />, errorElement
   { path: "/hours", element: load(<HoursBoardPage />) },
   { path: "/tachograph", element: load(<TachographPage />) },
   { path: "/jobs", element: load(<JobsPage />) },
+  { path: "/jobs/preflight", element: load(<JobPreflightPage />) },
   { path: "/my-work", element: load(<MyWorkPage />) },
   { path: "/vehicles", element: load(<VehiclesPage />) },
   { path: "/drivers", element: load(<DriversPage />) },
