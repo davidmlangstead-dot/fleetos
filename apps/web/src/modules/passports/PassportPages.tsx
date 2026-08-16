@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, CalendarDays, ClipboardList, FileText, Gauge, ShieldCheck, UserRound, Wrench } from "lucide-react";
+import { ArrowLeft, CalendarDays, ClipboardList, Gauge, ShieldCheck, UserRound } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../../lib/api";
 
@@ -90,7 +90,10 @@ function RecordDate({ label, value }: { label: string; value?: string | null }) 
 
 function Timeline({ events }: { events: PassportEvent[] }) {
   if (!events.length) return <div className="empty-state"><h2>No history recorded yet</h2><p>The passport will grow automatically as FleetOS records work, documents and compliance events.</p></div>;
-  return <div>{events.map((item, index) => <div key={item.id} style={{ display: "grid", gridTemplateColumns: "112px minmax(0,1fr) auto", gap: 14, padding: 14, borderTop: index ? "1px solid rgba(148,163,184,.2)" : "none", alignItems: "start" }}><div className="subtle">{new Date(item.at).toLocaleDateString()}<br/><small>{item.kind.replaceAll("_", " ")}</small></div><div><strong>{item.title}</strong>{item.detail && <p className="subtle" style={{ margin: "4px 0 0" }}>{item.detail}</p>}</div><div style={{ display: "flex", gap: 8, alignItems: "center" }}>{item.status && <span className="subtle"><strong>{item.status.replaceAll("_", " ")}</strong></span>}{item.href && <Link className="secondary-button" to={item.href} style={{ textDecoration: "none" }}>Open</Link>}</div></div>)}</div>;
+  return <div>{events.map((item, index) => {
+    const target = item.href?.startsWith("/jobs/") ? "/jobs" : item.href;
+    return <div key={item.id} style={{ display: "grid", gridTemplateColumns: "112px minmax(0,1fr) auto", gap: 14, padding: 14, borderTop: index ? "1px solid rgba(148,163,184,.2)" : "none", alignItems: "start" }}><div className="subtle">{new Date(item.at).toLocaleDateString()}<br/><small>{item.kind.replaceAll("_", " ")}</small></div><div><strong>{item.title}</strong>{item.detail && <p className="subtle" style={{ margin: "4px 0 0" }}>{item.detail}</p>}</div><div style={{ display: "flex", gap: 8, alignItems: "center" }}>{item.status && <span className="subtle"><strong>{item.status.replaceAll("_", " ")}</strong></span>}{target && <Link className="secondary-button" to={target} style={{ textDecoration: "none" }}>Open</Link>}</div></div>;
+  })}</div>;
 }
 
 function PassportHeader({ eyebrow, title, subtitle, backTo }: { eyebrow: string; title: string; subtitle: string; backTo: string }) {
@@ -108,7 +111,7 @@ export function VehiclePassportPage() {
   return <section className="page">
     <PassportHeader eyebrow="Fleet Passport" title={v.registration} subtitle={`${v.make || "Make not recorded"} ${v.model || ""} · ${v.type.replaceAll("_", " ")} · ${v.status.replaceAll("_", " ")}`} backTo="/vehicles" />
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 18 }}><Stat label="Record completeness" value={`${data.summary.completeness}%`} /><Stat label="Jobs" value={data.summary.jobs}/><Stat label="Documents" value={data.summary.documents}/><Stat label="Open defects" value={data.summary.openDefects}/><Stat label="Work orders" value={data.summary.workOrders}/></div>
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.4fr) minmax(260px,.6fr)", gap: 18, alignItems: "start" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 18, alignItems: "start" }}>
       <section className="panel"><div className="panel-heading" style={{ padding: 18 }}><div><p className="eyebrow">Permanent history</p><h2>Vehicle timeline</h2><p className="subtle">Generated from connected records; FleetOS does not invent missing events.</p></div><ClipboardList size={22}/></div><Timeline events={data.timeline}/></section>
       <div style={{ display: "grid", gap: 18 }}>
         <section className="panel" style={{ padding: 18 }}><div style={{ display: "flex", gap: 8, alignItems: "center" }}><ShieldCheck size={20}/><h2 style={{ margin: 0 }}>Current dates</h2></div><RecordDate label="MOT / annual test" value={data.current.motDue}/><RecordDate label="Tax" value={data.current.taxDue}/><RecordDate label="Insurance" value={data.current.insuranceDue}/><RecordDate label="Tachograph calibration" value={data.current.tachoCalibrationDue}/></section>
@@ -130,7 +133,7 @@ export function DriverPassportPage() {
   return <section className="page">
     <PassportHeader eyebrow="Driver Passport" title={name} subtitle={`${d.isActive ? "Active" : "Inactive"} driver · operational credentials and FleetOS history`} backTo="/drivers" />
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, marginBottom: 18 }}><Stat label="Record completeness" value={`${data.summary.completeness}%`} /><Stat label="Jobs" value={data.summary.jobs}/><Stat label="Documents" value={data.summary.documents}/><Stat label="Compliance records" value={data.summary.complianceItems}/><Stat label="Tacho downloads" value={data.summary.tachographDownloads}/></div>
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.4fr) minmax(260px,.6fr)", gap: 18, alignItems: "start" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 18, alignItems: "start" }}>
       <section className="panel"><div className="panel-heading" style={{ padding: 18 }}><div><p className="eyebrow">Operational history</p><h2>Driver timeline</h2><p className="subtle">Only records held by this company are shown.</p></div><CalendarDays size={22}/></div><Timeline events={data.timeline}/></section>
       <div style={{ display: "grid", gap: 18 }}>
         <section className="panel" style={{ padding: 18 }}><div style={{ display: "flex", gap: 8, alignItems: "center" }}><ShieldCheck size={20}/><h2 style={{ margin: 0 }}>Current credentials</h2></div><RecordDate label="Driving licence" value={data.current.licenceExpiry}/><RecordDate label="Driver CPC" value={data.current.cpcExpiry}/><RecordDate label="Tachograph card" value={data.current.tachoCardExpiry}/><RecordDate label="Medical" value={data.current.medicalDue}/><RecordDate label="Next tacho download" value={data.current.nextTachographDownload}/></section>
