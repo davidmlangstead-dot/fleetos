@@ -32,6 +32,7 @@ import { preferencesRouter } from "./modules/preferences/routes.js";
 import { accountsRouter } from "./modules/accounts/routes.js";
 import { resellersRouter } from "./modules/resellers/routes.js";
 import { platformRouter } from "./modules/platform/routes.js";
+import { passportsRouter } from "./modules/passports/routes.js";
 
 export const app = express();
 app.disable("x-powered-by");
@@ -91,6 +92,7 @@ app.use("/api/company", sensitiveRateLimit, companyRouter);
 app.use("/api/commercial", sensitiveRateLimit, commercialRouter);
 app.use("/api/preferences", sensitiveRateLimit, preferencesRouter);
 app.use("/api/resellers", sensitiveRateLimit, resellersRouter);
+app.use("/api/passports", passportsRouter);
 app.use("/api/accounts", sensitiveRateLimit, requireAuth, requireCommercialWriteAccess, idempotencyMiddleware, accountsRouter);
 app.use("/api/imports", sensitiveRateLimit, requireAuth, requireCommercialWriteAccess, idempotencyMiddleware, importsRouter);
 app.use("/api/dashboard", dashboardRouter);
