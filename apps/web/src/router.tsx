@@ -39,6 +39,8 @@ async function loadWithChunkRecovery<T>(loader: () => Promise<T>): Promise<T> {
 const DashboardPageClean = lazy(() => loadWithChunkRecovery(() => import("./modules/dashboard/DashboardPageClean").then(module => ({ default: module.DashboardPageClean }))));
 const VehiclesPage = lazy(() => loadWithChunkRecovery(() => import("./modules/vehicles/VehiclesPage").then(module => ({ default: module.VehiclesPage }))));
 const DriversPage = lazy(() => loadWithChunkRecovery(() => import("./modules/drivers/DriversPage").then(module => ({ default: module.DriversPage }))));
+const VehiclePassportPage = lazy(() => loadWithChunkRecovery(() => import("./modules/passports/PassportPages").then(module => ({ default: module.VehiclePassportPage }))));
+const DriverPassportPage = lazy(() => loadWithChunkRecovery(() => import("./modules/passports/PassportPages").then(module => ({ default: module.DriverPassportPage }))));
 const PersonalPage = lazy(() => loadWithChunkRecovery(() => import("./modules/personal/PersonalPage").then(module => ({ default: module.PersonalPage }))));
 const HoursBoardPage = lazy(() => loadWithChunkRecovery(() => import("./modules/operations/HoursBoardPage").then(module => ({ default: module.HoursBoardPage }))));
 const WorkshopPage = lazy(() => loadWithChunkRecovery(() => import("./modules/workshop/WorkshopPage").then(module => ({ default: module.WorkshopPage }))));
@@ -89,7 +91,9 @@ export const router = createBrowserRouter([{ element: <AppShell />, errorElement
   { path: "/jobs", element: load(<JobsPage />) },
   { path: "/my-work", element: load(<MyWorkPage />) },
   { path: "/vehicles", element: load(<VehiclesPage />) },
+  { path: "/vehicles/:id/passport", element: load(<VehiclePassportPage />) },
   { path: "/drivers", element: load(<DriversPage />) },
+  { path: "/drivers/:id/passport", element: load(<DriverPassportPage />) },
   { path: "/personal", element: load(<PersonalPage />) },
   { path: "/workshop", element: load(<WorkshopPage />) },
   { path: "/compliance", element: load(<ComplianceGuardianPage />) },
