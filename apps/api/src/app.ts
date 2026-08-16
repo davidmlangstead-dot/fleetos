@@ -32,6 +32,7 @@ import { preferencesRouter } from "./modules/preferences/routes.js";
 import { accountsRouter } from "./modules/accounts/routes.js";
 import { resellersRouter } from "./modules/resellers/routes.js";
 import { platformRouter } from "./modules/platform/routes.js";
+import { eligibilityRouter } from "./modules/eligibility/routes.js";
 
 export const app = express();
 app.disable("x-powered-by");
@@ -89,6 +90,7 @@ app.use("/api/platform", sensitiveRateLimit, platformRouter);
 app.use("/api/company/admin", sensitiveRateLimit, protectOwnerCompanyControls);
 app.use("/api/company", sensitiveRateLimit, companyRouter);
 app.use("/api/commercial", sensitiveRateLimit, commercialRouter);
+app.use("/api/eligibility", eligibilityRouter);
 app.use("/api/preferences", sensitiveRateLimit, preferencesRouter);
 app.use("/api/resellers", sensitiveRateLimit, resellersRouter);
 app.use("/api/accounts", sensitiveRateLimit, requireAuth, requireCommercialWriteAccess, idempotencyMiddleware, accountsRouter);
