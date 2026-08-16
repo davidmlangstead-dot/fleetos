@@ -51,10 +51,13 @@ const fixedOrigins = new Set([
   "https://fleetos-orpin-one.vercel.app",
   "https://fleetos-davidmlangstead-dots-projects.vercel.app",
   "https://fleetos-git-main-davidmlangstead-dots-projects.vercel.app",
+  "https://fleetos-manager-portal.onrender.com",
+  "https://fleetos-reseller-portal.onrender.com",
 ]);
 async function isAllowedOrigin(origin: string) {
   if (configuredOrigins.includes(origin) || fixedOrigins.has(origin)) return true;
   if (/^https:\/\/fleetos(?:-[a-z0-9]+)*-davidmlangstead-dots-projects\.vercel\.app$/i.test(origin)) return true;
+  if (/^https:\/\/fleetos-(manager|reseller)-portal(?:-[a-z0-9]+)?\.onrender\.com$/i.test(origin)) return true;
   if (/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) return true;
   try {
     const url = new URL(origin);
