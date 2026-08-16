@@ -7,7 +7,7 @@ type Doc={id:string;name:string;type:string;storagePath:string;fileSize:number|n
 type Option={id:string;label:string};
 type LinkOptions={vehicles:Option[];drivers:Option[];jobs:Option[];defects:Option[];compliance:Option[];workOrders:Option[]};
 type LinkType="none"|"vehicleId"|"driverId"|"jobId"|"defectId"|"complianceId"|"maintenanceWorkOrderId";
-const types=["OTHER","VEHICLE_DOCUMENT","DRIVER_DOCUMENT","POD","INVOICE","CERTIFICATE","SERVICE_RECORD"];
+const types=["OTHER","VEHICLE_DOCUMENT","DRIVER_DOCUMENT","POD","INVOICE","CERTIFICATE","RAMS","FIELD_PAPERWORK","SERVICE_RECORD"];
 const emptyOptions:LinkOptions={vehicles:[],drivers:[],jobs:[],defects:[],compliance:[],workOrders:[]};
 const linkMap:Record<Exclude<LinkType,"none">,keyof LinkOptions>={vehicleId:"vehicles",driverId:"drivers",jobId:"jobs",defectId:"defects",complianceId:"compliance",maintenanceWorkOrderId:"workOrders"};
 const linkLabels:Record<LinkType,string>={none:"Company record only",vehicleId:"Vehicle",driverId:"Driver",jobId:"Job",defectId:"Defect",complianceId:"Compliance item",maintenanceWorkOrderId:"Workshop work order"};
@@ -42,3 +42,4 @@ export function DocumentsPage(){
 }
 
 function linkedLabel(doc:Doc,lookup:Map<string,string>){const id=doc.maintenanceWorkOrderId||doc.vehicleId||doc.driverId||doc.jobId||doc.defectId||doc.complianceId;return id?lookup.get(id)||"Linked FleetOS record":"Company record only";}
+

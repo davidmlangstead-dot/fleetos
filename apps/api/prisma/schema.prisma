@@ -69,6 +69,8 @@ enum DocumentType {
   POD
   INVOICE
   CERTIFICATE
+  RAMS
+  FIELD_PAPERWORK
   SERVICE_RECORD
   OTHER
 }
@@ -358,4 +360,5 @@ model RegisterItem {
   @@index([companyId, module, archivedAt])
   @@index([companyId, dueAt])
 }
+
 

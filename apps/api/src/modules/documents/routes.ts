@@ -12,7 +12,7 @@ const jobWriters = requireRoles("DRIVER", "WORKSHOP_TECHNICIAN", "TRANSPORT_PLAN
 const optionalId = z.union([z.string().trim().min(1), z.literal("")]).optional();
 const schema = z.object({
   name: z.string().trim().min(1).max(240), storagePath: z.string().trim().min(1).max(600),
-  type: z.enum(["VEHICLE_DOCUMENT", "DRIVER_DOCUMENT", "POD", "INVOICE", "CERTIFICATE", "SERVICE_RECORD", "OTHER"]).default("OTHER"),
+  type: z.enum(["VEHICLE_DOCUMENT", "DRIVER_DOCUMENT", "POD", "INVOICE", "CERTIFICATE", "RAMS", "FIELD_PAPERWORK", "SERVICE_RECORD", "OTHER"]).default("OTHER"),
   fileSize: z.number().int().min(0).max(20 * 1024 * 1024).optional(), mimeType: z.string().trim().max(120).optional(),
   vehicleId: optionalId, driverId: optionalId, jobId: optionalId, defectId: optionalId, complianceId: optionalId,
   maintenanceWorkOrderId: z.union([z.string().uuid(), z.literal("")]).optional(),
@@ -101,6 +101,8 @@ documentsRouter.post("/job/:jobId", jobWriters, asyncHandler(async (req, res) =>
   const companyId = req.user!.companyId;
   const jobId = req.params.jobId;
   if (!(await canAccessAssignedJob(req.user!, jobId))) return res.status(403).json({ error: "You do not have access to add paperwork to this job" });
+  if (req.user!.role === "DRIVER" && !["POD", "FIELD_PAPERWORK"].includes(input.type)) return res.status(403).json({ error: "Drivers may only add proof of delivery or field-generated paperwork" });
+  if (req.user!.role === "DRIVER" && !input.storagePath.startsWith(`${companyId}/jobs/${jobId}/field/`)) return res.status(400).json({ error: "Driver paperwork must use the assigned job field-paperwork path" });
   if (!input.storagePath.startsWith(`${companyId}/jobs/${jobId}/`)) return res.status(400).json({ error: "Job paperwork path does not match this work order" });
   const doc = await prisma.document.create({ data: {
     companyId, name: input.name, fileUrl: input.storagePath, type: input.type, fileSize: input.fileSize,
@@ -136,3 +138,4 @@ documentsRouter.delete("/:id", writers, asyncHandler(async (req, res) => {
   await writeAuditEvent({ companyId: req.user!.companyId, actorUserId: req.user!.id, actorEmail: req.user!.email, action: "DELETE", entityType: "DOCUMENT", entityId: doc.id, summary: `Document removed: ${doc.name}` });
   res.json({ ok: true, storagePath: doc.fileUrl });
 }));
+

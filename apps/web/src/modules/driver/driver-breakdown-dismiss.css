@@ -1,0 +1,20 @@
+.driver-breakdown-actions {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.driver-breakdown-ok {
+  min-width: 64px;
+}
+
+@media (max-width: 620px) {
+  .driver-breakdown-actions {
+    grid-column: 1 / -1;
+  }
+
+  .driver-breakdown-actions button {
+    flex: 1;
+  }
+}
+

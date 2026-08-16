@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, RefreshCw, Truck } from "lucide-react";
 import { api } from "../../lib/api";
 import "./driver-breakdown-status.css";
+import "./driver-breakdown-dismiss.css";
 
 type Breakdown = {
   id: string;
@@ -17,6 +18,7 @@ type Breakdown = {
 type DriverSummary = { breakdowns: Breakdown[] };
 
 const VISIBLE_FOR_MS = 24 * 60 * 60 * 1000;
+const DISMISSED_BREAKDOWN_KEY = "fleetos:driver-breakdown-dismissed";
 
 function copyFor(status: string) {
   switch (status) {
@@ -36,6 +38,7 @@ function copyFor(status: string) {
 export function DriverBreakdownStatusBanner() {
   const [breakdown, setBreakdown] = useState<Breakdown | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [dismissed, setDismissed] = useState(() => localStorage.getItem(DISMISSED_BREAKDOWN_KEY));
 
   const refresh = useCallback(async () => {
     if (document.documentElement.dataset.fleetosRole !== "DRIVER" || !navigator.onLine) {
@@ -74,6 +77,8 @@ export function DriverBreakdownStatusBanner() {
   }, [refresh]);
 
   if (!breakdown || document.documentElement.dataset.fleetosRole !== "DRIVER") return null;
+  const statusKey = `${breakdown.id}:${breakdown.status}`;
+  if (dismissed === statusKey) return null;
   const copy = copyFor(breakdown.status);
   const Icon = breakdown.status === "RESOLVED" ? CheckCircle2 : breakdown.status === "RECOVERY_ARRANGED" ? Truck : AlertTriangle;
 
@@ -85,9 +90,15 @@ export function DriverBreakdownStatusBanner() {
       <span>{copy.detail}</span>
       {breakdown.resolutionNotes && <em>Office: {breakdown.resolutionNotes}</em>}
     </div>
-    <button type="button" onClick={() => void refresh()} disabled={refreshing} aria-label="Refresh breakdown status">
-      <RefreshCw className={refreshing ? "spin" : ""} />
-      <span>{refreshing ? "Checking" : "Refresh"}</span>
-    </button>
+    <div className="driver-breakdown-actions">
+      <button type="button" onClick={() => void refresh()} disabled={refreshing} aria-label="Refresh breakdown status">
+        <RefreshCw className={refreshing ? "spin" : ""} />
+        <span>{refreshing ? "Checking" : "Refresh"}</span>
+      </button>
+      <button type="button" className="driver-breakdown-ok" onClick={() => { localStorage.setItem(DISMISSED_BREAKDOWN_KEY, statusKey); setDismissed(statusKey); }}>
+        OK
+      </button>
+    </div>
   </aside>;
 }
+
