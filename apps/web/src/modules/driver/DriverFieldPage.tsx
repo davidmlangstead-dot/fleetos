@@ -1,12 +1,13 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarDays, Camera, Check, ChevronLeft, ChevronRight, ClipboardCheck, CloudOff, MapPin, RefreshCw, ShieldAlert, Truck, UserRound } from "lucide-react";
 import { api } from "../../lib/api";
+import { useI18n } from "../../lib/i18n";
 
 type Vehicle = { id: string; registration: string; type: string; mileage: number | null; status: string };
 type Job = { id: string; reference: string | null; title: string | null; customerName: string; scheduledAt: string | null; status: string; vehicle: { id: string; registration: string } | null };
 type CheckRecord = { id: string; status: string; nilDefect: boolean; completedAt: string; registration: string };
 type Breakdown = { id: string; severity: string; status: string; location: string; description: string; reportedAt: string; registration: string };
-type Absence = { id: string; type: string; status: string; startsOn: string; endsOn: string };
+type Absence = { id: string; type: string; status: string; startsOn: string; endsOn: string; reason?: string | null; officeNotes?: string | null };
 type Training = { id: string; title: string; category: string; status: string; expiryDate: string | null; dueDate: string | null };
 type DriverSummary = { driver: { id: string; firstName: string; lastName: string; phone: string | null }; vehicles: Vehicle[]; jobs: Job[]; checks: CheckRecord[]; breakdowns: Breakdown[]; absences: Absence[]; training: Training[] };
 type TemplateItem = { id: string; section: string; label: string; target: "VEHICLE" | "TRAILER"; safetyCritical: boolean };
@@ -93,7 +94,7 @@ export function DriverFieldPage() {
     {mode === "HOME" && <Home summary={summary} setMode={setMode} />}
     {mode === "CHECK" && <Walkaround summary={summary} onDone={async () => { await load(); setMode("HOME"); }} />}
     {mode === "BREAKDOWN" && <BreakdownPanel summary={summary} onDone={async () => { await load(); setMode("HOME"); }} />}
-    {mode === "ADMIN" && <AdminPanel summary={summary} />}
+    {mode === "ADMIN" && <AdminPanel summary={summary} onSaved={load} />}
   </main>;
 }
 
@@ -264,7 +265,14 @@ function BreakdownPanel({ summary, onDone }: { summary: DriverSummary; onDone: (
   </form>;
 }
 
-function AdminPanel({ summary }: { summary: DriverSummary }) {
+function AdminPanel({ summary, onSaved }: { summary: DriverSummary; onSaved: () => Promise<void> }) {
+  const { t, locale } = useI18n();
   const upcoming = useMemo(() => summary.training.filter(item => item.status !== "CANCELLED").slice(0, 8), [summary.training]);
-  return <section className="field-flow"><div className="field-flow-title"><CalendarDays/><div><small>Your records</small><h1>My admin</h1></div></div><div className="field-admin-grid"><article><h2>Training & expiries</h2>{upcoming.length ? upcoming.map(item => <div className="field-admin-row" key={item.id}><strong>{item.title}</strong><span>{item.status} · {formatDate(item.expiryDate ?? item.dueDate)}</span></div>) : <p>Nothing due.</p>}</article><article><h2>Leave / absence</h2>{summary.absences.length ? summary.absences.slice(0, 6).map(item => <div className="field-admin-row" key={item.id}><strong>{item.type}</strong><span>{formatDate(item.startsOn)}–{formatDate(item.endsOn)} · {item.status}</span></div>) : <p>No recent requests.</p>}</article><article><h2>Recent checks</h2>{summary.checks.slice(0, 6).map(item => <div className="field-admin-row" key={item.id}><strong>{item.registration}</strong><span>{item.status.replaceAll("_", " ")} · {formatDate(item.completedAt)}</span></div>)}</article></div></section>;
+  const today = new Date().toISOString().slice(0, 10);
+  const [form, setForm] = useState({ type: "HOLIDAY", startsOn: today, endsOn: today, reason: "" });
+  const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
+  async function submit(event: FormEvent) { event.preventDefault(); setBusy(true); setMessage(""); try { await api("/driver-operations/absences", { method: "POST", body: JSON.stringify(form) }); setMessage(t(form.type === "HOLIDAY" ? "admin.leaveSent" : "admin.sicknessSent")); setForm(current => ({ ...current, reason: "" })); await onSaved(); } catch (error) { setMessage(error instanceof Error ? error.message : t("admin.sendFailed")); } finally { setBusy(false); } }
+  const localDate=(value:string)=>new Date(value).toLocaleDateString(locale,{day:"2-digit",month:"short",year:"numeric"});
+  return <section className="field-flow"><div className="field-flow-title"><CalendarDays/><div><small>{t("admin.yourRecords")}</small><h1>{t("admin.myAdmin")}</h1></div></div>{message&&<p role="status" className="field-message">{message}</p>}<form className="driver-dark-card field-admin-request" onSubmit={submit}><h2>{t("admin.requestOrSick")}</h2><label className="field-label">{t("admin.action")}<select value={form.type} onChange={event=>setForm(current=>({...current,type:event.target.value}))}><option value="HOLIDAY">{t("admin.requestLeave")}</option><option value="SICKNESS">{t("admin.reportSickness")}</option></select></label><div className="form-grid"><label className="field-label">{t("admin.from")}<input required type="date" value={form.startsOn} onChange={event=>setForm(current=>({...current,startsOn:event.target.value}))}/></label><label className="field-label">{t("admin.to")}<input required type="date" value={form.endsOn} onChange={event=>setForm(current=>({...current,endsOn:event.target.value}))}/></label></div><label className="field-label">{t("admin.officeInfo")}<textarea value={form.reason} onChange={event=>setForm(current=>({...current,reason:event.target.value}))} placeholder={t(form.type==="HOLIDAY"?"admin.leavePlaceholder":"admin.sicknessPlaceholder")}/></label><button className="field-submit" disabled={busy}>{busy?t("admin.sending"):t(form.type==="HOLIDAY"?"admin.sendLeave":"admin.reportSickness")}</button></form><div className="field-admin-grid"><article><h2>{t("admin.training")}</h2>{upcoming.length ? upcoming.map(item => <div className="field-admin-row" key={item.id}><strong>{item.title}</strong><span>{item.status.replaceAll("_"," ")} · {formatDate(item.expiryDate ?? item.dueDate)}</span></div>) : <p>{t("admin.nothingDue")}</p>}</article><article><h2>{t("admin.leaveAbsence")}</h2>{summary.absences.length ? summary.absences.slice(0, 6).map(item => <div className="field-admin-row" key={item.id}><strong>{item.type.replaceAll("_"," ")}</strong><span>{localDate(item.startsOn)}–{localDate(item.endsOn)} · {item.status.replaceAll("_"," ")}</span>{item.officeNotes&&<small>{t("admin.office")}: {item.officeNotes}</small>}</div>) : <p>{t("admin.noRequests")}</p>}</article><article><h2>{t("admin.recentChecks")}</h2>{summary.checks.slice(0, 6).map(item => <div className="field-admin-row" key={item.id}><strong>{item.registration}</strong><span>{item.status.replaceAll("_", " ")} · {formatDate(item.completedAt)}</span></div>)}</article></div></section>;
 }
+

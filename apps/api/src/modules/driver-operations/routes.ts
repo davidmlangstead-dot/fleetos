@@ -97,6 +97,9 @@ const breakdownInput = z.object({
 const absenceInput = z.object({
   type: z.enum(["HOLIDAY", "SICKNESS", "OTHER"]), startsOn: z.string().date(), endsOn: z.string().date(), reason: z.string().trim().max(2000).optional(),
 }).superRefine((value, ctx) => { if (value.endsOn < value.startsOn) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["endsOn"], message: "End date cannot be before start date" }); });
+const officeSicknessInput = z.object({
+  driverId: z.string().trim().min(1), startsOn: z.string().date(), endsOn: z.string().date(), reason: z.string().trim().max(2000).optional(),
+}).superRefine((value, ctx) => { if (value.endsOn < value.startsOn) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["endsOn"], message: "End date cannot be before start date" }); });
 const breakdownUpdate = z.object({ status: z.enum(["ACKNOWLEDGED", "RECOVERY_ARRANGED", "RESOLVED", "CANCELLED"]), resolutionNotes: z.string().trim().max(5000).optional() });
 const absenceUpdate = z.object({ status: z.enum(["APPROVED", "DECLINED", "CLOSED", "CANCELLED"]), officeNotes: z.string().trim().max(3000).optional() });
 const trainingInput = z.object({
@@ -237,6 +240,17 @@ driverOperationsRouter.get("/office", officeReaders, asyncHandler(async (req, re
   res.json({ drivers, checks, breakdowns, absences, training, canManage: ["TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"].includes(req.user!.role) });
 }));
 
+driverOperationsRouter.post("/office-sickness", officeReaders, asyncHandler(async (req, res) => {
+  const input = officeSicknessInput.parse(req.body);
+  const companyId = req.user!.companyId;
+  const driver = await prisma.driver.findFirst({ where: { id: input.driverId, companyId, isActive: true }, select: { id: true, firstName: true, lastName: true } });
+  if (!driver) return res.status(400).json({ error: "Choose an active driver from this company" });
+  const id = randomUUID();
+  await prisma.$executeRaw`INSERT INTO "StaffAbsenceRequest" (id,"companyId","driverId","userId",type,status,"startsOn","endsOn",reason,"officeNotes","reviewedById","reviewedAt","createdAt","updatedAt") VALUES (${id}::uuid,${companyId},${driver.id},${req.user!.id},'SICKNESS','REPORTED',${input.startsOn}::date,${input.endsOn}::date,${input.reason || null},'Sickness recorded by office',${req.user!.id},NOW(),NOW(),NOW())`;
+  await writeAuditEvent({ companyId, actorUserId: req.user!.id, actorEmail: req.user!.email, action: "CREATE", entityType: "STAFF_ABSENCE", entityId: id, summary: `Office recorded sickness for ${driver.firstName} ${driver.lastName}`, metadata: { driverId: driver.id, startsOn: input.startsOn, endsOn: input.endsOn } });
+  res.status(201).json({ id, type: "SICKNESS", status: "REPORTED", ...input });
+}));
+
 driverOperationsRouter.patch("/breakdowns/:id", officeReaders, asyncHandler(async (req, res) => {
   const input = breakdownUpdate.parse(req.body);
   const rows = await prisma.$queryRaw<Array<{ id: string; defectId: string | null }>>`UPDATE "DriverBreakdown" SET status=${input.status},"resolutionNotes"=${input.resolutionNotes || null},"acknowledgedAt"=CASE WHEN ${input.status} IN ('ACKNOWLEDGED','RECOVERY_ARRANGED') THEN COALESCE("acknowledgedAt",NOW()) ELSE "acknowledgedAt" END,"resolvedAt"=CASE WHEN ${input.status}='RESOLVED' THEN NOW() ELSE "resolvedAt" END,"updatedAt"=NOW() WHERE id=${req.params.id}::uuid AND "companyId"=${req.user!.companyId} RETURNING id::text,"defectId"`;
@@ -271,3 +285,4 @@ driverOperationsRouter.patch("/training/:id", officeManagers, asyncHandler(async
   await writeAuditEvent({ companyId: req.user!.companyId, actorUserId: req.user!.id, actorEmail: req.user!.email, action: "UPDATE", entityType: "DRIVER_TRAINING", entityId: req.params.id, summary: `Training record updated${input.status ? `: ${input.status}` : ""}` });
   res.json({ ok: true });
 }));
+

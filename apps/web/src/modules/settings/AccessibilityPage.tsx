@@ -17,30 +17,30 @@ type Preferences = AccessibilityPreferences;
 export function AccessibilityPage() {
   const { t } = useI18n();
   const [prefs, setPrefs] = useState<Preferences>(() => loadLocalAccessibilityPreferences());
-  const [status, setStatus] = useState("Loading your saved preferences…");
+  const [status, setStatus] = useState(t("prefs.loading"));
   const [voiceResult, setVoiceResult] = useState("");
 
   useEffect(() => {
     void api<Preferences>("/preferences").then((saved) => {
       const next = { ...accessibilityDefaults, ...saved };
-      setPrefs(next); saveLocalAccessibilityPreferences(next); applyAccessibilityPreferences(next); setStatus("Saved to your FleetOS account");
-    }).catch(() => { applyAccessibilityPreferences(prefs); setStatus("Using this device's saved preferences"); });
+      setPrefs(next); saveLocalAccessibilityPreferences(next); applyAccessibilityPreferences(next); setStatus(t("prefs.savedAccount"));
+    }).catch(() => { applyAccessibilityPreferences(prefs); setStatus(t("prefs.savedDevice")); });
   }, []);
 
   async function save(next: Preferences) {
-    setPrefs(next); saveLocalAccessibilityPreferences(next); applyAccessibilityPreferences(next); setStatus("Saving…");
+    setPrefs(next); saveLocalAccessibilityPreferences(next); applyAccessibilityPreferences(next); setStatus(t("prefs.saving"));
     try {
       const saved = await api<Preferences>("/preferences", { method: "PUT", body: JSON.stringify(next) });
-      setPrefs(saved); saveLocalAccessibilityPreferences(saved); applyAccessibilityPreferences(saved); setStatus("Saved to your FleetOS account");
+      setPrefs(saved); saveLocalAccessibilityPreferences(saved); applyAccessibilityPreferences(saved); setStatus(t("prefs.savedAccount"));
     } catch {
-      setStatus("Saved on this device; account sync could not complete");
+      setStatus(t("prefs.syncFailed"));
     }
   }
 
   const toggle = (key: keyof Omit<Preferences, "language">) => void save({ ...prefs, [key]: !prefs[key] });
 
   function startReading() {
-    setVoiceResult(readPageAloud() ? "Reading this page aloud." : "Read aloud is not supported by this browser.");
+    setVoiceResult(t(readPageAloud() ? "prefs.reading" : "prefs.readUnsupported"));
   }
 
   function testVoiceInput() {
@@ -59,14 +59,14 @@ export function AccessibilityPage() {
       };
     };
     const Recognition = browserWindow.SpeechRecognition ?? browserWindow.webkitSpeechRecognition;
-    if (!Recognition) { setVoiceResult("Voice input is not supported by this browser."); return; }
+    if (!Recognition) { setVoiceResult(t("prefs.voiceUnsupported")); return; }
     const recognition = new Recognition();
     recognition.lang = prefs.language === "en" ? "en-GB" : prefs.language;
     recognition.interimResults = false;
     recognition.continuous = false;
-    recognition.onresult = (event) => setVoiceResult(`Heard: ${event.results[0]?.[0]?.transcript ?? ""}`);
-    recognition.onerror = () => setVoiceResult("Voice input could not start. Check microphone permission and browser support.");
-    setVoiceResult("Listening…");
+    recognition.onresult = (event) => setVoiceResult(`${t("prefs.heard")}: ${event.results[0]?.[0]?.transcript ?? ""}`);
+    recognition.onerror = () => setVoiceResult(t("prefs.voiceFailed"));
+    setVoiceResult(t("prefs.listening"));
     recognition.start();
   }
 
@@ -82,16 +82,17 @@ export function AccessibilityPage() {
       <div className="action-grid" style={{ marginTop: 18 }}>
         <button className="action-card" onClick={() => toggle("largeText")}><strong>{t("prefs.largeText")}</strong><span>{t(prefs.largeText ? "common.on" : "common.off")}</span></button>
         <button className="action-card" onClick={() => toggle("largeControls")}><strong>{t("prefs.largeControls")}</strong><span>{t(prefs.largeControls ? "common.on" : "common.off")}</span></button>
-        <button className="action-card" onClick={() => toggle("highContrast")}><strong>High contrast</strong><span>{prefs.highContrast ? "On" : "Off"}</span></button>
-        <button className="action-card" onClick={() => toggle("reducedMotion")}><strong>Reduced motion</strong><span>{prefs.reducedMotion ? "On" : "Off"}</span></button>
-        <button className="action-card" onClick={() => toggle("easyRead")}><strong>Easy Read</strong><span>{prefs.easyRead ? "On" : "Off"}</span></button>
-        <button className="action-card" onClick={() => toggle("darkMode")}><strong>Dark / night mode</strong><span>{prefs.darkMode ? "On" : "Off"}</span></button>
-        <button className="action-card" onClick={() => toggle("readAloud")}><strong>Read aloud preference</strong><span>{prefs.readAloud ? "On" : "Off"}</span></button>
-        <button className="action-card" onClick={() => toggle("voiceInput")}><strong>Voice input preference</strong><span>{prefs.voiceInput ? "On" : "Off"}</span></button>
+        <button className="action-card" onClick={() => toggle("highContrast")}><strong>{t("prefs.highContrast")}</strong><span>{t(prefs.highContrast ? "common.on" : "common.off")}</span></button>
+        <button className="action-card" onClick={() => toggle("reducedMotion")}><strong>{t("prefs.reducedMotion")}</strong><span>{t(prefs.reducedMotion ? "common.on" : "common.off")}</span></button>
+        <button className="action-card" onClick={() => toggle("easyRead")}><strong>{t("prefs.easyRead")}</strong><span>{t(prefs.easyRead ? "common.on" : "common.off")}</span></button>
+        <button className="action-card" onClick={() => toggle("darkMode")}><strong>{t("prefs.darkMode")}</strong><span>{t(prefs.darkMode ? "common.on" : "common.off")}</span></button>
+        <button className="action-card" onClick={() => toggle("readAloud")}><strong>{t("prefs.readAloud")}</strong><span>{t(prefs.readAloud ? "common.on" : "common.off")}</span></button>
+        <button className="action-card" onClick={() => toggle("voiceInput")}><strong>{t("prefs.voiceInput")}</strong><span>{t(prefs.voiceInput ? "common.on" : "common.off")}</span></button>
       </div>
     </section>
-    <section className="dashboard-section"><p className="eyebrow">Try it now</p><h2>Speech tools</h2><div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:12}}><button onClick={startReading}>Read this page aloud</button><button onClick={stopReadingAloud}>Stop reading</button><button onClick={testVoiceInput}>Test voice input</button></div>{voiceResult&&<p className="subtle">{voiceResult}</p>}</section>
-    <section className="dashboard-section"><p className="eyebrow">Translation model</p><h2>Original records stay original</h2><p>The selected language controls your interface preference and speech locale. Customer-entered evidence and messages retain their original wording; translated viewing copies can be layered on later without replacing the audit record.</p></section>
+    <section className="dashboard-section"><p className="eyebrow">{t("prefs.tryNow")}</p><h2>{t("prefs.speechTools")}</h2><div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:12}}><button onClick={startReading}>{t("prefs.readPage")}</button><button onClick={stopReadingAloud}>{t("prefs.stopReading")}</button><button onClick={testVoiceInput}>{t("prefs.testVoice")}</button></div>{voiceResult&&<p className="subtle">{voiceResult}</p>}</section>
+    <section className="dashboard-section"><p className="eyebrow">{t("prefs.translationModel")}</p><h2>{t("prefs.originalTitle")}</h2><p>{t("prefs.originalDetail")}</p></section>
   </div>;
 }
+
 
