@@ -12,6 +12,7 @@ import { StaffInvitePage } from "./modules/auth/StaffInvitePage";
 import { BrandingProvider, loadCurrentBranding, loadPublicBranding, useBranding } from "./lib/branding";
 import { bootstrapAccessibilityPreferences } from "./lib/accessibility";
 import { I18nProvider } from "./lib/i18n";
+import { DriverBreakdownStatusBanner } from "./modules/driver/DriverBreakdownStatusBanner";
 import "./styles.css";
 import "./shell-fixes.css";
 import "./driver-operations.css";
@@ -32,6 +33,7 @@ type Workspace = { id: string; name: string; slug: string; role: string };
 function setResolvedRole(role?: string) {
   if (role) document.documentElement.dataset.fleetosRole = role;
   else delete document.documentElement.dataset.fleetosRole;
+  window.dispatchEvent(new CustomEvent("fleetos:role", { detail: { role: role ?? null } }));
 }
 
 function FleetOSApp() {
@@ -164,7 +166,7 @@ function FleetOSApp() {
 }
 
 createRoot(document.getElementById("root")!).render(
-  <StrictMode><QueryClientProvider client={client}><I18nProvider><BrandingProvider><FleetOSApp /></BrandingProvider></I18nProvider></QueryClientProvider></StrictMode>,
+  <StrictMode><QueryClientProvider client={client}><I18nProvider><BrandingProvider><FleetOSApp /><DriverBreakdownStatusBanner /></BrandingProvider></I18nProvider></QueryClientProvider></StrictMode>,
 );
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
