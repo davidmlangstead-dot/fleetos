@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { createBrowserRouter, Navigate, useRouteError } from "react-router-dom";
+import { createBrowserRouter, createHashRouter, Navigate, useRouteError } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import { ManagerShell, ResellerShell } from "./components/PortalShell";
 import { portalKind } from "./lib/portal";
@@ -54,6 +54,11 @@ const customerRoutes=[{element:<AppShell/>,errorElement:<RouteError/>,children:[
   {path:"/",element:load(<DashboardPageClean/>)},{path:"/driver",element:load(<DriverFieldPage/>)},{path:"/driver/tachograph",element:load(<DriverTachographPage/>)},{path:"/driver-operations",element:load(<DriverOperationsOfficePage/>)},{path:"/hours",element:load(<HoursBoardPage/>)},{path:"/tachograph",element:load(<TachographPage/>)},{path:"/jobs",element:load(<JobsPage/>)},{path:"/jobs/preflight",element:load(<JobPreflightPage/>)},{path:"/my-work",element:load(<MyWorkPage/>)},{path:"/vehicles",element:load(<VehiclesPage/>)},{path:"/vehicles/:id/passport",element:load(<VehiclePassportPage/>)},{path:"/drivers",element:load(<DriversPage/>)},{path:"/drivers/:id/passport",element:load(<DriverPassportPage/>)},{path:"/personal",element:load(<PersonalPage/>)},{path:"/workshop",element:load(<WorkshopPage/>)},{path:"/compliance",element:load(<ComplianceGuardianPage/>)},{path:"/documents",element:load(<DocumentsPage/>)},{path:"/registers",element:load(<RegistersHubPage/>)},{path:"/registers/:module",element:load(<RegisterModulePage/>)},{path:"/reports",element:load(<ReportsPage/>)},{path:"/marketplace",element:load(<MarketplacePage/>)},{path:"/imports",element:load(<SpreadsheetImportPage/>)},{path:"/join",element:load(<ResellerCustomerJoinPage/>)},{path:"/organisation/depots",element:load(<DepotsPage/>)},{path:"/settings/company",element:load(<CompanySettingsPage/>)},{path:"/settings/beta",element:load(<BetaControlsPage/>)},{path:"/settings/audit",element:load(<AuditPage/>)},{path:"/settings/medic",element:load(<MedicPage/>)},{path:"/settings/accessibility",element:load(<AccessibilityPage/>)},{path:"/messages",element:load(<MessagesPage/>)},{path:"*",element:<Navigate to="/" replace/>}
 ]}];
 const managerRoutes=[{element:<ManagerShell/>,errorElement:<RouteError/>,children:[{path:"/",element:load(<PlatformControlPage/>)},{path:"/customers",element:load(<PlatformCustomersPage/>)},{path:"/resellers",element:load(<ManagerResellersPage/>)},{path:"/money",element:load(<PlatformMoneyPage/>)},{path:"*",element:<Navigate to="/" replace/>}]}];
-const resellerRoutes=[{path:"/join",element:load(<ResellerJoinPage/>),errorElement:<RouteError/>},{element:<ResellerShell/>,errorElement:<RouteError/>,children:[{path:"/",element:load(<ResellerPortalPage/>)},{path:"/branding",element:load(<ResellerBrandingPage/>)},{path:"*",element:<Navigate to="/" replace/>}]}];
+const resellerInvite=new URLSearchParams(window.location.search).has("token");
+const resellerRoutes=resellerInvite
+  ? [{path:"/",element:load(<ResellerJoinPage/>),errorElement:<RouteError/>}]
+  : [{element:<ResellerShell/>,errorElement:<RouteError/>,children:[{path:"/",element:load(<ResellerPortalPage/>)},{path:"/branding",element:load(<ResellerBrandingPage/>)},{path:"/join",element:load(<ResellerJoinPage/>)},{path:"*",element:<Navigate to="/" replace/>}]}];
 
-export const router=createBrowserRouter(portalKind==="MANAGER"?managerRoutes:portalKind==="RESELLER"?resellerRoutes:customerRoutes);
+export const router=portalKind==="CUSTOMER"
+  ? createBrowserRouter(customerRoutes)
+  : createHashRouter(portalKind==="MANAGER"?managerRoutes:resellerRoutes);

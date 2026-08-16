@@ -56,7 +56,8 @@ function FleetOSApp() {
         if(!platform.isPlatformOwner)throw new Error("This account does not have FleetOS manager access.");
         setBranding({...DEFAULT_BRANDING,name:"FleetOS Manager",tagline:"Owner-only platform control"});
       }else{
-        if(window.location.pathname!=="/join"){
+        const inviteToken=new URLSearchParams(window.location.search).get("token");
+        if(!inviteToken){
           const memberships=await api<ResellerMembership[]>("/resellers/mine");
           if(!memberships.length)throw new Error("This account does not have a reseller membership.");
         }
