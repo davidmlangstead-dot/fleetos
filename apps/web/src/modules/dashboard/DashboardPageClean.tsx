@@ -8,13 +8,20 @@ type Attention = { critical: number; dueSoon: number; vehicleDates: { overdue: n
 type Commercial = { subscriptionStatus: string; betaEnabled: boolean; trialEndsAt: string | null; trialDaysRemaining: number | null; vehicleLimit: number; vehicleUsage: number; vehiclesAvailable: number; vehicleLimitReached: boolean };
 type Dashboard = { vehicles: number; activeJobs: number; overdueCompliance: number; openDefects: number; jobs: Job[]; attention: Attention; commercial: Commercial | null };
 
+const latestTools = [
+  { label: "Vehicle Passports", description: "Open Vehicles, then tap Passport on any vehicle for its permanent history, dates, documents, defects, jobs and maintenance timeline.", to: "/vehicles", Icon: Truck, tone: "blue" },
+  { label: "Driver Passports", description: "Open Drivers, then tap Passport on a driver to see operational credentials, records and their FleetOS history.", to: "/drivers", Icon: Users, tone: "violet" },
+  { label: "Dispatch Preflight", description: "Check whether the recorded driver, vehicle, dates, defects, maintenance and skills are ready before dispatch.", to: "/jobs/preflight", Icon: BriefcaseBusiness, tone: "orange" },
+  { label: "Compliance Inbox / Guardian", description: "Operator Licence Guardian with operational health, urgent actions, upcoming dates and missing-data warnings.", to: "/compliance", Icon: CircleAlert, tone: "red" },
+] as const;
+
 const modules = [
   { label: "Personal", description: "Staff, roles, accounts and people records.", to: "/personal", Icon: Users, tone: "blue" },
   { label: "Vehicles", description: "Fleet register, vehicle types and lifecycle dates.", to: "/vehicles", Icon: Truck, tone: "blue" },
   { label: "Drivers", description: "Drivers, licences, training and assignments.", to: "/drivers", Icon: BriefcaseBusiness, tone: "violet" },
   { label: "Jobs", description: "Plan, assign and track operational work.", to: "/jobs", Icon: ArrowRight, tone: "violet" },
   { label: "Workshop", description: "Defects, maintenance and inspection work.", to: "/workshop", Icon: Wrench, tone: "orange" },
-  { label: "Compliance", description: "Evidence, dates, expiries and actions.", to: "/compliance", Icon: CircleAlert, tone: "red" },
+  { label: "Compliance Inbox", description: "Operator Guardian, evidence, dates, expiries and actions.", to: "/compliance", Icon: CircleAlert, tone: "red" },
   { label: "Messages", description: "Two-way conversations connected to work.", to: "/messages", Icon: MessageSquare, tone: "green" },
   { label: "Spreadsheet import", description: "Bring vehicles and drivers across from existing spreadsheets.", to: "/imports", Icon: FileSpreadsheet, tone: "green" },
 ] as const;
@@ -47,8 +54,13 @@ export function DashboardPageClean() {
     {error && <p role="alert" className="form-message error">{error}</p>}
     <div className="metric-grid">{metrics.map(([label, value, note, Icon, tone, to]) => <Link to={to} key={label} className="metric-card" style={{ textDecoration: "none", color: "inherit" }}><div className={`metric-icon ${tone}`}><Icon size={21} /></div><div><p>{label}</p><strong>{value}</strong><small>{note}</small></div></Link>)}</div>
 
+    <section className="panel" style={{ marginBottom: 24, borderWidth: 2 }}>
+      <div className="panel-heading"><div><p className="eyebrow" style={{ marginBottom: 5 }}>Latest FleetOS tools</p><h2>New operational controls</h2><p>These features are live now. Passports sit against each vehicle/driver record; Preflight and Guardian open directly.</p></div></div>
+      <div className="metric-grid">{latestTools.map(({ label, description, to, Icon, tone }) => <Link to={to} key={label} className="metric-card" style={{ textDecoration: "none", color: "inherit" }}><div className={`metric-icon ${tone}`}><Icon size={21} /></div><div><strong style={{ display: "block", marginBottom: 4 }}>{label}</strong><small>{description}</small></div><ArrowRight size={17} /></Link>)}</div>
+    </section>
+
     <section className="panel" style={{ marginBottom: 24 }}>
-      <div className="panel-heading"><div><h2>Owner health check</h2><p>A single view of recorded items that need attention. FleetOS only counts data actually held in this workspace.</p></div><Link className="text-button" to="/compliance">Open compliance</Link></div>
+      <div className="panel-heading"><div><h2>Owner health check</h2><p>A single view of recorded items that need attention. FleetOS only counts data actually held in this workspace.</p></div><Link className="text-button" to="/compliance">Open Compliance Inbox</Link></div>
       <div className="metric-grid">
         <Link to="/compliance" className="metric-card" style={{ textDecoration: "none", color: "inherit" }}><div className="metric-icon red"><AlertTriangle size={21}/></div><div><p>Needs action now</p><strong>{data.attention.critical}</strong><small>Overdue dates, open defects and compliance items</small></div></Link>
         <Link to="/vehicles" className="metric-card" style={{ textDecoration: "none", color: "inherit" }}><div className="metric-icon orange"><Truck size={21}/></div><div><p>Vehicle dates</p><strong>{data.attention.vehicleDates.overdue}</strong><small>{data.attention.vehicleDates.dueSoon} more due in 30 days</small></div></Link>
