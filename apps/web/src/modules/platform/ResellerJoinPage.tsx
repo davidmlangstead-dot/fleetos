@@ -11,13 +11,13 @@ export function ResellerJoinPage() {
     setBusy(true);setMessage("");
     try{
       await api("/resellers/invites/accept",{method:"POST",body:JSON.stringify({token})});
-      window.location.href="/reseller";
+      window.location.href="/";
     }catch(e){setMessage(e instanceof Error?e.message:"Could not accept reseller invitation");setBusy(false);}
   }
 
   return <section className="page"><div className="panel" style={{maxWidth:680,margin:"40px auto",padding:28}}>
     <p className="eyebrow">Reseller invitation</p><h1>Join the FleetOS reseller network</h1>
-    <p>This invitation gives your account access to a reseller portal. It does <strong>not</strong> give access to FleetOS owner control or other resellers.</p>
+    <p>This invitation gives your account access to the dedicated white-label portal. It does <strong>not</strong> give access to FleetOS manager control or unrelated reseller/customer accounts.</p>
     {message&&<p className="form-message error">{message}</p>}
     <button onClick={()=>void accept()} disabled={busy||!token}>{busy?"Accepting…":"Accept reseller invitation"}</button>
   </div></section>;
