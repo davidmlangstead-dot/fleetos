@@ -1,40 +1,12 @@
 import { lazy, Suspense } from "react";
 import { createBrowserRouter, Navigate, useRouteError } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
+import { ManagerShell, ResellerShell } from "./components/PortalShell";
+import { portalKind } from "./lib/portal";
 
 const CHUNK_RECOVERY_KEY = "fleetos-chunk-recovery";
-
-function looksLikeChunkFailure(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error ?? "");
-  return /Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk|ChunkLoadError/i.test(message);
-}
-
-async function loadWithChunkRecovery<T>(loader: () => Promise<T>): Promise<T> {
-  try {
-    const result = await loader();
-    sessionStorage.removeItem(CHUNK_RECOVERY_KEY);
-    return result;
-  } catch (error) {
-    if (looksLikeChunkFailure(error) && sessionStorage.getItem(CHUNK_RECOVERY_KEY) !== "1") {
-      sessionStorage.setItem(CHUNK_RECOVERY_KEY, "1");
-      try {
-        if ("caches" in window) {
-          const keys = await caches.keys();
-          await Promise.all(keys.filter((key) => key.startsWith("fleetos-shell-")).map((key) => caches.delete(key)));
-        }
-        if ("serviceWorker" in navigator) {
-          const registration = await navigator.serviceWorker.getRegistration();
-          await registration?.update();
-        }
-      } catch (recoveryError) {
-        console.warn("FleetOS stale-chunk cache recovery could not complete", recoveryError);
-      }
-      window.location.reload();
-      return new Promise<T>(() => undefined);
-    }
-    throw error;
-  }
-}
+function looksLikeChunkFailure(error: unknown) { const message = error instanceof Error ? error.message : String(error ?? ""); return /Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk|ChunkLoadError/i.test(message); }
+async function loadWithChunkRecovery<T>(loader: () => Promise<T>): Promise<T> { try { const result = await loader(); sessionStorage.removeItem(CHUNK_RECOVERY_KEY); return result; } catch (error) { if (looksLikeChunkFailure(error) && sessionStorage.getItem(CHUNK_RECOVERY_KEY) !== "1") { sessionStorage.setItem(CHUNK_RECOVERY_KEY, "1"); try { if ("caches" in window) { const keys = await caches.keys(); await Promise.all(keys.filter((key) => key.startsWith("fleetos-shell-")).map((key) => caches.delete(key))); } if ("serviceWorker" in navigator) { const registration = await navigator.serviceWorker.getRegistration(); await registration?.update(); } } catch (recoveryError) { console.warn("FleetOS stale-chunk cache recovery could not complete", recoveryError); } window.location.reload(); return new Promise<T>(() => undefined); } throw error; } }
 
 const DashboardPageClean = lazy(() => loadWithChunkRecovery(() => import("./modules/dashboard/DashboardPageClean").then(module => ({ default: module.DashboardPageClean }))));
 const VehiclesPage = lazy(() => loadWithChunkRecovery(() => import("./modules/vehicles/VehiclesPage").then(module => ({ default: module.VehiclesPage }))));
@@ -67,56 +39,21 @@ const MyWorkPage = lazy(() => loadWithChunkRecovery(() => import("./modules/jobs
 const PlatformControlPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/PlatformControlPage").then(module => ({ default: module.PlatformControlPage }))));
 const PlatformCustomersPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/PlatformControlPage").then(module => ({ default: module.PlatformCustomersPage }))));
 const PlatformMoneyPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/PlatformControlPage").then(module => ({ default: module.PlatformMoneyPage }))));
+const ManagerResellersPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/ManagerResellersPage").then(module => ({ default: module.ManagerResellersPage }))));
 const ResellerPortalPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/ResellerPortalPage").then(module => ({ default: module.ResellerPortalPage }))));
+const ResellerBrandingPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/ResellerBrandingPage").then(module => ({ default: module.ResellerBrandingPage }))));
 const ResellerJoinPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/ResellerJoinPage").then(module => ({ default: module.ResellerJoinPage }))));
 const ResellerCustomerJoinPage = lazy(() => loadWithChunkRecovery(() => import("./modules/platform/ResellerCustomerJoinPage").then(module => ({ default: module.ResellerCustomerJoinPage }))));
 const AccessibilityPage = lazy(() => loadWithChunkRecovery(() => import("./modules/settings/AccessibilityPage").then(module => ({ default: module.AccessibilityPage }))));
 
 const pageFallback = <main className="loading-page"><div><h1>Loading FleetOS</h1></div></main>;
 const load = (element: React.ReactNode) => <Suspense fallback={pageFallback}>{element}</Suspense>;
+function RouteError() { const error = useRouteError(); const chunkFailure = looksLikeChunkFailure(error); const detail = error instanceof Error ? error.message : "The page could not be opened."; return <main className="loading-page"><div><p className="eyebrow">FleetOS recovery</p><h1>{chunkFailure ? "FleetOS has just been updated" : "We couldn't open this page"}</h1><p>{chunkFailure ? "Your browser still has part of the previous version. Reload to switch to the current version safely." : detail}</p><button onClick={() => window.location.reload()}>Reload FleetOS</button></div></main>; }
 
-function RouteError() {
-  const error = useRouteError();
-  const chunkFailure = looksLikeChunkFailure(error);
-  const detail = error instanceof Error ? error.message : "The page could not be opened.";
-  return <main className="loading-page"><div><p className="eyebrow">FleetOS recovery</p><h1>{chunkFailure ? "FleetOS has just been updated" : "We couldn't open this page"}</h1><p>{chunkFailure ? "Your browser still has part of the previous version. Reload to switch to the current version safely." : detail}</p><button onClick={() => window.location.reload()}>Reload FleetOS</button></div></main>;
-}
+const customerRoutes=[{element:<AppShell/>,errorElement:<RouteError/>,children:[
+  {path:"/",element:load(<DashboardPageClean/>)},{path:"/driver",element:load(<DriverFieldPage/>)},{path:"/driver/tachograph",element:load(<DriverTachographPage/>)},{path:"/driver-operations",element:load(<DriverOperationsOfficePage/>)},{path:"/hours",element:load(<HoursBoardPage/>)},{path:"/tachograph",element:load(<TachographPage/>)},{path:"/jobs",element:load(<JobsPage/>)},{path:"/jobs/preflight",element:load(<JobPreflightPage/>)},{path:"/my-work",element:load(<MyWorkPage/>)},{path:"/vehicles",element:load(<VehiclesPage/>)},{path:"/vehicles/:id/passport",element:load(<VehiclePassportPage/>)},{path:"/drivers",element:load(<DriversPage/>)},{path:"/drivers/:id/passport",element:load(<DriverPassportPage/>)},{path:"/personal",element:load(<PersonalPage/>)},{path:"/workshop",element:load(<WorkshopPage/>)},{path:"/compliance",element:load(<ComplianceGuardianPage/>)},{path:"/documents",element:load(<DocumentsPage/>)},{path:"/registers",element:load(<RegistersHubPage/>)},{path:"/registers/:module",element:load(<RegisterModulePage/>)},{path:"/reports",element:load(<ReportsPage/>)},{path:"/marketplace",element:load(<MarketplacePage/>)},{path:"/imports",element:load(<SpreadsheetImportPage/>)},{path:"/join",element:load(<ResellerCustomerJoinPage/>)},{path:"/organisation/depots",element:load(<DepotsPage/>)},{path:"/settings/company",element:load(<CompanySettingsPage/>)},{path:"/settings/beta",element:load(<BetaControlsPage/>)},{path:"/settings/audit",element:load(<AuditPage/>)},{path:"/settings/medic",element:load(<MedicPage/>)},{path:"/settings/accessibility",element:load(<AccessibilityPage/>)},{path:"/messages",element:load(<MessagesPage/>)},{path:"*",element:<Navigate to="/" replace/>}
+]}];
+const managerRoutes=[{element:<ManagerShell/>,errorElement:<RouteError/>,children:[{path:"/",element:load(<PlatformControlPage/>)},{path:"/customers",element:load(<PlatformCustomersPage/>)},{path:"/resellers",element:load(<ManagerResellersPage/>)},{path:"/money",element:load(<PlatformMoneyPage/>)},{path:"*",element:<Navigate to="/" replace/>}]}];
+const resellerRoutes=[{path:"/join",element:load(<ResellerJoinPage/>),errorElement:<RouteError/>},{element:<ResellerShell/>,errorElement:<RouteError/>,children:[{path:"/",element:load(<ResellerPortalPage/>)},{path:"/branding",element:load(<ResellerBrandingPage/>)},{path:"*",element:<Navigate to="/" replace/>}]}];
 
-export const router = createBrowserRouter([{ element: <AppShell />, errorElement: <RouteError />, children: [
-  { path: "/", element: load(<DashboardPageClean />) },
-  { path: "/driver", element: load(<DriverFieldPage />) },
-  { path: "/driver/tachograph", element: load(<DriverTachographPage />) },
-  { path: "/driver-operations", element: load(<DriverOperationsOfficePage />) },
-  { path: "/hours", element: load(<HoursBoardPage />) },
-  { path: "/tachograph", element: load(<TachographPage />) },
-  { path: "/jobs", element: load(<JobsPage />) },
-  { path: "/jobs/preflight", element: load(<JobPreflightPage />) },
-  { path: "/my-work", element: load(<MyWorkPage />) },
-  { path: "/vehicles", element: load(<VehiclesPage />) },
-  { path: "/vehicles/:id/passport", element: load(<VehiclePassportPage />) },
-  { path: "/drivers", element: load(<DriversPage />) },
-  { path: "/drivers/:id/passport", element: load(<DriverPassportPage />) },
-  { path: "/personal", element: load(<PersonalPage />) },
-  { path: "/workshop", element: load(<WorkshopPage />) },
-  { path: "/compliance", element: load(<ComplianceGuardianPage />) },
-  { path: "/documents", element: load(<DocumentsPage />) },
-  { path: "/registers", element: load(<RegistersHubPage />) },
-  { path: "/registers/:module", element: load(<RegisterModulePage />) },
-  { path: "/reports", element: load(<ReportsPage />) },
-  { path: "/marketplace", element: load(<MarketplacePage />) },
-  { path: "/imports", element: load(<SpreadsheetImportPage />) },
-  { path: "/control", element: load(<PlatformControlPage />) },
-  { path: "/control/customers", element: load(<PlatformCustomersPage />) },
-  { path: "/control/money", element: load(<PlatformMoneyPage />) },
-  { path: "/reseller", element: load(<ResellerPortalPage />) },
-  { path: "/reseller/join", element: load(<ResellerJoinPage />) },
-  { path: "/join", element: load(<ResellerCustomerJoinPage />) },
-  { path: "/organisation/depots", element: load(<DepotsPage />) },
-  { path: "/settings/company", element: load(<CompanySettingsPage />) },
-  { path: "/settings/beta", element: load(<BetaControlsPage />) },
-  { path: "/settings/audit", element: load(<AuditPage />) },
-  { path: "/settings/medic", element: load(<MedicPage />) },
-  { path: "/settings/accessibility", element: load(<AccessibilityPage />) },
-  { path: "/messages", element: load(<MessagesPage />) },
-  { path: "*", element: <Navigate to="/" replace /> },
-]}]);
+export const router=createBrowserRouter(portalKind==="MANAGER"?managerRoutes:portalKind==="RESELLER"?resellerRoutes:customerRoutes);
