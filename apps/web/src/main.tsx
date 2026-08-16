@@ -21,6 +21,7 @@ import "./jobs.css";
 import "./job-lifecycle.css";
 import "./branding.css";
 import "./accessibility.css";
+import "./dark-glass.css";
 
 bootstrapAccessibilityPreferences();
 
@@ -171,4 +172,3 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
     void navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).then((registration) => registration.update()).catch((error) => console.error("FleetOS service worker registration failed", error));
   });
 }
-
