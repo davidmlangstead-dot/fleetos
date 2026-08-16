@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { z } from "zod";
 import { asyncHandler } from "../../lib/asyncHandler.js";
@@ -7,6 +8,7 @@ import { requireAuth, requireRoles } from "../../middleware/auth.js";
 
 const readers = requireRoles("WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN");
 const writers = requireRoles("WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN");
+const jobWriters = requireRoles("DRIVER", "WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN");
 const optionalId = z.union([z.string().trim().min(1), z.literal("")]).optional();
 const schema = z.object({
   name: z.string().trim().min(1).max(240), storagePath: z.string().trim().min(1).max(600),
@@ -15,6 +17,7 @@ const schema = z.object({
   vehicleId: optionalId, driverId: optionalId, jobId: optionalId, defectId: optionalId, complianceId: optionalId,
   maintenanceWorkOrderId: z.union([z.string().uuid(), z.literal("")]).optional(),
 });
+const jobDocumentSchema = schema.pick({ name:true, storagePath:true, type:true, fileSize:true, mimeType:true });
 
 type DocumentRow = {
   id: string; name: string; type: string; fileUrl: string; fileSize: number | null; mimeType: string | null;
@@ -24,6 +27,30 @@ type DocumentRow = {
 
 export const documentsRouter = Router();
 documentsRouter.use(requireAuth);
+
+async function canAccessAssignedJob(user: NonNullable<Express.Request["user"]>, jobId: string) {
+  if (user.role !== "DRIVER") {
+    const rows = await prisma.$queryRaw<Array<{ ok:boolean }>>`SELECT EXISTS(SELECT 1 FROM "Job" WHERE id=${jobId} AND "companyId"=${user.companyId}) AS ok`;
+    return rows[0]?.ok ?? false;
+  }
+  const rows = await prisma.$queryRaw<Array<{ ok:boolean }>>`
+    SELECT EXISTS(
+      SELECT 1 FROM "Job" j
+      WHERE j.id=${jobId} AND j."companyId"=${user.companyId} AND (
+        EXISTS (
+          SELECT 1 FROM "JobAssignment" ja
+          JOIN "Person" p ON p.id=ja."personId" AND p."companyId"=ja."companyId"
+          WHERE ja."jobId"=j.id AND ja."companyId"=j."companyId"
+            AND (p."userId"=${user.id} OR lower(p.email)=lower(${user.email}))
+        )
+        OR EXISTS (
+          SELECT 1 FROM "Driver" d
+          WHERE d.id=j."driverId" AND d."companyId"=j."companyId" AND lower(d.email)=lower(${user.email})
+        )
+      )
+    ) AS ok`;
+  return rows[0]?.ok ?? false;
+}
 
 documentsRouter.get("/link-options", readers, asyncHandler(async (req, res) => {
   const companyId = req.user!.companyId;
@@ -68,6 +95,21 @@ async function belongsToCompany(companyId: string, input: z.infer<typeof schema>
   if (input.maintenanceWorkOrderId) checks.push(prisma.$queryRaw<{ id: string }[]>`SELECT id::text FROM "MaintenanceWorkOrder" WHERE id=${input.maintenanceWorkOrderId}::uuid AND "companyId"=${companyId} LIMIT 1`.then(rows => rows[0]));
   return (await Promise.all(checks)).every(Boolean);
 }
+
+documentsRouter.post("/job/:jobId", jobWriters, asyncHandler(async (req, res) => {
+  const input = jobDocumentSchema.parse(req.body);
+  const companyId = req.user!.companyId;
+  const jobId = req.params.jobId;
+  if (!(await canAccessAssignedJob(req.user!, jobId))) return res.status(403).json({ error: "You do not have access to add paperwork to this job" });
+  if (!input.storagePath.startsWith(`${companyId}/jobs/${jobId}/`)) return res.status(400).json({ error: "Job paperwork path does not match this work order" });
+  const doc = await prisma.document.create({ data: {
+    companyId, name: input.name, fileUrl: input.storagePath, type: input.type, fileSize: input.fileSize,
+    mimeType: input.mimeType, uploadedById: req.user!.id, jobId,
+  } });
+  await prisma.$executeRaw`INSERT INTO "JobTimelineEntry" (id,"companyId","jobId",type,summary,detail,"createdById","createdAt") VALUES (${randomUUID()}::uuid,${companyId},${jobId},'DOCUMENT',${`Paperwork added: ${doc.name}`},${doc.type},${req.user!.id},NOW())`;
+  await writeAuditEvent({ companyId, actorUserId: req.user!.id, actorEmail: req.user!.email, action: "CREATE", entityType: "DOCUMENT", entityId: doc.id, summary: `Job paperwork added: ${doc.name}`, metadata: { type: doc.type, jobId } });
+  res.status(201).json({ ...doc, storagePath: doc.fileUrl });
+}));
 
 documentsRouter.post("/", writers, asyncHandler(async (req, res) => {
   const input = schema.parse(req.body);
