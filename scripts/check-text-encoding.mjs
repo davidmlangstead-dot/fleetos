@@ -3,7 +3,12 @@ import path from "node:path";
 
 const roots = ["apps/web/src", "apps/api/src"];
 const extensions = new Set([".ts", ".tsx", ".js", ".jsx", ".css", ".html", ".json"]);
-const suspicious = ["â", "Â", "Ã", "�"];
+const suspiciousPatterns = [
+  { label: "Unicode replacement character", pattern: /�/u },
+  { label: "UTF-8 punctuation mojibake", pattern: /â€|â€™|â€œ|â€|â€“|â€”|â€¦/u },
+  { label: "UTF-8 spacing or currency mojibake", pattern: /Â(?:£|€|©|®|·|°| )/u },
+  { label: "UTF-8 Latin mojibake", pattern: /Ã[\u0080-\u00BF]/u },
+];
 const findings = [];
 
 async function walk(dir) {
@@ -17,9 +22,8 @@ async function walk(dir) {
     if (!extensions.has(path.extname(entry.name))) continue;
     const text = await readFile(full, "utf8");
     text.split(/\r?\n/).forEach((line, index) => {
-      if (suspicious.some(marker => line.includes(marker))) {
-        findings.push(`${full}:${index + 1}: ${line.trim().slice(0, 220)}`);
-      }
+      const match = suspiciousPatterns.find(({ pattern }) => pattern.test(line));
+      if (match) findings.push(`${full}:${index + 1}: ${match.label}: ${line.trim().slice(0, 220)}`);
     });
   }
 }
@@ -32,4 +36,4 @@ if (findings.length) {
   process.exit(1);
 }
 
-console.log("Text encoding check passed: no common mojibake markers found in app source.");
+console.log("Text encoding check passed: no common mojibake patterns found in app source.");
