@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, KanbanSquare, List, Plus, Search, Settings2, ShieldCheck, Users } from "lucide-react";
+import { CalendarDays, ClipboardCheck, FileText, KanbanSquare, List, Mail, Plus, Search, Send, Settings2, ShieldCheck, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
 import { JobDetails } from "./JobDetails";
@@ -9,6 +9,12 @@ import type { JobConfig, JobRow } from "./types";
 
 type View="BOARD"|"LIST"|"TYPES";
 const boardColumns=[{key:"BACKLOG",name:"Backlog",statuses:["DRAFT","PLANNED","ASSIGNED"]},{key:"SCHEDULED",name:"Scheduled",statuses:["SCHEDULED","DISPATCHED"]},{key:"ACTIVE",name:"In progress",statuses:["TRAVELLING","ON_SITE","PAUSED","IN_PROGRESS"]},{key:"COMPLETE",name:"Completed",statuses:["DELIVERED","COMPLETED","COMPLETED_ISSUES","CLOSED"]}];
+const sheetStages=[
+  {key:"TO_SEND",label:"Office to send",detail:"Jobs ready to issue to the driver",statuses:["DRAFT","PLANNED","ASSIGNED","SCHEDULED"],Icon:Send},
+  {key:"WITH_DRIVER",label:"With driver",detail:"Sent out or being completed in the field",statuses:["DISPATCHED","TRAVELLING","ON_SITE","PAUSED","IN_PROGRESS"],Icon:ClipboardCheck},
+  {key:"RETURNED",label:"Returned to office",detail:"Driver has finished and office needs to check",statuses:["COMPLETED","COMPLETED_ISSUES"],Icon:FileText},
+  {key:"APPROVED",label:"Approved / report",detail:"Ready for PDF report and email trail",statuses:["CLOSED","DELIVERED"],Icon:Mail},
+] as const;
 const label=(value:string)=>value.replaceAll("_"," ");const date=(value:string|null)=>value?new Date(value).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"}):"Unscheduled";
 
 export function JobsPage(){
@@ -17,9 +23,11 @@ export function JobsPage(){
   useEffect(()=>{void load();},[]);
   const filtered=useMemo(()=>jobs.filter(job=>{const term=search.toLowerCase();return (!term||[job.reference,job.title,job.customerName,job.siteName,job.siteAddress,...job.assignments.map(a=>a.name)].some(value=>String(value??"").toLowerCase().includes(term)))&&(trade==="ALL"||job.trade===trade);}),[jobs,search,trade]);
   const metrics=useMemo(()=>({open:jobs.filter(job=>!["COMPLETED","CLOSED","CANCELLED","DELIVERED"].includes(job.status)).length,today:jobs.filter(job=>job.scheduledStart&&new Date(job.scheduledStart).toDateString()===new Date().toDateString()).length,unassigned:jobs.filter(job=>!job.assignments.length&&!job.registration).length,urgent:jobs.filter(job=>["URGENT","EMERGENCY"].includes(job.priority)&&!["COMPLETED","CLOSED","CANCELLED"].includes(job.status)).length}),[jobs]);
+  const sheetCounts=useMemo(()=>sheetStages.map(stage=>({...stage,count:jobs.filter(job=>stage.statuses.some(status=>status===job.status)).length})),[jobs]);
   if(selected)return <JobDetails id={selected} onClose={()=>setSelected(null)} onChanged={load}/>;
   return <section className="page jobs-page"><div className="page-heading"><div><p className="eyebrow">Field service operations</p><h1>Jobs & work orders</h1><p className="subtle">Run any trade, contract or transport workflow from booking through field completion and cost control.</p></div><div style={{display:"flex",gap:10,flexWrap:"wrap"}}><Link className="secondary-button" to="/jobs/preflight" style={{display:"inline-flex",gap:7,alignItems:"center",textDecoration:"none"}}><ShieldCheck/> Dispatch preflight</Link><button className="primary-button" onClick={()=>setShowWizard(true)}><Plus/> Create job</button></div></div>{error&&<p role="alert" className="form-message error">{error}</p>}
     <div className="job-metrics"><article className="panel"><span>Open work</span><strong>{metrics.open}</strong></article><article className="panel"><span>Today</span><strong>{metrics.today}</strong></article><article className="panel"><span>Unallocated</span><strong>{metrics.unassigned}</strong></article><article className="panel"><span>Urgent / emergency</span><strong>{metrics.urgent}</strong></article></div>
+    {!showWizard&&<section className="panel job-sheet-flow"><div><p className="eyebrow">Job sheet flow</p><h2>Office creates job → driver completes sheet → office approves PDF/email</h2><p className="subtle">Use this as the live handover queue. Open any job below to send, submit, approve, create the PDF report and record the email trail.</p></div><div>{sheetCounts.map(stage=>{const Icon=stage.Icon;return <button key={stage.key} type="button" onClick={()=>{setView("LIST");setTrade("ALL");setSearch("");}}><Icon/><span>{stage.label}</span><strong>{stage.count}</strong><small>{stage.detail}</small></button>;})}</div></section>}
     {showWizard&&config&&<JobWizard config={config} onCancel={()=>setShowWizard(false)} onComplete={()=>{setShowWizard(false);setLoading(true);void load();}}/>}
     {!showWizard&&<><nav className="job-view-tabs"><button className={view==="BOARD"?"active":""} onClick={()=>setView("BOARD")}><KanbanSquare/> Workflow board</button><button className={view==="LIST"?"active":""} onClick={()=>setView("LIST")}><List/> Job register</button><button className={view==="TYPES"?"active":""} onClick={()=>setView("TYPES")}><Settings2/> Job types</button></nav>{view!=="TYPES"&&<div className="job-toolbar panel"><div className="search"><Search/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search reference, customer, site or assignee…"/></div><select value={trade} onChange={e=>setTrade(e.target.value)}><option value="ALL">All trades</option>{[...new Set(config?.jobTypes.map(type=>type.trade)??[])].map(value=><option key={value}>{value}</option>)}</select><span>{filtered.length} jobs</span></div>}
       {view==="TYPES"&&config&&<JobTypeManager types={config.jobTypes} onSaved={load}/>} {loading&&<p className="empty-line">Loading jobs…</p>}
