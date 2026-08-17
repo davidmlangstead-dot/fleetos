@@ -56,7 +56,7 @@ medicRouter.get("/status", requireAuth, requireRoles(...medicRoles), asyncHandle
     database = { status: "DEGRADED", latencyMs: 0, detail: "Database health check failed." };
   }
 
-  const [membershipCount, recentIncidents, openCount, securityRows, stuckRows] = await Promise.all([
+  const [membershipCount, recentIncidents, openCount, securityRows, directGrantRows, storageRows, stuckRows] = await Promise.all([
     prisma.companyMembership.count({ where: { companyId: req.user!.companyId } }),
     prisma.$queryRaw<Array<{ id: string; severity: string; status: string; code: string; source: string; summary: string; detail: string | null; recovery: string | null; createdAt: Date; resolvedAt: Date | null }>>`
       SELECT id::text, severity, status, code, source, summary, detail, recovery, "createdAt", "resolvedAt"
@@ -77,6 +77,18 @@ medicRouter.get("/status", requireAuth, requireRoles(...medicRoles), asyncHandle
       WHERE n.nspname='public' AND c.relkind='r' AND c.relname <> '_prisma_migrations'
     `,
     prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM information_schema.role_table_grants
+      WHERE table_schema='public' AND grantee IN ('anon','authenticated')
+    `,
+    prisma.$queryRaw<Array<{ total: bigint; companyScoped: bigint; driverScoped: bigint }>>`
+      SELECT COUNT(*)::bigint AS total,
+        COUNT(*) FILTER (WHERE COALESCE(qual,'') || COALESCE(with_check,'') ILIKE '%CompanyMembership%' AND COALESCE(qual,'') || COALESCE(with_check,'') ILIKE '%storage.foldername%')::bigint AS "companyScoped",
+        COUNT(*) FILTER (WHERE COALESCE(qual,'') || COALESCE(with_check,'') ILIKE '%driver_can_access_job_storage%')::bigint AS "driverScoped"
+      FROM pg_policies
+      WHERE schemaname='storage' AND tablename='objects' AND policyname LIKE 'fleet_documents%'
+    `,
+    prisma.$queryRaw<Array<{ count: bigint }>>`
       SELECT COUNT(*)::bigint AS count FROM "IdempotencyRequest"
       WHERE "companyId"=${req.user!.companyId} AND state='PROCESSING' AND "updatedAt" < NOW()-INTERVAL '5 minutes'
     `,
@@ -85,15 +97,21 @@ medicRouter.get("/status", requireAuth, requireRoles(...medicRoles), asyncHandle
   const security = securityRows[0];
   const totalTables = Number(security?.total ?? 0n);
   const protectedTables = Number(security?.protected ?? 0n);
-  const exposedTables = Number(security?.exposed ?? 0n);
+  const exposedTables = Number(security?.exposeded ?? 0n);
+  const directGrants = Number(directGrantRows[0]?.count ?? 0n);
+  const storagePolicies = Number(storageRows[0]?.total ?? 0n);
+  const companyScopedStoragePolicies = Number(storageRows[0]?.companyScoped ?? 0n);
+  const driverScopedStoragePolicies = Number(storageRows[0]?.driverScoped ?? 0n);
   const stuckChanges = Number(stuckRows[0]?.count ?? 0n);
-  const securityHealthy = totalTables > 0 && protectedTables === totalTables && exposedTables === 0;
+  const securityHealthy = totalTables > 0 && protectedTables === totalTables && exposedTables === 0 && directGrants === 0;
+  const storageHealthy = storagePolicies > 0 && companyScopedStoragePolicies + driverScopedStoragePolicies === storagePolicies;
   const checks = [
     { key: "api", label: "FleetOS API", status: "HEALTHY", detail: "Medic reached the authenticated API." },
     { key: "database", label: "Database", status: database.status, detail: database.detail, latencyMs: database.latencyMs },
     { key: "auth", label: "Authentication", status: "HEALTHY", detail: "Supabase validated this session." },
     { key: "tenant", label: "Tenant access", status: membershipCount > 0 ? "HEALTHY" : "DEGRADED", detail: membershipCount > 0 ? `${membershipCount} company membership${membershipCount === 1 ? "" : "s"} found.` : "No company memberships were found." },
-    { key: "database-security", label: "Database tenant safeguards", status: securityHealthy ? "HEALTHY" : "DEGRADED", detail: securityHealthy ? `${protectedTables}/${totalTables} customer tables have row-level protection; no direct browser table access is exposed.` : `${protectedTables}/${totalTables} tables protected; ${exposedTables} direct-access exposure${exposedTables === 1 ? "" : "s"} detected.` },
+    { key: "database-security", label: "Database tenant safeguards", status: securityHealthy ? "HEALTHY" : "DEGRADED", detail: securityHealthy ? `${protectedTables}/${totalTables} public tables have RLS; ${directGrants} direct anon/authenticated table grants.` : `${protectedTables}/${totalTables} tables protected; ${exposedTables} table exposure${exposedTables === 1 ? "" : "s"} and ${directGrants} direct grant${directGrants === 1 ? "" : "s"} detected.` },
+    { key: "storage-tenant-boundary", label: "Document storage tenant boundary", status: storageHealthy ? "HEALTHY" : "DEGRADED", detail: storageHealthy ? `${storagePolicies} fleet document storage policies are scoped by company folder or assigned-driver job access.` : `${storagePolicies} fleet document storage policies found; ${companyScopedStoragePolicies + driverScopedStoragePolicies} are recognised as tenant scoped.` },
     { key: "offline-replay", label: "Offline duplicate protection", status: stuckChanges === 0 ? "HEALTHY" : "DEGRADED", detail: stuckChanges === 0 ? "No offline changes are stuck in the replay ledger." : `${stuckChanges} offline change${stuckChanges === 1 ? " is" : "s are"} stuck and need review.` },
   ];
   const openIncidents = Number(openCount[0]?.count ?? 0n);
