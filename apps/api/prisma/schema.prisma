@@ -229,6 +229,13 @@ model Job {
   worksheetResponses Json        @default("{}")
   riskAssessment     Json        @default("{}")
   customerSignature  Json        @default("{}")
+  issuedToDriverAt   DateTime?
+  submittedByDriverAt DateTime?
+  officeApprovedAt   DateTime?
+  reportGeneratedAt  DateTime?
+  reportEmailedAt    DateTime?
+  reportEmailTo      String?
+  reportEmailStatus  String?
   completedAt        DateTime?
   vehicleId          String?
   driverId           String?
