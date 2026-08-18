@@ -35,6 +35,9 @@ type PlatformIdentity={isPlatformOwner:boolean};
 type ResellerMembership={id:string;name:string;role:string};
 
 function setResolvedRole(role?: string) { if (role) document.documentElement.dataset.fleetosRole = role; else delete document.documentElement.dataset.fleetosRole; window.dispatchEvent(new CustomEvent("fleetos:role", { detail: { role: role ?? null } })); }
+function replacePath(path: string) {
+  if (window.location.pathname !== path) window.history.replaceState(null, "", path);
+}
 
 function FleetOSApp() {
   const { branding, setBranding } = useBranding();
@@ -81,11 +84,10 @@ function FleetOSApp() {
       let active = officeEntry ? officeWorkspace : workspaces.find((workspace) => workspace.id === selected);
       if (officeEntry && !active) { setResolvedRole(); setError("This account does not have an office workspace. Sign in with a company administrator, manager, planner or office account."); setState("error"); return; }
       if (!active) { active = workspaces[0]; localStorage.setItem(ACTIVE_WORKSPACE_KEY, active.id); }
-      if (window.location.pathname === "/" && active.role === "DRIVER" && officeWorkspace) { active = officeWorkspace; localStorage.setItem(ACTIVE_WORKSPACE_KEY, active.id); }
-      if (officeEntry) { localStorage.setItem(ACTIVE_WORKSPACE_KEY, active.id); window.history.replaceState(null, "", "/"); }
-      if (active.role !== "DRIVER" && window.location.pathname.startsWith("/driver")) window.history.replaceState(null, "", "/");
+      if (officeEntry) { localStorage.setItem(ACTIVE_WORKSPACE_KEY, active.id); replacePath("/"); }
+      if (active.role !== "DRIVER" && window.location.pathname.startsWith("/driver")) replacePath("/");
       setResolvedRole(active.role); try { setBranding(await loadCurrentBranding()); } catch { }
-      if (active.role === "DRIVER" && window.location.pathname === "/") window.history.replaceState(null, "", "/driver");
+      if (active.role === "DRIVER" && !window.location.pathname.startsWith("/driver") && window.location.pathname !== "/messages" && window.location.pathname !== "/my-work") replacePath("/driver");
       setError(""); setState("ready");
     } catch (err) {
       console.error("FleetOS workspace bootstrap failed", err);

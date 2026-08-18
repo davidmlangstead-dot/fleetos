@@ -16,8 +16,8 @@ export type Branding = {
 };
 
 export const DEFAULT_BRANDING: Branding = {
-  name: "FleetOS",
-  tagline: "Transport operations, made simpler",
+  name: "Rivetway",
+  tagline: "Driver-built fleet operations",
   logoUrl: null,
   primaryColor: "#197B58",
   accentColor: "#32C58B",
@@ -34,8 +34,9 @@ const BrandingContext = createContext<BrandingContextValue>({ branding: DEFAULT_
 
 function normaliseBranding(value: Partial<Branding> | null | undefined): Branding {
   const colour = (candidate: unknown, fallback: string) => typeof candidate === "string" && /^#[0-9a-f]{6}$/i.test(candidate) ? candidate.toUpperCase() : fallback;
+  const name = typeof value?.name === "string" && value.name.trim() ? value.name.trim().slice(0, 80) : DEFAULT_BRANDING.name;
   return {
-    name: typeof value?.name === "string" && value.name.trim() ? value.name.trim().slice(0, 80) : DEFAULT_BRANDING.name,
+    name: name === "FleetOS" ? DEFAULT_BRANDING.name : name,
     tagline: typeof value?.tagline === "string" && value.tagline.trim() ? value.tagline.trim().slice(0, 160) : DEFAULT_BRANDING.tagline,
     logoUrl: typeof value?.logoUrl === "string" && value.logoUrl.startsWith("https://") ? value.logoUrl : null,
     primaryColor: colour(value?.primaryColor, DEFAULT_BRANDING.primaryColor),
@@ -107,7 +108,7 @@ export function BrandLogo({ compact = false }: { compact?: boolean }) {
 export function PoweredBy() {
   const { branding } = useBranding();
   if (!branding.showPoweredBy || branding.name === DEFAULT_BRANDING.name) return null;
-  return <small className="powered-by">Powered by FleetOS</small>;
+  return <small className="powered-by">Powered by Rivetway</small>;
 }
 
 export function BrandSupport() {

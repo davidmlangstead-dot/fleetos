@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bell, Building2, ClipboardList, Clock3, Gauge, History, LogOut, MapPin, Menu, MessageCircle, Plus, ShieldCheck, Stethoscope, Truck, UserRound, Users, Wrench, X } from "lucide-react";
+import { Bell, Building2, ClipboardList, Clock3, Gauge, History, LogOut, MapPin, Menu, MessageCircle, Plus, ShieldCheck, Truck, UserRound, Users, Wrench, X } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { api, ACTIVE_WORKSPACE_KEY } from "../lib/api";
 import { supabase } from "../lib/supabase";
@@ -35,24 +35,16 @@ const nav: readonly NavItem[] = [
   ["/driver/tachograph", "My Tacho", Clock3, ["DRIVER"]],
   ["/my-work", "My Work", ClipboardList, ["DRIVER", "WORKSHOP_TECHNICIAN"]],
   ["/hours", "Hours Board", Clock3, management],
-  ["/tachograph", "Tachograph", Clock3, tachographUsers],
-  ["/driver-operations", "Driver Ops", ClipboardList, management],
+  ["/tachograph", "Tacho", Clock3, tachographUsers],
   ["/jobs", "Jobs", ClipboardList, management],
+  ["/messages", "Messages", MessageCircle, everyone],
   ["/vehicles", "Vehicles", Truck, vehicleReaders],
-  ["/drivers", "Drivers", Users, management],
-  ["/personal", "Personal", UserRound, peopleManagers],
+  ["/personal", "Staffing", Users, peopleManagers],
   ["/workshop", "Workshop", Wrench, workshop],
   ["/compliance", "Compliance", ShieldCheck, vehicleReaders],
-  ["/documents", "Documents", ClipboardList, documentUsers],
-  ["/registers", "Registers", ClipboardList, registerUsers],
-  ["/reports", "Reports", Gauge, reportUsers],
-  ["/marketplace", "Marketplace", MessageCircle, marketplaceUsers],
-  ["/organisation/depots", "Depots & Sites", MapPin, companyManagers],
-  ["/settings/company", "Company Settings", Building2, companyManagers],
-  ["/settings/accessibility", "Accessibility & Language", UserRound, everyone],
+  ["/settings/company", "Settings", Building2, companyManagers],
   ["/settings/audit", "Audit Trail", History, companyManagers],
-  ["/settings/medic", "System Medic", Stethoscope, companyManagers],
-  ["/messages", "Messages", MessageCircle, everyone],
+  ["/organisation/depots", "Depots & Sites", MapPin, companyManagers],
 ] as const;
 
 const roleLabels: Record<Role, string> = {

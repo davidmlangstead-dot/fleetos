@@ -1,6 +1,6 @@
 {
-  "name": "FleetOS",
-  "short_name": "FleetOS",
+  "name": "Rivetway",
+  "short_name": "Rivetway",
   "description": "Driver-focused transport operations",
   "start_url": "/",
   "scope": "/",
