@@ -60,14 +60,14 @@ export function OnboardingPage({ onComplete }: Props) {
     }
   }
 
-  return <main className="auth-page" style={{ alignItems: "flex-start", paddingTop: 44 }}>
-    <section className="auth-card" style={{ maxWidth: 820, width: "100%" }}>
+  return <main className="auth-page onboarding-page">
+    <section className="auth-card onboarding-card">
       <div className="brand auth-brand"><BrandLogo /></div>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center" }}>
         <div><p className="eyebrow">One-time company setup</p><h1 style={{ marginBottom: 4 }}>Build your operating profile once.</h1></div>
         <strong>{step} / 4</strong>
       </div>
-      <div style={{ height: 6, background: "#e2e8f0", borderRadius: 999, overflow: "hidden", margin: "12px 0 24px" }}><div style={{ height: "100%", width: `${step * 25}%`, background: "#2563eb" }} /></div>
+      <div className="onboarding-progress"><div style={{ width: `${step * 25}%` }} /></div>
 
       {step === 1 && <div>
         <div className="panel" style={{ padding: 16, marginBottom: 18, display: "flex", gap: 12 }}><Building2 size={22}/><div><strong>Your company is the tenant boundary</strong><p className="subtle" style={{ margin: "4px 0 0" }}>People, vehicles, jobs, workshop and compliance records stay inside this workspace.</p></div></div>
@@ -94,7 +94,7 @@ export function OnboardingPage({ onComplete }: Props) {
 
       {step === 4 && <div>
         <p className="eyebrow">Ready</p><h2>One source of truth from day one.</h2><div className="panel" style={{ padding: 18, margin: "16px 0" }}><p><strong>{form.name}</strong></p><p className="subtle">{form.industries.map(value => industries.find(([id]) => id === value)?.[1]).filter(Boolean).join(" · ")} · {form.teamSize || "Team size not set"}</p><p className="subtle">{form.usesHgv ? `HGV operation${form.operatorLicenceNumber ? ` · O-licence ${form.operatorLicenceNumber}` : ""}` : "Non-HGV profile"}</p><p className="subtle">{form.complianceSchemes.length ? form.complianceSchemes.map(value => schemes.find(([id]) => id === value)?.[1]).filter(Boolean).join(" · ") : "No optional compliance schemes selected"}</p></div>
-        <div style={{ display: "grid", gap: 8, color: "#475569", fontSize: 14 }}><span><CheckCircle2 size={16} style={{ verticalAlign: "middle", marginRight: 7 }}/>You become Company Admin.</span><span><CheckCircle2 size={16} style={{ verticalAlign: "middle", marginRight: 7 }}/>No demo company or fake fleet data is created.</span><span><CheckCircle2 size={16} style={{ verticalAlign: "middle", marginRight: 7 }}/>Vehicles, people and evidence are added once and reused across {branding.name}.</span></div>
+        <div className="onboarding-checks"><span><CheckCircle2 size={16}/>You become Company Admin.</span><span><CheckCircle2 size={16}/>No demo company or fake fleet data is created.</span><span><CheckCircle2 size={16}/>Vehicles, people and evidence are added once and reused across {branding.name}.</span></div>
       </div>}
 
       {error && <p className="form-message error" style={{ marginTop: 16 }}>{error}</p>}
@@ -105,4 +105,3 @@ export function OnboardingPage({ onComplete }: Props) {
     </section>
   </main>;
 }
-

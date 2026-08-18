@@ -192,6 +192,45 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 /* Accessible focus without harsh glare */
 :focus-visible{outline:2px solid rgba(92,222,176,.78)!important;outline-offset:2px!important}
 
+/* Auth and onboarding use the same dark glass language as the app shell. */
+.auth-page{
+  min-height:100vh;
+  display:grid;
+  place-items:center;
+  padding:32px 18px;
+  background:
+    radial-gradient(circle at 20% 0%,rgba(53,201,151,.13),transparent 28rem),
+    radial-gradient(circle at 85% 16%,rgba(76,128,184,.11),transparent 30rem),
+    linear-gradient(155deg,var(--bg-0),var(--bg-1) 52%,#08131d)!important;
+  color:var(--text)!important;
+}
+.auth-page.onboarding-page{align-items:start;padding-top:44px}
+.auth-card{
+  width:min(100%,460px);
+  background:linear-gradient(145deg,rgba(18,34,49,.88),rgba(10,23,35,.78))!important;
+  border:1px solid var(--line)!important;
+  border-radius:14px;
+  box-shadow:var(--shadow)!important;
+  padding:28px;
+  color:var(--text)!important;
+  backdrop-filter:blur(18px) saturate(125%);
+  -webkit-backdrop-filter:blur(18px) saturate(125%);
+}
+.auth-card.onboarding-card{width:min(100%,860px);max-width:860px}
+.auth-brand{padding:0 0 24px!important}
+.auth-card form{display:grid;gap:14px;margin-top:18px}
+.auth-submit{width:100%;justify-content:center;margin-top:4px}
+.switch-mode{display:inline-flex;align-items:center;gap:7px;margin-top:16px}
+.auth-links{display:flex;justify-content:flex-end}
+.link-small{font-size:12px;font-weight:750}
+.form-message{border:1px solid var(--line-strong);border-radius:9px;background:rgba(23,43,58,.64);color:var(--text);padding:10px 12px}
+.form-message.error{border-color:rgba(255,123,114,.35);background:rgba(90,34,38,.32);color:#ffb8b2!important}
+.onboarding-progress{height:7px;background:rgba(148,163,184,.16);border-radius:999px;overflow:hidden;margin:12px 0 24px}
+.onboarding-progress>div{height:100%;background:linear-gradient(90deg,#2bbb8a,#63ddb1)}
+.onboarding-checks{display:grid;gap:8px;color:var(--muted);font-size:14px}
+.onboarding-checks span{display:flex;align-items:center;gap:8px}
+.onboarding-checks svg{color:var(--accent);flex:0 0 auto}
+
 /* Driver remains dark, but now shares glass treatment. */
 html[data-fleetos-role="DRIVER"] .panel,
 html[data-fleetos-role="DRIVER"] .dashboard-section,
