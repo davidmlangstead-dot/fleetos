@@ -1,36 +1,81 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardCheck, GraduationCap, RefreshCw, ShieldAlert } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, CheckCircle2, ClipboardCheck, RefreshCw, ShieldAlert } from "lucide-react";
 import { api } from "../../lib/api";
 
-type Driver = { id: string; firstName: string; lastName: string; email: string | null };
 type CheckItem = { id: string; status: string; note?: string; severity?: string };
-type CheckRecord = { id: string; status: string; nilDefect: boolean; roadworthyConfirmed: boolean; odometer: number | null; location: string | null; items: CheckItem[]; defectIds: string[]; signatureName: string; completedAt: string; durationSeconds: number; registration: string; trailerRegistration: string | null; firstName: string; lastName: string };
-type Breakdown = { id: string; severity: string; status: string; location: string; description: string; canMove: boolean; occupantsSafe: boolean; contactNumber: string | null; reportedAt: string; resolutionNotes: string | null; registration: string; firstName: string; lastName: string };
-type Absence = { id: string; type: string; status: string; startsOn: string; endsOn: string; reason: string | null; officeNotes: string | null; firstName: string; lastName: string };
-type Training = { id: string; driverId: string; title: string; category: string; status: string; provider: string | null; dueDate: string | null; bookedDate: string | null; completedDate: string | null; expiryDate: string | null; notes: string | null; firstName: string; lastName: string };
-type OfficeData = { drivers: Driver[]; checks: CheckRecord[]; breakdowns: Breakdown[]; absences: Absence[]; training: Training[]; canManage: boolean };
-type Tab = "CHECKS" | "BREAKDOWNS" | "ABSENCE" | "TRAINING";
-const tabs: Array<[Tab, string, typeof ClipboardCheck]> = [["CHECKS", "Daily checks", ClipboardCheck], ["BREAKDOWNS", "Breakdowns", ShieldAlert], ["ABSENCE", "Holiday & sickness", CalendarDays], ["TRAINING", "Training", GraduationCap]];
+type CheckRecord = {
+  id: string; status: string; nilDefect: boolean; roadworthyConfirmed: boolean; odometer: number | null;
+  location: string | null; items: CheckItem[]; signatureName: string; completedAt: string; durationSeconds: number;
+  registration: string; trailerRegistration: string | null; firstName: string; lastName: string;
+};
+type Breakdown = {
+  id: string; severity: string; status: string; location: string; description: string; canMove: boolean;
+  occupantsSafe: boolean; contactNumber: string | null; reportedAt: string; resolutionNotes: string | null;
+  registration: string; firstName: string; lastName: string;
+};
+type OfficeData = { checks: CheckRecord[]; breakdowns: Breakdown[]; canManage: boolean };
+
 const statusLabel = (value: string) => value.replaceAll("_", " ");
-const date = (value: string | null | undefined) => value ? new Date(value).toLocaleDateString("en-GB") : "Not set";
 
 export function DriverOperationsOfficePage() {
-  const [data, setData] = useState<OfficeData | null>(null); const [tab, setTab] = useState<Tab>("CHECKS"); const [error, setError] = useState(""); const [busy, setBusy] = useState(false);
-  const [trainingForm, setTrainingForm] = useState({ driverId: "", title: "", category: "DRIVER_CPC", status: "PLANNED", provider: "", dueDate: "", bookedDate: "", expiryDate: "", notes: "" });
-  const today = new Date().toISOString().slice(0, 10);
-  const [sicknessForm, setSicknessForm] = useState({ driverId: "", startsOn: today, endsOn: today, reason: "" });
-  async function load() { setError(""); try { setData(await api<OfficeData>("/driver-operations/office")); } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Could not load Driver Operations."); } }
+  const [data, setData] = useState<OfficeData | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    setError("");
+    try { setData(await api<OfficeData>("/driver-operations/office")); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "Could not load checks and breakdowns."); }
+  }
+
   useEffect(() => { void load(); }, []);
-  const summary = useMemo(() => ({ unsafe: data?.checks.filter(item => item.status === "UNSAFE").length ?? 0, openBreakdowns: data?.breakdowns.filter(item => !["RESOLVED", "CANCELLED"].includes(item.status)).length ?? 0, pendingAbsence: data?.absences.filter(item => ["PENDING", "REPORTED"].includes(item.status)).length ?? 0, trainingDue: data?.training.filter(item => ["PLANNED", "BOOKED", "EXPIRED"].includes(item.status)).length ?? 0 }), [data]);
-  async function update(path: string, body: object) { setBusy(true); setError(""); try { await api(path, { method: "PATCH", body: JSON.stringify(body) }); await load(); } catch (updateError) { setError(updateError instanceof Error ? updateError.message : "Could not update the record."); } finally { setBusy(false); } }
-  async function addTraining(event: FormEvent) { event.preventDefault(); setBusy(true); setError(""); try { await api("/driver-operations/training", { method: "POST", body: JSON.stringify({ ...trainingForm, provider: trainingForm.provider || undefined, dueDate: trainingForm.dueDate || undefined, bookedDate: trainingForm.bookedDate || undefined, expiryDate: trainingForm.expiryDate || undefined, notes: trainingForm.notes || undefined }) }); setTrainingForm(current => ({ ...current, title: "", provider: "", notes: "" })); await load(); } catch (trainingError) { setError(trainingError instanceof Error ? trainingError.message : "Could not add the training record."); } finally { setBusy(false); } }
-  async function addSickness(event: FormEvent) { event.preventDefault(); setBusy(true); setError(""); try { await api("/driver-operations/office-sickness", { method: "POST", body: JSON.stringify({ ...sicknessForm, reason: sicknessForm.reason || undefined }) }); setSicknessForm(current => ({ ...current, driverId: "", reason: "" })); await load(); } catch (absenceError) { setError(absenceError instanceof Error ? absenceError.message : "Could not record the sickness absence."); } finally { setBusy(false); } }
-  if (!data) return <main className="loading-page"><div><RefreshCw className="spin"/><h1>Loading Driver Operations</h1>{error && <p role="alert">{error}</p>}</div></main>;
-  return <section className="page driver-page"><div className="page-heading"><div><p className="eyebrow">Office control</p><h1>Driver Operations</h1><p className="subtle">Driver checks, breakdowns, holidays, sickness and training in one office queue.</p></div><button className="secondary-button" onClick={() => void load()}><RefreshCw size={17}/> Refresh</button></div>{error && <p role="alert" className="form-message error">{error}</p>}<div className="driver-metrics"><article className="panel"><span>Unsafe checks</span><strong>{summary.unsafe}</strong></article><article className="panel"><span>Open breakdowns</span><strong>{summary.openBreakdowns}</strong></article><article className="panel"><span>Admin attention</span><strong>{summary.pendingAbsence}</strong></article><article className="panel"><span>Training due</span><strong>{summary.trainingDue}</strong></article></div><nav className="driver-tabs" aria-label="Driver office sections">{tabs.map(([value, label, Icon]) => <button key={value} className={tab === value ? "active" : ""} onClick={() => setTab(value)}><Icon size={18}/>{label}</button>)}</nav>
-    {tab === "CHECKS" && <section className="panel driver-form-card"><h2>Signed daily checks</h2>{data.checks.length ? <div className="office-record-list">{data.checks.map(item => { const defects = item.items.filter(answer => answer.status === "DEFECT"); return <details key={item.id} className={item.status === "UNSAFE" ? "unsafe" : ""}><summary><div><strong>{item.registration}{item.trailerRegistration ? ` + ${item.trailerRegistration}` : ""}</strong><span>{item.firstName} {item.lastName} · {new Date(item.completedAt).toLocaleString("en-GB")}</span></div><span className={`driver-status ${item.status.toLowerCase()}`}>{statusLabel(item.status)}</span></summary><div className="record-detail"><p>Signed by <strong>{item.signatureName}</strong> · {Math.max(1, Math.round(item.durationSeconds / 60))} minutes · odometer {item.odometer ?? "not entered"} · {item.location || "location not entered"}</p>{item.nilDefect ? <p><CheckCircle2 size={16}/> Nil-defect declaration recorded.</p> : <div><strong>{defects.length} defects reported</strong>{defects.map(defect => <p key={defect.id}><AlertTriangle size={15}/> {defect.id.replaceAll("-", " ")}: {defect.note} ({statusLabel(defect.severity ?? "assessment required")})</p>)}</div>}</div></details>; })}</div> : <p className="subtle">No driver checks recorded yet.</p>}</section>}
-    {tab === "BREAKDOWNS" && <section className="panel driver-form-card"><h2>Breakdown response queue</h2>{data.breakdowns.length ? <div className="office-record-list">{data.breakdowns.map(item => <article key={item.id} className={["UNSAFE", "IMMOBILE"].includes(item.severity) && !["RESOLVED", "CANCELLED"].includes(item.status) ? "unsafe" : ""}><div><strong>{item.registration} · {item.firstName} {item.lastName}</strong><span>{statusLabel(item.severity)} · {new Date(item.reportedAt).toLocaleString("en-GB")}</span><p>{item.location} · {item.description}</p><small>{item.occupantsSafe ? "Occupants reported safe" : "Occupant safety needs confirmation"} · {item.canMove ? "Vehicle may move with instruction" : "Driver says vehicle cannot move"}{item.contactNumber ? ` · ${item.contactNumber}` : ""}</small></div><div className="office-actions"><span className={`driver-status ${item.status.toLowerCase()}`}>{statusLabel(item.status)}</span>{item.status === "REPORTED" && <button disabled={busy} onClick={() => void update(`/driver-operations/breakdowns/${item.id}`, { status: "ACKNOWLEDGED" })}>Acknowledge</button>}{["REPORTED", "ACKNOWLEDGED"].includes(item.status) && <button disabled={busy} onClick={() => void update(`/driver-operations/breakdowns/${item.id}`, { status: "RECOVERY_ARRANGED" })}>Recovery arranged</button>}{!["RESOLVED", "CANCELLED"].includes(item.status) && <button className="primary-button" disabled={busy} onClick={() => { const notes = window.prompt("Resolution notes"); if (notes !== null) void update(`/driver-operations/breakdowns/${item.id}`, { status: "RESOLVED", resolutionNotes: notes }); }}>Resolve</button>}</div></article>)}</div> : <p className="subtle">No breakdown reports.</p>}</section>}
-    {tab === "ABSENCE" && <div className="driver-stack"><form className="panel driver-form-card" onSubmit={addSickness}><h2>Report driver sickness</h2><p className="subtle">Office can record sickness when a driver phones in. The entry is added to the same absence record and audit trail.</p><div className="form-grid"><label>Driver *<select required value={sicknessForm.driverId} onChange={event=>setSicknessForm(current=>({...current,driverId:event.target.value}))}><option value="">Choose driver…</option>{data.drivers.map(driver=><option key={driver.id} value={driver.id}>{driver.firstName} {driver.lastName}</option>)}</select></label><label>From<input required type="date" value={sicknessForm.startsOn} onChange={event=>setSicknessForm(current=>({...current,startsOn:event.target.value}))}/></label><label>Expected to / end date<input required type="date" value={sicknessForm.endsOn} onChange={event=>setSicknessForm(current=>({...current,endsOn:event.target.value}))}/></label></div><label>Details<textarea value={sicknessForm.reason} onChange={event=>setSicknessForm(current=>({...current,reason:event.target.value}))} placeholder="What the driver reported and any cover arrangements"/></label><button className="primary-button" disabled={busy}>{busy?"Saving…":"Record sickness"}</button></form><section className="panel driver-form-card"><h2>Holiday, sickness and absence</h2>{data.absences.length ? <div className="office-record-list">{data.absences.map(item => <article key={item.id}><div><strong>{item.firstName} {item.lastName} · {statusLabel(item.type)}</strong><span>{date(item.startsOn)} to {date(item.endsOn)}</span>{item.reason && <p>{item.reason}</p>}{item.officeNotes && <small>Office: {item.officeNotes}</small>}</div><div className="office-actions"><span className={`driver-status ${item.status.toLowerCase()}`}>{statusLabel(item.status)}</span>{data.canManage && item.status === "PENDING" && <><button className="primary-button" disabled={busy} onClick={() => void update(`/driver-operations/absences/${item.id}`, { status: "APPROVED" })}>Approve leave</button><button disabled={busy} onClick={() => void update(`/driver-operations/absences/${item.id}`, { status: "DECLINED" })}>Decline leave</button></>}{data.canManage && item.status === "REPORTED" && <button className="primary-button" disabled={busy} onClick={() => void update(`/driver-operations/absences/${item.id}`, { status: "CLOSED" })}>Close when returned</button>}</div></article>)}</div> : <p className="subtle">No absence records.</p>}</section></div>}
-    {tab === "TRAINING" && <div className="driver-stack">{data.canManage && <form className="panel driver-form-card" onSubmit={addTraining}><h2>Add training or qualification</h2><div className="form-grid"><label>Driver *<select required value={trainingForm.driverId} onChange={event => setTrainingForm(current => ({ ...current, driverId: event.target.value }))}><option value="">Choose driver…</option>{data.drivers.map(driver => <option key={driver.id} value={driver.id}>{driver.firstName} {driver.lastName}</option>)}</select></label><label>Title *<input required value={trainingForm.title} onChange={event => setTrainingForm(current => ({ ...current, title: event.target.value }))}/></label><label>Category<select value={trainingForm.category} onChange={event => setTrainingForm(current => ({ ...current, category: event.target.value }))}>{["DRIVER_CPC", "LICENCE", "TACHOGRAPH", "SAFETY", "VEHICLE", "SITE", "OTHER"].map(value => <option key={value} value={value}>{statusLabel(value)}</option>)}</select></label><label>Status<select value={trainingForm.status} onChange={event => setTrainingForm(current => ({ ...current, status: event.target.value }))}>{["PLANNED", "BOOKED", "COMPLETED"].map(value => <option key={value}>{value}</option>)}</select></label><label>Provider<input value={trainingForm.provider} onChange={event => setTrainingForm(current => ({ ...current, provider: event.target.value }))}/></label><label>Due date<input type="date" value={trainingForm.dueDate} onChange={event => setTrainingForm(current => ({ ...current, dueDate: event.target.value }))}/></label><label>Booked date<input type="date" value={trainingForm.bookedDate} onChange={event => setTrainingForm(current => ({ ...current, bookedDate: event.target.value }))}/></label><label>Expiry date<input type="date" value={trainingForm.expiryDate} onChange={event => setTrainingForm(current => ({ ...current, expiryDate: event.target.value }))}/></label></div><label>Notes<textarea value={trainingForm.notes} onChange={event => setTrainingForm(current => ({ ...current, notes: event.target.value }))}/></label><button className="primary-button" disabled={busy}>Add training record</button></form>}<section className="panel driver-form-card"><h2>Training matrix</h2>{data.training.length ? <div className="training-grid">{data.training.map(item => <article key={item.id}><span className={`driver-status ${item.status.toLowerCase()}`}>{statusLabel(item.status)}</span><h3>{item.firstName} {item.lastName}</h3><strong>{item.title}</strong><p>{statusLabel(item.category)} · due {date(item.dueDate)} · expires {date(item.expiryDate)}</p>{item.provider && <small>{item.provider}</small>}{data.canManage && !["COMPLETED", "CANCELLED"].includes(item.status) && <div className="office-actions"><button disabled={busy} onClick={() => void update(`/driver-operations/training/${item.id}`, { status: "BOOKED" })}>Booked</button><button className="primary-button" disabled={busy} onClick={() => void update(`/driver-operations/training/${item.id}`, { status: "COMPLETED", completedDate: new Date().toISOString().slice(0, 10) })}>Complete</button></div>}</article>)}</div> : <p className="subtle">No training records.</p>}</section></div>}
+
+  const summary = useMemo(() => ({
+    openBreakdowns: data?.breakdowns.filter(item => !["RESOLVED", "CANCELLED"].includes(item.status)).length ?? 0,
+    unsafeChecks: data?.checks.filter(item => item.status === "UNSAFE").length ?? 0,
+    defectChecks: data?.checks.filter(item => item.status === "DEFECTS_REPORTED").length ?? 0,
+  }), [data]);
+
+  async function updateBreakdown(id: string, body: object) {
+    setBusy(true); setError("");
+    try { await api(`/driver-operations/breakdowns/${id}`, { method: "PATCH", body: JSON.stringify(body) }); await load(); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "Could not update the breakdown."); }
+    finally { setBusy(false); }
+  }
+
+  if (!data) return <main className="loading-page"><div><RefreshCw className="spin"/><h1>Loading checks & breakdowns</h1>{error && <p role="alert">{error}</p>}</div></main>;
+
+  return <section className="page driver-page">
+    <div className="page-heading">
+      <div><p className="eyebrow">Office control</p><h1>Checks & Breakdowns</h1><p className="subtle">Driver reports arrive here. Clean checks stay recorded; defects and breakdowns rise to the top.</p></div>
+      <button className="secondary-button" onClick={() => void load()}><RefreshCw size={17}/> Refresh</button>
+    </div>
+    {error && <p role="alert" className="form-message error">{error}</p>}
+
+    <div className="driver-metrics">
+      <article className="panel"><span>Open breakdowns</span><strong>{summary.openBreakdowns}</strong></article>
+      <article className="panel"><span>Unsafe checks</span><strong>{summary.unsafeChecks}</strong></article>
+      <article className="panel"><span>Checks with defects</span><strong>{summary.defectChecks}</strong></article>
+    </div>
+
+    <section className="panel driver-form-card">
+      <div className="panel-heading"><div><h2><ShieldAlert size={19}/> Breakdown response</h2><p>Newest unresolved reports first.</p></div></div>
+      {data.breakdowns.length ? <div className="office-record-list">{data.breakdowns.map(item => <article key={item.id} className={["UNSAFE", "IMMOBILE"].includes(item.severity) && !["RESOLVED", "CANCELLED"].includes(item.status) ? "unsafe" : ""}>
+        <div><strong>{item.registration} · {item.firstName} {item.lastName}</strong><span>{statusLabel(item.severity)} · {new Date(item.reportedAt).toLocaleString("en-GB")}</span><p>{item.location} · {item.description}</p><small>{item.occupantsSafe ? "Occupants safe" : "Occupant safety needs confirmation"} · {item.canMove ? "Driver says vehicle can move" : "Vehicle cannot move"}{item.contactNumber ? ` · ${item.contactNumber}` : ""}</small></div>
+        <div className="office-actions"><span className={`driver-status ${item.status.toLowerCase()}`}>{statusLabel(item.status)}</span>
+          {item.status === "REPORTED" && <button disabled={busy} onClick={() => void updateBreakdown(item.id, { status: "ACKNOWLEDGED" })}>Acknowledge</button>}
+          {["REPORTED", "ACKNOWLEDGED"].includes(item.status) && <button disabled={busy} onClick={() => void updateBreakdown(item.id, { status: "RECOVERY_ARRANGED" })}>Recovery arranged</button>}
+          {!["RESOLVED", "CANCELLED"].includes(item.status) && <button className="primary-button" disabled={busy} onClick={() => { const notes = window.prompt("Resolution notes"); if (notes !== null) void updateBreakdown(item.id, { status: "RESOLVED", resolutionNotes: notes }); }}>Resolve</button>}
+        </div>
+      </article>)}</div> : <p className="subtle">No breakdown reports.</p>}
+    </section>
+
+    <section className="panel driver-form-card">
+      <div className="panel-heading"><div><h2><ClipboardCheck size={19}/> Driver checks</h2><p>Every submitted walkaround is retained here for the office.</p></div></div>
+      {data.checks.length ? <div className="office-record-list">{data.checks.map(item => { const defects = item.items.filter(answer => answer.status === "DEFECT"); return <details key={item.id} className={item.status === "UNSAFE" ? "unsafe" : ""}>
+        <summary><div><strong>{item.registration}{item.trailerRegistration ? ` + ${item.trailerRegistration}` : ""}</strong><span>{item.firstName} {item.lastName} · {new Date(item.completedAt).toLocaleString("en-GB")}</span></div><span className={`driver-status ${item.status.toLowerCase()}`}>{statusLabel(item.status)}</span></summary>
+        <div className="record-detail"><p>Signed by <strong>{item.signatureName}</strong> · {Math.max(1, Math.round(item.durationSeconds / 60))} minutes · odometer {item.odometer ?? "not entered"} · {item.location || "location not entered"}</p>{item.nilDefect ? <p><CheckCircle2 size={16}/> Nil-defect declaration recorded.</p> : <div><strong>{defects.length} defect{defects.length === 1 ? "" : "s"} reported</strong>{defects.map(defect => <p key={defect.id}><AlertTriangle size={15}/> {defect.id.replaceAll("-", " ")}: {defect.note} ({statusLabel(defect.severity ?? "assessment required")})</p>)}</div>}</div>
+      </details>; })}</div> : <p className="subtle">No driver checks recorded yet.</p>}
+    </section>
   </section>;
 }
-
