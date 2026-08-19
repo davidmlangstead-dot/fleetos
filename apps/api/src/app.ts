@@ -16,6 +16,7 @@ import { importsRouter } from "./modules/imports/routes.js";
 import { dashboardRouter } from "./modules/dashboard/routes.js";
 import { driversRouter } from "./modules/drivers/routes.js";
 import { vehiclesRouter } from "./modules/vehicles/routes.js";
+import { brandedDocumentsRouter } from "./modules/branded-documents/routes.js";
 import { jobsRouter } from "./modules/jobs/routes.js";
 import { fieldServiceRouter } from "./modules/field-service/routes.js";
 import { operationsRouter } from "./modules/operations/routes.js";
@@ -108,6 +109,7 @@ app.use("/api/imports", sensitiveRateLimit, requireAuth, requireCommercialWriteA
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/drivers", sensitiveRateLimit, requireAuth, requireCommercialWriteAccess, idempotencyMiddleware, driversRouter);
 app.use("/api/vehicles", requireAuth, requireCommercialWriteAccess, idempotencyMiddleware, vehiclesRouter);
+app.use("/api", requireAuth, requireCommercialWriteAccess, brandedDocumentsRouter);
 app.use("/api/jobs", requireAuth, requireCommercialWriteAccess, idempotencyMiddleware, jobsRouter);
 app.use("/api/field-service", requireAuth, requireCommercialWriteAccess, idempotencyMiddleware, fieldServiceRouter);
 app.use("/api/operations", requireAuth, requireCommercialWriteAccess, idempotencyMiddleware, operationsRouter);
