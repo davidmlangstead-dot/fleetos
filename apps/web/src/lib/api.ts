@@ -16,9 +16,6 @@ function getBaseUrl() {
     if (configured) return configured.endsWith("/api") ? configured : `${configured}/api`;
     return "http://localhost:3001/api";
   }
-
-  // Production has one canonical API target. Do not allow stale Vercel env values
-  // to silently point a new frontend deployment at an old backend.
   return "https://fleetos-1.onrender.com/api";
 }
 
@@ -41,13 +38,41 @@ function apiError(payload: unknown, status: number) {
   return error;
 }
 
-export async function syncPendingChanges() {
-  if (!navigator.onLine) return;
+async function activeSession() {
   let { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) {
+  if (!session?.access_token && navigator.onLine) {
     const refreshed = await supabase.auth.refreshSession();
     session = refreshed.data.session ?? null;
   }
+  return session;
+}
+
+export async function downloadApiFile(path: string, filename: string) {
+  const session = await activeSession();
+  if (!session?.access_token) throw new Error("Your session has expired. Sign in again to download this file.");
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  const workspaceId = localStorage.getItem(ACTIVE_WORKSPACE_KEY) ?? "";
+  const response = await fetch(`${baseUrl}${cleanPath}`, {
+    headers: {
+      authorization: `Bearer ${session.access_token}`,
+      ...(workspaceId ? { "x-company-id": workspaceId } : {}),
+    },
+  });
+  if (!response.ok) throw apiError(await readPayload(response), response.status);
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export async function syncPendingChanges() {
+  if (!navigator.onLine) return;
+  const session = await activeSession();
   if (!session?.access_token) return;
 
   return syncOfflineMutations(session.user.id, async (item) => {
@@ -56,7 +81,7 @@ export async function syncPendingChanges() {
       body: item.body,
       headers: {
         ...item.headers,
-        authorization: `Bearer ${session!.access_token}`,
+        authorization: `Bearer ${session.access_token}`,
         "x-company-id": item.workspaceId,
         "x-idempotency-key": item.id,
       },
@@ -82,12 +107,7 @@ export function startOfflineSync() {
 export { clearOfflineData };
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
-  let { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token && navigator.onLine) {
-    const refreshed = await supabase.auth.refreshSession();
-    session = refreshed.data.session ?? null;
-  }
-
+  const session = await activeSession();
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   const workspaceId = localStorage.getItem(ACTIVE_WORKSPACE_KEY) ?? "";
   const method = (options.method ?? "GET").toUpperCase();
@@ -157,5 +177,3 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   }
   return (payload ?? {}) as T;
 }
-
-
