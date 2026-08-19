@@ -16,10 +16,10 @@ const roleMap: Record<string, string> = {
 };
 
 const personTypes = new Set([
-  "DRIVER", "ENGINEER", "TECHNICIAN", "OPERATIVE", "SUBCONTRACTOR",
+  "DRIVER", "ENGINEER", "TECHNICIAN", "OPERATIVE", "SUBCONTRACTOR", "CONTRACTOR",
   "OFFICE", "WORKSHOP", "SUPERVISOR", "MANAGER", "ADMIN",
 ]);
-const driverCapableTypes = new Set(["DRIVER", "SUPERVISOR", "MANAGER", "SUBCONTRACTOR"]);
+const driverCapableTypes = new Set(["DRIVER", "SUPERVISOR", "MANAGER", "WORKSHOP", "CONTRACTOR"]);
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -63,11 +63,7 @@ Deno.serve(async (req) => {
 
     const admin = createClient(url, service, { auth: { autoRefreshToken: false, persistSession: false } });
 
-    const { data: appUser, error: appUserError } = await admin
-      .from("User")
-      .select("id,email")
-      .ilike("email", caller.email)
-      .maybeSingle();
+    const { data: appUser, error: appUserError } = await admin.from("User").select("id,email").ilike("email", caller.email).maybeSingle();
     if (appUserError) return json({ error: "Could not resolve FleetOS identity" }, 500);
 
     const candidateUserIds = [...new Set([caller.id, appUser?.id].filter(Boolean) as string[])];
@@ -78,9 +74,7 @@ Deno.serve(async (req) => {
       .in("userId", candidateUserIds);
     if (membershipLookupError) return json({ error: "Could not verify company permission" }, 500);
 
-    const membership = memberships?.find((m: any) =>
-      ["COMPANY_ADMIN", "TRANSPORT_MANAGER", "PLATFORM_ADMIN"].includes(m.role)
-    );
+    const membership = memberships?.find((m: any) => ["COMPANY_ADMIN", "TRANSPORT_MANAGER", "PLATFORM_ADMIN"].includes(m.role));
     if (!membership) return json({ error: "You do not have permission to add staff to this company" }, 403);
 
     const [{ data: company }, { data: branding }] = await Promise.all([
@@ -92,50 +86,35 @@ Deno.serve(async (req) => {
     const inviteRedirect = `https://fleetos-orpin-one.vercel.app/staff-invite?company=${encodeURIComponent(company.slug)}`;
 
     if (depotId) {
-      const { data: depot, error: depotError } = await admin
-        .from("Depot")
-        .select("id")
-        .eq("id", depotId)
-        .eq("companyId", companyId)
-        .eq("isActive", true)
-        .maybeSingle();
+      const { data: depot, error: depotError } = await admin.from("Depot").select("id").eq("id", depotId).eq("companyId", companyId).eq("isActive", true).maybeSingle();
       if (depotError || !depot) return json({ error: "Depot is not active in the selected company" }, 400);
     }
 
     if (onboardingKey) {
-      const { data: existing } = await admin
-        .from("Person")
-        .select("*")
-        .eq("companyId", companyId)
-        .eq("onboardingKey", onboardingKey)
-        .maybeSingle();
+      const { data: existing } = await admin.from("Person").select("*").eq("companyId", companyId).eq("onboardingKey", onboardingKey).maybeSingle();
       if (existing) return json({ ok: true, person: existing, invited: !!existing.userId, resumed: true }, 200);
     }
 
-    const { data: person, error: personError } = await admin
-      .from("Person")
-      .insert({
-        companyId,
-        userId: null,
-        onboardingKey: onboardingKey || null,
-        depotId: depotId || null,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email: email?.trim() || null,
-        phone: phone?.trim() || null,
-        personType,
-        accessRole,
-        skills: cleanSkills,
-        startDate: startDate || null,
-        dateOfBirth: dateOfBirth || null,
-        address: address?.trim() || null,
-        postcode: postcode?.trim() || null,
-        emergencyContact: emergencyContact?.trim() || null,
-        emergencyPhone: emergencyPhone?.trim() || null,
-        isActive: true,
-      })
-      .select()
-      .single();
+    const { data: person, error: personError } = await admin.from("Person").insert({
+      companyId,
+      userId: null,
+      onboardingKey: onboardingKey || null,
+      depotId: depotId || null,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: email?.trim() || null,
+      phone: phone?.trim() || null,
+      personType,
+      accessRole,
+      skills: cleanSkills,
+      startDate: startDate || null,
+      dateOfBirth: dateOfBirth || null,
+      address: address?.trim() || null,
+      postcode: postcode?.trim() || null,
+      emergencyContact: emergencyContact?.trim() || null,
+      emergencyPhone: emergencyPhone?.trim() || null,
+      isActive: true,
+    }).select().single();
 
     if (personError) return json({ error: personError.message }, 400);
 
@@ -147,11 +126,7 @@ Deno.serve(async (req) => {
     try {
       if (inviteAccount) {
         const normalizedEmail = email.trim().toLowerCase();
-        const { data: existingFleetUser } = await admin
-          .from("User")
-          .select("id,email")
-          .ilike("email", normalizedEmail)
-          .maybeSingle();
+        const { data: existingFleetUser } = await admin.from("User").select("id,email").ilike("email", normalizedEmail).maybeSingle();
 
         if (existingFleetUser?.id) {
           linkedUserId = existingFleetUser.id;
@@ -184,13 +159,7 @@ Deno.serve(async (req) => {
           }, { onConflict: "email" });
           if (userError) throw userError;
 
-          const { data: existingMembership } = await admin
-            .from("CompanyMembership")
-            .select("id,role")
-            .eq("userId", linkedUserId)
-            .eq("companyId", companyId)
-            .maybeSingle();
-
+          const { data: existingMembership } = await admin.from("CompanyMembership").select("id,role").eq("userId", linkedUserId).eq("companyId", companyId).maybeSingle();
           if (!existingMembership) {
             const { data: createdMembership, error: membershipError } = await admin.from("CompanyMembership").insert({
               id: crypto.randomUUID(),
@@ -203,11 +172,7 @@ Deno.serve(async (req) => {
             createdMembershipId = createdMembership.id;
           }
 
-          const { error: personUserError } = await admin
-            .from("Person")
-            .update({ userId: linkedUserId })
-            .eq("id", person.id)
-            .eq("companyId", companyId);
+          const { error: personUserError } = await admin.from("Person").update({ userId: linkedUserId }).eq("id", person.id).eq("companyId", companyId);
           if (personUserError) throw personUserError;
         }
       }
@@ -248,18 +213,8 @@ Deno.serve(async (req) => {
         error: error instanceof Error ? error.message : String(error),
       });
       if (createdMembershipId) {
-        const { error: rollbackMembershipError } = await admin
-          .from("CompanyMembership")
-          .delete()
-          .eq("id", createdMembershipId)
-          .eq("companyId", companyId);
-        if (rollbackMembershipError) {
-          console.error("create-staff membership rollback failed", {
-            companyId,
-            createdMembershipId,
-            error: rollbackMembershipError.message,
-          });
-        }
+        const { error: rollbackMembershipError } = await admin.from("CompanyMembership").delete().eq("id", createdMembershipId).eq("companyId", companyId);
+        if (rollbackMembershipError) console.error("create-staff membership rollback failed", { companyId, createdMembershipId, error: rollbackMembershipError.message });
       }
       await admin.from("Driver").delete().eq("id", person.id).eq("companyId", companyId);
       await admin.from("Person").delete().eq("id", person.id).eq("companyId", companyId);
