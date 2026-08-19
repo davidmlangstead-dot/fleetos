@@ -23,18 +23,12 @@ const vehicleReaders: readonly Role[] = ["WORKSHOP_TECHNICIAN", ...management];
 const peopleManagers: readonly Role[] = ["TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const companyManagers: readonly Role[] = ["TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const registerUsers: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
-const documentUsers: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const tachographUsers: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
-const reportUsers: readonly Role[] = ["TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
-const marketplaceUsers: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const everyone: readonly Role[] = ["DRIVER", "WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const driverAppUsers: readonly Role[] = ["DRIVER", "WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 
-const nav: readonly NavItem[] = [
+const officeNav: readonly NavItem[] = [
   ["/", "Today", Gauge, management],
-  ["/driver", "Driver Today", Gauge, driverAppUsers],
-  ["/driver/tachograph", "My Tacho", Clock3, driverAppUsers],
-  ["/my-work", "My Work", ClipboardList, driverAppUsers],
   ["/hours", "Hours Board", Clock3, management],
   ["/tachograph", "Tacho", Clock3, tachographUsers],
   ["/jobs", "Jobs", ClipboardList, management],
@@ -48,6 +42,13 @@ const nav: readonly NavItem[] = [
   ["/organisation/depots", "Depots & Sites", MapPin, companyManagers],
 ] as const;
 
+const driverNav: readonly NavItem[] = [
+  ["/driver", "Today", Gauge, ["DRIVER"]],
+  ["/driver/tachograph", "My Tacho", Clock3, ["DRIVER"]],
+  ["/my-work", "My Work", ClipboardList, ["DRIVER"]],
+  ["/messages", "Messages", MessageCircle, ["DRIVER"]],
+] as const;
+
 const roleLabels: Record<Role, string> = {
   DRIVER: "Driver", WORKSHOP_TECHNICIAN: "Workshop", TRANSPORT_PLANNER: "Transport planner",
   TRANSPORT_MANAGER: "Transport manager", OFFICE_STAFF: "Office", FINANCE: "Finance",
@@ -57,7 +58,9 @@ const roleLabels: Record<Role, string> = {
 function routeRoles(pathname: string) {
   if (pathname.startsWith("/control") || pathname.startsWith("/reseller")) return null;
   if (pathname.startsWith("/registers/")) return registerUsers;
-  return nav.find(([path]) => path === pathname)?.[3] ?? null;
+  if (pathname === "/driver" || pathname === "/driver/tachograph" || pathname === "/my-work") return driverAppUsers;
+  const allNav = [...officeNav, ...driverNav];
+  return allNav.find(([path]) => path === pathname)?.[3] ?? null;
 }
 
 export function AppShell() {
@@ -73,10 +76,11 @@ export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const activeWorkspace = useMemo(() => workspaces.find((item) => item.id === company?.id) ?? null, [workspaces, company]);
-  const visibleNav = useMemo(() => nav.filter(([path, , , roles]) => {
-    if (path === "/marketplace" && !branding.marketplaceEnabled) return false;
-    return activeWorkspace ? roles.includes(activeWorkspace.role) : false;
-  }), [activeWorkspace, branding.marketplaceEnabled]);
+  const visibleNav = useMemo(() => {
+    if (!activeWorkspace) return [];
+    const source = activeWorkspace.role === "DRIVER" ? driverNav : officeNav;
+    return source.filter(([, , , roles]) => roles.includes(activeWorkspace.role));
+  }, [activeWorkspace]);
 
   async function load() {
     const [platform, resellerMemberships] = await Promise.all([
@@ -102,7 +106,7 @@ export function AppShell() {
     }
   }
 
-  useEffect(() => { void load().catch((error) => console.error("FleetOS identity load failed:", error)); }, []);
+  useEffect(() => { void load().catch((error) => console.error("Rivetway identity load failed:", error)); }, []);
 
   function switchWorkspace(id: string) {
     const selected = workspaces.find((item) => item.id === id);
@@ -126,6 +130,8 @@ export function AppShell() {
   const resellerRoute = !resellerJoinRoute && (location.pathname === "/reseller" || location.pathname.startsWith("/reseller/"));
   const onOwnerHost = window.location.hostname === OWNER_HOST;
   const onResellerHost = window.location.hostname === RESELLER_HOST;
+  const inDriverMode = location.pathname === "/driver" || location.pathname.startsWith("/driver/") || location.pathname === "/my-work";
+  const canUseDriverMode = !!role && role !== "DRIVER" && driverAppUsers.includes(role);
   const accessDenied = ownerRoute
     ? !(onOwnerHost && platformOwner)
     : resellerRoute
@@ -140,10 +146,10 @@ export function AppShell() {
         {role !== "DRIVER" && <button onClick={() => void addWorkspace()} style={{ width: "100%", marginTop: 8 }}><Plus size={15} /> Add company</button>}
       </div>}
       <nav>
-        {visibleNav.map(([to, label, Icon]) => { const translated = to === "/driver" ? t("nav.today") : to === "/driver/tachograph" ? t("nav.tacho") : to === "/my-work" ? t("nav.work") : to === "/messages" ? t("nav.messages") : to === "/settings/accessibility" ? t("nav.settings") : label; return <NavLink key={to} to={to} end={to === "/"} onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}><Icon size={20} /><span>{translated}</span></NavLink>; })}
+        {visibleNav.map(([to, label, Icon]) => <NavLink key={to} to={to} end={to === "/" || to === "/driver"} onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}><Icon size={20} /><span>{to === "/messages" ? t("nav.messages") : label}</span></NavLink>)}
         {!company && resellerAccess && onResellerHost && <NavLink to="/reseller" onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}><Building2 size={20}/><span>Reseller Portal</span></NavLink>}
       </nav>
-      <div className="sidebar-bottom"><div className="company-dot">{initials}</div><div><strong>{companyName}</strong><small>{role ? roleLabels[role] : resellerAccess ? "Reseller account" : platformOwner ? "FleetOS owner" : "Account"}</small><PoweredBy /></div></div>
+      <div className="sidebar-bottom"><div className="company-dot">{initials}</div><div><strong>{companyName}</strong><small>{role ? roleLabels[role] : resellerAccess ? "Reseller account" : platformOwner ? "Rivetway owner" : "Account"}</small><PoweredBy /></div></div>
     </aside>
     {mobileOpen && <button className="mobile-overlay" aria-label="Close navigation" onClick={() => setMobileOpen(false)} />}
     <main>
@@ -157,8 +163,13 @@ export function AppShell() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 8px 10px" }}><strong>Fleet alerts</strong><small>{alerts.total ? `${alerts.total} active` : "All clear"}</small></div>
             {alerts.items.length === 0 ? <p style={{ margin: 8, color: "#64748b" }}>No active alerts for your role.</p> : alerts.items.map((item) => <button key={item.id} onClick={() => { setAlertsOpen(false); window.location.href = item.href; }} style={{ display: "block", width: "100%", textAlign: "left", border: 0, borderTop: "1px solid #f1f5f9", background: "transparent", padding: "10px 8px", cursor: "pointer" }}><div style={{ display: "flex", gap: 8, alignItems: "center" }}><span style={{ fontSize: 10, fontWeight: 800, letterSpacing: ".04em", color: item.severity === "CRITICAL" ? "#b91c1c" : "#a16207" }}>{item.severity}</span><strong style={{ fontSize: 13 }}>{item.title}</strong></div>{item.detail && <div style={{ marginTop: 4, color: "#64748b", fontSize: 12 }}>{item.detail}</div>}</button>)}
           </div>}
-          <button className="avatar" aria-label="Account menu" aria-expanded={accountOpen} onClick={() => { setAlertsOpen(false); setAccountOpen((open) => !open); }}>{initials || "FO"}</button>
-          {accountOpen && <div className="account-menu">{role && companyManagers.includes(role) && <button onClick={() => { setAccountOpen(false); window.location.href = "/settings/company"; }}><Building2 size={16} /> {t("shell.companySettings")}</button>}<button onClick={() => { setAccountOpen(false); window.location.href = "/settings/accessibility"; }}><UserRound size={16} /> {t("shell.accessibility")}</button><button onClick={() => { setAccountOpen(false); void supabase.auth.signOut(); }}><LogOut size={16} /> {t("shell.signOut")}</button></div>}
+          <button className="avatar" aria-label="Account menu" aria-expanded={accountOpen} onClick={() => { setAlertsOpen(false); setAccountOpen((open) => !open); }}>{initials || "RW"}</button>
+          {accountOpen && <div className="account-menu">
+            {canUseDriverMode && <button onClick={() => { setAccountOpen(false); window.location.href = inDriverMode ? "/" : "/driver"; }}><Truck size={16} /> {inDriverMode ? "Back to office" : "Driver mode"}</button>}
+            {role && companyManagers.includes(role) && <button onClick={() => { setAccountOpen(false); window.location.href = "/settings/company"; }}><Building2 size={16} /> {t("shell.companySettings")}</button>}
+            <button onClick={() => { setAccountOpen(false); window.location.href = "/settings/accessibility"; }}><UserRound size={16} /> {t("shell.accessibility")}</button>
+            <button onClick={() => { setAccountOpen(false); void supabase.auth.signOut(); }}><LogOut size={16} /> {t("shell.signOut")}</button>
+          </div>}
         </div>
       </header>
       {accessDenied ? <main className="loading-page"><div><h1>{t("shell.accessDenied")}</h1><p>{t("shell.accessDeniedDetail")}</p><button onClick={() => { window.location.href = role === "DRIVER" ? "/driver" : resellerAccess && !company && onResellerHost ? "/reseller" : "/"; }}>{t("shell.return")}</button></div></main> : <Outlet />}
