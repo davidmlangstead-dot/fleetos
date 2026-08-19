@@ -33,6 +33,7 @@ type AppState = "loading" | "landing" | "auth" | "onboarding" | "ready" | "error
 type Workspace = { id: string; name: string; slug: string; role: string };
 type PlatformIdentity={isPlatformOwner:boolean};
 type ResellerMembership={id:string;name:string;role:string};
+const DRIVER_APP_ROLES = new Set(["DRIVER", "WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
 
 function setResolvedRole(role?: string) { if (role) document.documentElement.dataset.fleetosRole = role; else delete document.documentElement.dataset.fleetosRole; window.dispatchEvent(new CustomEvent("fleetos:role", { detail: { role: role ?? null } })); }
 function replacePath(path: string) {
@@ -87,7 +88,7 @@ function FleetOSApp() {
       if (officeEntry && !active) { setResolvedRole(); setError("This account does not have an office workspace. Sign in with a company administrator, manager, planner or office account."); setState("error"); return; }
       if (!active) { active = workspaces[0]; localStorage.setItem(ACTIVE_WORKSPACE_KEY, active.id); }
       if (officeEntry) { localStorage.setItem(ACTIVE_WORKSPACE_KEY, active.id); if (replacePath("/")) return; }
-      if (active.role !== "DRIVER" && window.location.pathname.startsWith("/driver") && replacePath("/")) return;
+      if (!DRIVER_APP_ROLES.has(active.role) && window.location.pathname.startsWith("/driver") && replacePath("/")) return;
       setResolvedRole(active.role); try { setBranding(await loadCurrentBranding()); } catch { }
       if (active.role === "DRIVER" && !window.location.pathname.startsWith("/driver") && window.location.pathname !== "/messages" && window.location.pathname !== "/my-work" && replacePath("/driver")) return;
       setError(""); setState("ready");
