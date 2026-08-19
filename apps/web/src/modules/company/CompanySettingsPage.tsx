@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Building2, Database, Download, Save, ShieldCheck, Trash2, UserCheck } from "lucide-react";
-import { api } from "../../lib/api";
+import { Building2, Database, Download, ImagePlus, Save, ShieldCheck, Trash2, UserCheck } from "lucide-react";
+import { api, ACTIVE_WORKSPACE_KEY } from "../../lib/api";
+import { supabase } from "../../lib/supabase";
 
 type CompanyProfile = {
   id: string; name: string; slug: string; address: string | null; postcode: string | null; phone: string | null;
@@ -30,6 +31,26 @@ function downloadJson(value: unknown, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+async function logoJpeg(file: File) {
+  if (!file.type.startsWith("image/")) throw new Error("Choose a PNG or JPEG logo.");
+  if (file.size > 8 * 1024 * 1024) throw new Error("Logo files must be 8 MB or smaller.");
+  const bitmap = await createImageBitmap(file);
+  const maxWidth = 1400;
+  const scale = Math.min(1, maxWidth / bitmap.width);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not prepare the logo.");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+  if (!blob) throw new Error("Could not prepare the logo.");
+  return blob;
+}
+
 export function CompanySettingsPage() {
   const [form, setForm] = useState<CompanyProfile | null>(null);
   const [admin, setAdmin] = useState<Admin | null>(null);
@@ -37,11 +58,24 @@ export function CompanySettingsPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoBusy, setLogoBusy] = useState(false);
+
+  const companyId = localStorage.getItem(ACTIVE_WORKSPACE_KEY);
+  const logoPath = companyId ? `${companyId}/branding/document-logo.jpg` : null;
+
+  async function loadLogo() {
+    if (!logoPath) return setLogoUrl(null);
+    const { data, error: signedError } = await supabase.storage.from("fleet-documents").createSignedUrl(logoPath, 3600);
+    if (signedError || !data?.signedUrl) return setLogoUrl(null);
+    setLogoUrl(data.signedUrl);
+  }
 
   async function load() {
     try {
       const [profile, controls] = await Promise.all([api<CompanyProfile>("/company"), api<Admin>("/company/admin")]);
       setForm(profile); setAdmin(controls); setError("");
+      await loadLogo();
     } catch (e) { setError(e instanceof Error ? e.message : "Could not load company settings."); }
   }
   useEffect(() => { void load(); }, []);
@@ -53,10 +87,35 @@ export function CompanySettingsPage() {
   const complete = (text: string) => { setMessage(text); setError(""); };
   const fail = (e: unknown, fallback: string) => { setError(e instanceof Error ? e.message : fallback); setMessage(""); };
 
+  async function uploadLogo(file: File) {
+    if (!logoPath) return setError("No active company workspace is selected.");
+    setLogoBusy(true); setError(""); setMessage("");
+    try {
+      const blob = await logoJpeg(file);
+      const { error: uploadError } = await supabase.storage.from("fleet-documents").upload(logoPath, blob, { upsert: true, contentType: "image/jpeg", cacheControl: "3600" });
+      if (uploadError) throw uploadError;
+      await loadLogo();
+      complete("Document logo saved. It will be used on company paperwork.");
+    } catch (e) { fail(e, "Could not upload the company logo."); }
+    finally { setLogoBusy(false); }
+  }
+
+  async function removeLogo() {
+    if (!logoPath) return;
+    setLogoBusy(true); setError("");
+    try {
+      const { error: removeError } = await supabase.storage.from("fleet-documents").remove([logoPath]);
+      if (removeError) throw removeError;
+      setLogoUrl(null); complete("Document logo removed.");
+    } catch (e) { fail(e, "Could not remove the company logo."); }
+    finally { setLogoBusy(false); }
+  }
+
   async function save() {
     const currentForm = form;
     const currentAdmin = admin;
     if (!currentForm || !currentAdmin) return;
+    if (!currentForm.industries.length) return setError("Choose at least one company type before saving.");
     setBusy(true); setMessage(""); setError("");
     try {
       const [profile, control] = await Promise.all([
@@ -69,16 +128,14 @@ export function CompanySettingsPage() {
         }) }),
       ]);
       setForm(profile); setAdmin((current) => current ? ({ ...current, control: { ...current.control, ...control } }) : current);
-      complete("Company settings saved.");
+      complete("Company settings saved. Built-in job types have been matched to this company.");
     } catch (e) { fail(e, "Could not save company settings."); }
     finally { setBusy(false); }
   }
 
   async function portableExport() {
-    const currentForm = form;
-    if (!currentForm) return;
     setBusy(true);
-    try { const data = await api<unknown>("/company/export"); downloadJson(data, `fleetos-${currentForm.slug}-${new Date().toISOString().slice(0,10)}.json`); complete("Portable company export downloaded."); }
+    try { const data = await api<unknown>("/company/export"); downloadJson(data, `fleetos-${form.slug}-${new Date().toISOString().slice(0,10)}.json`); complete("Portable company export downloaded."); }
     catch (e) { fail(e, "Could not create the company export."); }
     finally { setBusy(false); }
   }
@@ -111,26 +168,39 @@ export function CompanySettingsPage() {
   }
 
   return <section className="page">
-    <div className="page-heading"><div><p className="eyebrow">Company administration</p><h1>Company settings</h1><p className="subtle">Settings for this customer company only. FleetOS owner, reseller and white-label controls are kept outside customer workspaces.</p></div></div>
+    <div className="page-heading"><div><p className="eyebrow">Company administration</p><h1>Company settings</h1><p className="subtle">Set the company once. Rivetway uses this profile to keep jobs, compliance and paperwork relevant.</p></div></div>
     {error && <p className="form-message error">{error}</p>}{message && <p className="form-message">{message}</p>}
 
-    <section className="panel" style={{marginBottom:18}}><div className="panel-heading"><div><h2><Building2 size={19}/> Company profile</h2><p>Identity and operating details.</p></div></div><div style={{display:"grid",gap:12,padding:16}}>
+    <section className="panel" style={{marginBottom:18}}><div className="panel-heading"><div><h2><Building2 size={19}/> Company profile</h2><p>Company type controls the built-in job templates. Custom job types are always kept.</p></div></div><div style={{display:"grid",gap:12,padding:16}}>
       <label>Company name<input required value={form.name} onChange={e=>update("name",e.target.value)}/></label>
       <label>Home depot / operating centre<input value={form.homeDepotName ?? ""} onChange={e=>update("homeDepotName",e.target.value)}/></label>
       <label>Address<input value={form.address ?? ""} onChange={e=>update("address",e.target.value)}/></label>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}><label>Postcode<input value={form.postcode ?? ""} onChange={e=>update("postcode",e.target.value)}/></label><label>Phone<input value={form.phone ?? ""} onChange={e=>update("phone",e.target.value)}/></label></div>
-      <div><strong>Industry</strong><div className="chip-grid">{industries.map(([value,label])=><label key={value} className="chip-check"><input type="checkbox" checked={form.industries.includes(value)} onChange={()=>toggle("industries",value)}/><span>{label}</span></label>)}</div></div>
+      <div><strong>What type of work does this company do?</strong><p className="subtle">Choose all that apply. These choices decide the starter job types shown in Field Service.</p><div className="chip-grid">{industries.map(([value,label])=><label key={value} className="chip-check"><input type="checkbox" checked={form.industries.includes(value)} onChange={()=>toggle("industries",value)}/><span>{label}</span></label>)}</div></div>
       <div><strong>Compliance schemes used</strong><div className="chip-grid">{schemes.map(([value,label])=><label key={value} className="chip-check"><input type="checkbox" checked={form.complianceSchemes.includes(value)} onChange={()=>toggle("complianceSchemes",value)}/><span>{label}</span></label>)}</div></div>
+    </div></section>
+
+    <section className="panel" style={{marginBottom:18}}><div className="panel-heading"><div><h2><ImagePlus size={19}/> Company paperwork</h2><p>Logo used on job sheets, reports, quotes and invoices.</p></div></div><div style={{padding:16,display:"grid",gap:14}}>
+      <label
+        htmlFor="company-document-logo"
+        onDragOver={e=>{e.preventDefault();e.dataTransfer.dropEffect="copy";}}
+        onDrop={e=>{e.preventDefault();const file=e.dataTransfer.files?.[0];if(file)void uploadLogo(file);}}
+        style={{border:"2px dashed #94a3b8",borderRadius:14,padding:24,minHeight:170,display:"grid",placeItems:"center",textAlign:"center",cursor:"pointer"}}
+      >
+        {logoUrl?<img src={logoUrl} alt="Company document logo" style={{maxWidth:320,maxHeight:120,objectFit:"contain"}}/>:<div><ImagePlus size={30}/><h3>Drop company logo here</h3><p className="subtle">or click to choose a PNG/JPEG · max 8 MB</p></div>}
+        <input id="company-document-logo" type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={logoBusy} onChange={e=>{const file=e.target.files?.[0];if(file)void uploadLogo(file);e.currentTarget.value="";}}/>
+      </label>
+      <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}><p className="subtle" style={{margin:0}}>Rivetway stores this privately and standardises it for reliable document output.</p>{logoUrl&&<button type="button" className="secondary-button" disabled={logoBusy} onClick={()=>void removeLogo()}><Trash2 size={16}/> Remove logo</button>}</div>
     </div></section>
 
     <section className="panel" style={{marginBottom:18}}><div className="panel-heading"><div><h2><ShieldCheck size={19}/> Business & privacy</h2><p>Customer-controlled contact and retention settings.</p></div></div><div style={{display:"grid",gap:12,padding:16}}>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}><label>Billing email<input type="email" value={admin.control.billingEmail ?? ""} onChange={e=>updateControl("billingEmail",e.target.value)}/></label><label>Privacy contact email<input type="email" value={admin.control.privacyContactEmail ?? ""} onChange={e=>updateControl("privacyContactEmail",e.target.value)}/></label></div>
       <label>Administrative data retention days<input type="number" min={365} max={3650} value={admin.control.retentionDays} onChange={e=>updateControl("retentionDays",Number(e.target.value))}/></label>
-      <label className="toggle-row"><input type="checkbox" checked={admin.control.marketplaceEnabled} onChange={e=>updateControl("marketplaceEnabled",e.target.checked)}/><span><strong>Marketplace enabled</strong><small>Allow this company to use the FleetOS marketplace.</small></span></label>
+      <label className="toggle-row"><input type="checkbox" checked={admin.control.marketplaceEnabled} onChange={e=>updateControl("marketplaceEnabled",e.target.checked)}/><span><strong>Marketplace enabled</strong><small>Allow this company to use the Rivetway marketplace.</small></span></label>
       <div className="stat-grid"><article className="stat-card"><span>Members</span><strong>{admin.usage.members}</strong></article><article className="stat-card"><span>Vehicles</span><strong>{admin.usage.vehicles}</strong></article><article className="stat-card"><span>Active drivers</span><strong>{admin.usage.activeDrivers}</strong></article><article className="stat-card"><span>Plan</span><strong>{admin.control.subscriptionPlan.replaceAll("_"," ")}</strong><small>{admin.control.subscriptionStatus.replaceAll("_"," ")}</small></article></div>
     </div></section>
 
-    <section className="panel" style={{marginBottom:18}}><div className="panel-heading"><div><h2><Database size={19}/> Data & backups</h2><p>Portable copies of this company’s own FleetOS records.</p></div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button className="secondary-button" onClick={()=>void portableExport()} disabled={busy}><Download size={16}/> Export</button><button className="secondary-button" onClick={()=>void createBackup()} disabled={busy}><Database size={16}/> Create backup</button></div></div>
+    <section className="panel" style={{marginBottom:18}}><div className="panel-heading"><div><h2><Database size={19}/> Data & backups</h2><p>Portable copies of this company’s own records.</p></div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button className="secondary-button" onClick={()=>void portableExport()} disabled={busy}><Download size={16}/> Export</button><button className="secondary-button" onClick={()=>void createBackup()} disabled={busy}><Database size={16}/> Create backup</button></div></div>
       <div style={{padding:16,display:"grid",gap:10}}>{admin.backups.length===0?<p className="subtle">No saved backups.</p>:admin.backups.map(item=><div key={item.id} style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"center",borderBottom:"1px solid #e2e8f0",paddingBottom:10}}><div><strong>{item.label}</strong><div className="subtle">{new Date(item.createdAt).toLocaleString("en-GB")}</div></div><div style={{display:"flex",gap:8}}><button className="secondary-button" onClick={()=>void downloadBackup(item)}><Download size={15}/></button><button className="secondary-button" onClick={()=>void deleteBackup(item)}><Trash2 size={15}/></button></div></div>)}</div>
     </section>
 
