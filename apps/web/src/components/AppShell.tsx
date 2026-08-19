@@ -28,18 +28,19 @@ const tachographUsers: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLAN
 const reportUsers: readonly Role[] = ["TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const marketplaceUsers: readonly Role[] = ["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 const everyone: readonly Role[] = ["DRIVER", "WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
+const driverAppUsers: readonly Role[] = ["DRIVER", "WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"];
 
 const nav: readonly NavItem[] = [
   ["/", "Today", Gauge, management],
-  ["/driver", "Driver Today", Gauge, ["DRIVER"]],
-  ["/driver/tachograph", "My Tacho", Clock3, ["DRIVER"]],
-  ["/my-work", "My Work", ClipboardList, ["DRIVER", "WORKSHOP_TECHNICIAN"]],
+  ["/driver", "Driver Today", Gauge, driverAppUsers],
+  ["/driver/tachograph", "My Tacho", Clock3, driverAppUsers],
+  ["/my-work", "My Work", ClipboardList, driverAppUsers],
   ["/hours", "Hours Board", Clock3, management],
   ["/tachograph", "Tacho", Clock3, tachographUsers],
   ["/jobs", "Jobs", ClipboardList, management],
   ["/messages", "Messages", MessageCircle, everyone],
   ["/vehicles", "Vehicles", Truck, vehicleReaders],
-  ["/personal", "Staffing", Users, peopleManagers],
+  ["/personal", "Staff", Users, peopleManagers],
   ["/workshop", "Workshop", Wrench, workshop],
   ["/compliance", "Compliance", ShieldCheck, vehicleReaders],
   ["/settings/company", "Settings", Building2, companyManagers],
@@ -164,4 +165,3 @@ export function AppShell() {
     </main>
   </div>;
 }
-
