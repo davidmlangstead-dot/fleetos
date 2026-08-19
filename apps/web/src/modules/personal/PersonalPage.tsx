@@ -8,26 +8,28 @@ const personTypes = [
   ["DRIVER", "Driver", "Driving, vehicle checks and mobile jobs.", "DRIVER"],
   ["SUPERVISOR", "Supervisor", "Driving plus day-to-day team supervision.", "SUPERVISOR"],
   ["MANAGER", "Manager", "Driving plus operational management.", "MANAGER"],
-  ["SUBCONTRACTOR", "Workshop Contractor", "Driving plus workshop or contracted work.", "WORKSHOP"],
+  ["WORKSHOP", "Workshop", "Driving plus workshop, inspection and maintenance work.", "WORKSHOP"],
+  ["CONTRACTOR", "Contractor", "Driving plus contracted or temporary work.", "WORKSHOP"],
 ] as const;
 
 const accessRoles = [
   ["DRIVER", "Driver"],
-  ["WORKSHOP", "Workshop Contractor"],
+  ["WORKSHOP", "Workshop / Contractor"],
   ["SUPERVISOR", "Supervisor"],
   ["MANAGER", "Manager"],
 ] as const;
+
+type PersonType = typeof personTypes[number][0];
+type AccessRole = typeof accessRoles[number][0];
+type Depot = { id: string; name: string; isActive: boolean };
 
 const trainingByType: Record<PersonType, readonly string[]> = {
   DRIVER: ["Driving licence", "Driver CPC", "Tachograph card", "Driver assessment"],
   SUPERVISOR: ["Driving licence", "Driver CPC", "Tachograph card", "Driver assessment", "Supervisor induction"],
   MANAGER: ["Driving licence", "Driver CPC", "Tachograph card", "Driver assessment", "Manager induction"],
-  SUBCONTRACTOR: ["Driving licence", "Driver CPC", "Tachograph card", "Driver assessment", "Workshop induction"],
+  WORKSHOP: ["Driving licence", "Driver CPC", "Tachograph card", "Driver assessment", "Workshop induction"],
+  CONTRACTOR: ["Driving licence", "Driver CPC", "Tachograph card", "Driver assessment", "Contractor induction"],
 };
-
-type PersonType = typeof personTypes[number][0];
-type AccessRole = typeof accessRoles[number][0];
-type Depot = { id: string; name: string; isActive: boolean };
 
 export function PersonalPage() {
   const [step, setStep] = useState(1);
@@ -36,27 +38,13 @@ export function PersonalPage() {
   const [error, setError] = useState("");
   const [depots, setDepots] = useState<Depot[]>([]);
   const [form, setForm] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
+    firstName: "", lastName: "", email: "", phone: "",
     personType: "DRIVER" as PersonType,
     accessRole: "DRIVER" as AccessRole,
-    skills: [] as string[],
-    depotId: "",
-    startDate: "",
-    dateOfBirth: "",
-    address: "",
-    postcode: "",
-    emergencyContact: "",
-    emergencyPhone: "",
-    licenceNumber: "",
-    licenceExpiry: "",
-    cpcExpiry: "",
-    tachoCardNumber: "",
-    tachoCardExpiry: "",
-    medicalDue: "",
-    inviteAccount: true,
+    skills: [] as string[], depotId: "", startDate: "", dateOfBirth: "",
+    address: "", postcode: "", emergencyContact: "", emergencyPhone: "",
+    licenceNumber: "", licenceExpiry: "", cpcExpiry: "", tachoCardNumber: "",
+    tachoCardExpiry: "", medicalDue: "", inviteAccount: true,
   });
 
   const selectedType = useMemo(() => personTypes.find(([value]) => value === form.personType), [form.personType]);
@@ -98,14 +86,10 @@ export function PersonalPage() {
     if (message) return setError(message);
     const companyId = localStorage.getItem(ACTIVE_WORKSPACE_KEY);
     if (!companyId) return setError("No active company workspace is selected.");
-
     setBusy(true);
     setError("");
-    const { data, error: functionError } = await supabase.functions.invoke("create-staff", {
-      body: { ...form, depotId: form.depotId || null, companyId },
-    });
+    const { data, error: functionError } = await supabase.functions.invoke("create-staff", { body: { ...form, depotId: form.depotId || null, companyId } });
     setBusy(false);
-
     if (functionError) {
       if (functionError instanceof FunctionsHttpError) {
         try {
@@ -135,9 +119,9 @@ export function PersonalPage() {
 
       {step === 2 && <section className="panel"><div className="panel-heading"><h2>Who is it?</h2></div><div style={{ display: "grid", gap: 14, padding: 16 }}><div className="form-grid"><label>First name *<input autoFocus required value={form.firstName} onChange={(event) => update("firstName", event.target.value)} /></label><label>Last name *<input required value={form.lastName} onChange={(event) => update("lastName", event.target.value)} /></label><label>Email<input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} /></label><label>Phone<input value={form.phone} onChange={(event) => update("phone", event.target.value)} /></label><label>Depot / base<select value={form.depotId} onChange={(event) => update("depotId", event.target.value)}><option value="">No depot assigned</option>{depots.map((depot) => <option key={depot.id} value={depot.id}>{depot.name}</option>)}</select></label></div><label style={{ display: "flex", gap: 10, alignItems: "center" }}><input type="checkbox" checked={form.inviteAccount} onChange={(event) => update("inviteAccount", event.target.checked)} /> Create app login</label></div></section>}
 
-      {step === 3 && <section className="panel"><div className="panel-heading"><div><h2>Driving & training</h2><p>All four staff types can drive. Only record what applies.</p></div></div><div style={{ display: "grid", gap: 16, padding: 16 }}><div className="form-grid"><label>Licence number<input value={form.licenceNumber} onChange={(event) => update("licenceNumber", event.target.value)} /></label><label>Licence expiry<input type="date" value={form.licenceExpiry} onChange={(event) => update("licenceExpiry", event.target.value)} /></label><label>CPC expiry<input type="date" value={form.cpcExpiry} onChange={(event) => update("cpcExpiry", event.target.value)} /></label><label>Tacho card number<input value={form.tachoCardNumber} onChange={(event) => update("tachoCardNumber", event.target.value)} /></label><label>Tacho card expiry<input type="date" value={form.tachoCardExpiry} onChange={(event) => update("tachoCardExpiry", event.target.value)} /></label><label>Medical due<input type="date" value={form.medicalDue} onChange={(event) => update("medicalDue", event.target.value)} /></label></div><div><h3 style={{ marginBottom: 10 }}>{selectedType?.[1]} training matrix</h3><div style={{ display: "grid", gap: 8 }}>{trainingOptions.map((item) => <label key={item} style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", border: "1px solid rgba(148,163,184,.25)", borderRadius: 10 }}><input type="checkbox" checked={form.skills.includes(item)} onChange={() => toggleTraining(item)} /> {item}</label>)}</div></div></div></section>}
+      {step === 3 && <section className="panel"><div className="panel-heading"><div><h2>Driving & training</h2><p>All five staff types can drive. Only record what applies.</p></div></div><div style={{ display: "grid", gap: 16, padding: 16 }}><div className="form-grid"><label>Licence number<input value={form.licenceNumber} onChange={(event) => update("licenceNumber", event.target.value)} /></label><label>Licence expiry<input type="date" value={form.licenceExpiry} onChange={(event) => update("licenceExpiry", event.target.value)} /></label><label>CPC expiry<input type="date" value={form.cpcExpiry} onChange={(event) => update("cpcExpiry", event.target.value)} /></label><label>Tacho card number<input value={form.tachoCardNumber} onChange={(event) => update("tachoCardNumber", event.target.value)} /></label><label>Tacho card expiry<input type="date" value={form.tachoCardExpiry} onChange={(event) => update("tachoCardExpiry", event.target.value)} /></label><label>Medical due<input type="date" value={form.medicalDue} onChange={(event) => update("medicalDue", event.target.value)} /></label></div><div><h3 style={{ marginBottom: 10 }}>{selectedType?.[1]} training matrix</h3><div style={{ display: "grid", gap: 8 }}>{trainingOptions.map((item) => <label key={item} style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 12px", border: "1px solid rgba(148,163,184,.25)", borderRadius: 10 }}><input type="checkbox" checked={form.skills.includes(item)} onChange={() => toggleTraining(item)} /> {item}</label>)}</div></div></div></section>}
 
-      {step === 4 && <section className="panel"><div className="panel-heading"><div><h2>Review</h2><p>One entry, no duplicate setup.</p></div></div><div style={{ display: "grid", gap: 10, padding: 16 }}><p><strong>{form.firstName} {form.lastName}</strong> · {selectedType?.[1]}</p><p>Depot: <strong>{depotName}</strong></p><p>App role: <strong>{accessRoles.find(([value]) => value === form.accessRole)?.[1]}</strong> · Driver app enabled</p><p>{form.email || "No email"} · {form.phone || "No phone"}</p><p>Training: <strong>{form.skills.length ? form.skills.join(", ") : "None recorded"}</strong></p><p>{form.inviteAccount ? "App login: invitation will be sent or existing account linked" : "App login: not created"}</p></div></section>}
+      {step === 4 && <section className="panel"><div className="panel-heading"><div><h2>Review</h2><p>One entry, no duplicate setup.</p></div></div><div style={{ display: "grid", gap: 10, padding: 16 }}><p><strong>{form.firstName} {form.lastName}</strong> · {selectedType?.[1]}</p><p>Depot: <strong>{depotName}</strong></p><p>App role: <strong>{selectedType?.[1]}</strong> · Driver app enabled</p><p>{form.email || "No email"} · {form.phone || "No phone"}</p><p>Training: <strong>{form.skills.length ? form.skills.join(", ") : "None recorded"}</strong></p><p>{form.inviteAccount ? "App login: invitation will be sent or existing account linked" : "App login: not created"}</p></div></section>}
 
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 18 }}><button type="button" className="switch-mode" disabled={step === 1 || busy} onClick={() => setStep((current) => current - 1)}><ChevronLeft size={17} /> Back</button>{step < 4 ? <button type="button" className="primary-button" onClick={next}>Next <ChevronRight size={17} /></button> : <button type="submit" className="primary-button" disabled={busy}><UserPlus size={17} />{busy ? " Creating…" : " Add staff"}</button>}</div>
     </form>
