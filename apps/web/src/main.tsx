@@ -36,7 +36,9 @@ type ResellerMembership={id:string;name:string;role:string};
 
 function setResolvedRole(role?: string) { if (role) document.documentElement.dataset.fleetosRole = role; else delete document.documentElement.dataset.fleetosRole; window.dispatchEvent(new CustomEvent("fleetos:role", { detail: { role: role ?? null } })); }
 function replacePath(path: string) {
-  if (window.location.pathname !== path) window.history.replaceState(null, "", path);
+  if (window.location.pathname === path) return false;
+  window.location.replace(path);
+  return true;
 }
 
 function FleetOSApp() {
@@ -84,10 +86,10 @@ function FleetOSApp() {
       let active = officeEntry ? officeWorkspace : workspaces.find((workspace) => workspace.id === selected);
       if (officeEntry && !active) { setResolvedRole(); setError("This account does not have an office workspace. Sign in with a company administrator, manager, planner or office account."); setState("error"); return; }
       if (!active) { active = workspaces[0]; localStorage.setItem(ACTIVE_WORKSPACE_KEY, active.id); }
-      if (officeEntry) { localStorage.setItem(ACTIVE_WORKSPACE_KEY, active.id); replacePath("/"); }
-      if (active.role !== "DRIVER" && window.location.pathname.startsWith("/driver")) replacePath("/");
+      if (officeEntry) { localStorage.setItem(ACTIVE_WORKSPACE_KEY, active.id); if (replacePath("/")) return; }
+      if (active.role !== "DRIVER" && window.location.pathname.startsWith("/driver") && replacePath("/")) return;
       setResolvedRole(active.role); try { setBranding(await loadCurrentBranding()); } catch { }
-      if (active.role === "DRIVER" && !window.location.pathname.startsWith("/driver") && window.location.pathname !== "/messages" && window.location.pathname !== "/my-work") replacePath("/driver");
+      if (active.role === "DRIVER" && !window.location.pathname.startsWith("/driver") && window.location.pathname !== "/messages" && window.location.pathname !== "/my-work" && replacePath("/driver")) return;
       setError(""); setState("ready");
     } catch (err) {
       console.error("FleetOS workspace bootstrap failed", err);
