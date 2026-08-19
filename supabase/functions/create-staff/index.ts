@@ -19,6 +19,7 @@ const personTypes = new Set([
   "DRIVER", "ENGINEER", "TECHNICIAN", "OPERATIVE", "SUBCONTRACTOR",
   "OFFICE", "WORKSHOP", "SUPERVISOR", "MANAGER", "ADMIN",
 ]);
+const driverCapableTypes = new Set(["DRIVER", "SUPERVISOR", "MANAGER", "SUBCONTRACTOR"]);
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -211,7 +212,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      if (personType === "DRIVER") {
+      if (driverCapableTypes.has(personType)) {
         const { error: driverError } = await admin.from("Driver").insert({
           id: person.id,
           personId: person.id,
