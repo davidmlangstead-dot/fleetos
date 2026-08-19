@@ -97,7 +97,7 @@ medicRouter.get("/status", requireAuth, requireRoles(...medicRoles), asyncHandle
   const security = securityRows[0];
   const totalTables = Number(security?.total ?? 0n);
   const protectedTables = Number(security?.protected ?? 0n);
-  const exposedTables = Number(security?.exposeded ?? 0n);
+  const exposedTables = Number(security?.exposed ?? 0n);
   const directGrants = Number(directGrantRows[0]?.count ?? 0n);
   const storagePolicies = Number(storageRows[0]?.total ?? 0n);
   const companyScopedStoragePolicies = Number(storageRows[0]?.companyScoped ?? 0n);
@@ -154,4 +154,3 @@ medicRouter.patch("/incidents/:id/resolve", requireAuth, requireRoles(...medicRo
   if (!rows[0]) return res.status(404).json({ error: "Medic incident not found" });
   res.json(rows[0]);
 }));
-
