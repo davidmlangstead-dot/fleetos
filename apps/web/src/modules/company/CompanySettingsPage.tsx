@@ -134,8 +134,10 @@ export function CompanySettingsPage() {
   }
 
   async function portableExport() {
+    const currentForm = form;
+    if (!currentForm) return;
     setBusy(true);
-    try { const data = await api<unknown>("/company/export"); downloadJson(data, `fleetos-${form.slug}-${new Date().toISOString().slice(0,10)}.json`); complete("Portable company export downloaded."); }
+    try { const data = await api<unknown>("/company/export"); downloadJson(data, `fleetos-${currentForm.slug}-${new Date().toISOString().slice(0,10)}.json`); complete("Portable company export downloaded."); }
     catch (e) { fail(e, "Could not create the company export."); }
     finally { setBusy(false); }
   }
