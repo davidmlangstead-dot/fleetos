@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, CalendarRepeat, ClipboardCheck, FileCheck2, List, MapPinned, Plus, ReceiptText, Search, Settings2 } from "lucide-react";
+import { CalendarClock, CalendarDays, ClipboardCheck, FileCheck2, List, MapPinned, Plus, ReceiptText, Search, Settings2 } from "lucide-react";
 import { api } from "../../lib/api";
 import { JobDetails } from "./JobDetails";
 import { JobTypeManager } from "./JobTypeManager";
@@ -56,7 +56,7 @@ export function JobsPage(){
         <button className={view==="JOBS"?"active":""} onClick={()=>setView("JOBS")}><List/> Jobs</button>
         <button className={view==="CUSTOMERS"?"active":""} onClick={()=>setView("CUSTOMERS")}><MapPinned/> Customers</button>
         <button className={view==="QUOTES"?"active":""} onClick={()=>setView("QUOTES")}><FileCheck2/> Quotes</button>
-        <button className={view==="RECURRING"?"active":""} onClick={()=>setView("RECURRING")}><CalendarRepeat/> Planned</button>
+        <button className={view==="RECURRING"?"active":""} onClick={()=>setView("RECURRING")}><CalendarClock/> Planned</button>
         <button className={view==="REPORTS"?"active":""} onClick={()=>setView("REPORTS")}><ClipboardCheck/> Reports</button>
         <button className={view==="INVOICES"?"active":""} onClick={()=>setView("INVOICES")}><ReceiptText/> Invoices</button>
         <button className={view==="TYPES"?"active":""} onClick={()=>setView("TYPES")}><Settings2/> Setup</button>
