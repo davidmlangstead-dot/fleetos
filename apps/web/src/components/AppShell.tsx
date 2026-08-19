@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bell, Building2, ClipboardList, Clock3, Gauge, History, LogOut, MapPin, Menu, MessageCircle, Plus, ShieldCheck, Truck, UserRound, Users, Wrench, X } from "lucide-react";
+import { Bell, Building2, ClipboardList, Clock3, Gauge, History, LogOut, MapPin, Menu, MessageCircle, Plus, ShieldAlert, ShieldCheck, Truck, UserRound, Users, Wrench, X } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { api, ACTIVE_WORKSPACE_KEY } from "../lib/api";
 import { supabase } from "../lib/supabase";
@@ -36,6 +36,7 @@ const officeNav: readonly NavItem[] = [
   ["/vehicles", "Vehicles", Truck, vehicleReaders],
   ["/personal", "Staff", Users, peopleManagers],
   ["/workshop", "Workshop", Wrench, workshop],
+  ["/driver-operations", "Checks & Breakdowns", ShieldAlert, management],
   ["/compliance", "Compliance", ShieldCheck, vehicleReaders],
   ["/settings/company", "Settings", Building2, companyManagers],
   ["/settings/audit", "Audit Trail", History, companyManagers],
