@@ -1,10 +1,11 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CalendarDays, Camera, Check, ChevronLeft, ChevronRight, ClipboardCheck, CloudOff, MapPin, RefreshCw, ShieldAlert, Truck, UserRound } from "lucide-react";
+import { AlertTriangle, BriefcaseBusiness, CalendarDays, Camera, Check, ChevronLeft, ChevronRight, ClipboardCheck, CloudOff, MapPin, RefreshCw, ShieldAlert, Truck, UserRound } from "lucide-react";
 import { api } from "../../lib/api";
 import { useI18n } from "../../lib/i18n";
 
 type Vehicle = { id: string; registration: string; type: string; mileage: number | null; status: string };
 type Job = { id: string; reference: string | null; title: string | null; customerName: string; scheduledAt: string | null; status: string; vehicle: { id: string; registration: string } | null };
+type AssignedWork = { id: string; reference: string | null; title: string | null; customerName: string; scheduledStart: string | null; status: string; registration: string | null };
 type CheckRecord = { id: string; status: string; nilDefect: boolean; completedAt: string; registration: string };
 type Breakdown = { id: string; severity: string; status: string; location: string; description: string; reportedAt: string; registration: string };
 type Absence = { id: string; type: string; status: string; startsOn: string; endsOn: string; reason?: string | null; officeNotes?: string | null };
@@ -70,7 +71,23 @@ export function DriverFieldPage() {
 
   async function load() {
     setLoading(true);
-    try { setSummary(await api<DriverSummary>("/driver-operations/me")); setMessage(""); }
+    try {
+      const [driverSummary, assignedWork] = await Promise.all([
+        api<DriverSummary>("/driver-operations/me"),
+        api<AssignedWork[]>("/jobs/my-work").catch(() => [] as AssignedWork[]),
+      ]);
+      const assignedJobs: Job[] = assignedWork.map(job => ({
+        id: job.id,
+        reference: job.reference,
+        title: job.title,
+        customerName: job.customerName,
+        scheduledAt: job.scheduledStart,
+        status: job.status,
+        vehicle: job.registration ? { id: "", registration: job.registration } : null,
+      }));
+      setSummary({ ...driverSummary, jobs: assignedJobs.length ? assignedJobs : driverSummary.jobs });
+      setMessage("");
+    }
     catch (error) { setMessage(error instanceof Error ? error.message : "Driver information could not be loaded."); }
     finally { setLoading(false); }
   }
@@ -104,6 +121,7 @@ function Home({ summary, setMode }: { summary: DriverSummary; setMode: (mode: Mo
     <section className="field-welcome"><p>Good {new Date().getHours() < 12 ? "morning" : "day"}</p><h1>{summary.driver.firstName}</h1><span>{todayJobs.length ? `${todayJobs.length} job${todayJobs.length === 1 ? "" : "s"} today` : "No jobs assigned today"}</span></section>
     <div className="field-main-actions">
       <button className="field-action field-action-check" onClick={() => setMode("CHECK")}><ClipboardCheck/><span><strong>START CHECK</strong><small>Vehicle walkaround</small></span><ChevronRight/></button>
+      <button className="field-action" onClick={() => { window.location.href = "/my-work"; }}><BriefcaseBusiness/><span><strong>MY JOBS</strong><small>{summary.jobs.length ? `${summary.jobs.length} assigned` : "No assigned work"}</small></span><ChevronRight/></button>
       <button className="field-action field-action-breakdown" onClick={() => setMode("BREAKDOWN")}><ShieldAlert/><span><strong>BREAKDOWN</strong><small>Alert office & workshop</small></span><ChevronRight/></button>
       <button className="field-action" onClick={() => setMode("ADMIN")}><UserRound/><span><strong>MY ADMIN</strong><small>Training, leave & records</small></span><ChevronRight/></button>
     </div>
@@ -275,4 +293,3 @@ function AdminPanel({ summary, onSaved }: { summary: DriverSummary; onSaved: () 
   const localDate=(value:string)=>new Date(value).toLocaleDateString(locale,{day:"2-digit",month:"short",year:"numeric"});
   return <section className="field-flow"><div className="field-flow-title"><CalendarDays/><div><small>{t("admin.yourRecords")}</small><h1>{t("admin.myAdmin")}</h1></div></div>{message&&<p role="status" className="field-message">{message}</p>}<form className="driver-dark-card field-admin-request" onSubmit={submit}><h2>{t("admin.requestOrSick")}</h2><label className="field-label">{t("admin.action")}<select value={form.type} onChange={event=>setForm(current=>({...current,type:event.target.value}))}><option value="HOLIDAY">{t("admin.requestLeave")}</option><option value="SICKNESS">{t("admin.reportSickness")}</option></select></label><div className="form-grid"><label className="field-label">{t("admin.from")}<input required type="date" value={form.startsOn} onChange={event=>setForm(current=>({...current,startsOn:event.target.value}))}/></label><label className="field-label">{t("admin.to")}<input required type="date" value={form.endsOn} onChange={event=>setForm(current=>({...current,endsOn:event.target.value}))}/></label></div><label className="field-label">{t("admin.officeInfo")}<textarea value={form.reason} onChange={event=>setForm(current=>({...current,reason:event.target.value}))} placeholder={t(form.type==="HOLIDAY"?"admin.leavePlaceholder":"admin.sicknessPlaceholder")}/></label><button className="field-submit" disabled={busy}>{busy?t("admin.sending"):t(form.type==="HOLIDAY"?"admin.sendLeave":"admin.reportSickness")}</button></form><div className="field-admin-grid"><article><h2>{t("admin.training")}</h2>{upcoming.length ? upcoming.map(item => <div className="field-admin-row" key={item.id}><strong>{item.title}</strong><span>{item.status.replaceAll("_"," ")} · {formatDate(item.expiryDate ?? item.dueDate)}</span></div>) : <p>{t("admin.nothingDue")}</p>}</article><article><h2>{t("admin.leaveAbsence")}</h2>{summary.absences.length ? summary.absences.slice(0, 6).map(item => <div className="field-admin-row" key={item.id}><strong>{item.type.replaceAll("_"," ")}</strong><span>{localDate(item.startsOn)}–{localDate(item.endsOn)} · {item.status.replaceAll("_"," ")}</span>{item.officeNotes&&<small>{t("admin.office")}: {item.officeNotes}</small>}</div>) : <p>{t("admin.noRequests")}</p>}</article><article><h2>{t("admin.recentChecks")}</h2>{summary.checks.slice(0, 6).map(item => <div className="field-admin-row" key={item.id}><strong>{item.registration}</strong><span>{item.status.replaceAll("_", " ")} · {formatDate(item.completedAt)}</span></div>)}</article></div></section>;
 }
-
