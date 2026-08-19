@@ -4,8 +4,9 @@ type Bucket = { count: number; resetAt: number };
 const buckets = new Map<string, Bucket>();
 
 function clientKey(req: Parameters<RequestHandler>[0]) {
-  const forwarded = req.header("x-forwarded-for")?.split(",")[0]?.trim();
-  return forwarded || req.ip || "unknown";
+  // Express resolves req.ip using the configured trusted proxy chain. Avoid
+  // trusting a raw X-Forwarded-For value supplied directly by a client.
+  return req.ip || req.socket.remoteAddress || "unknown";
 }
 
 function limiter(windowMs: number, max: number, namespace: string): RequestHandler {
