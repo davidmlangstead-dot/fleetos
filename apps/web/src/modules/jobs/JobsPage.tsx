@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, ClipboardCheck, List, MapPinned, Plus, Search, Settings2 } from "lucide-react";
+import { CalendarDays, CalendarRepeat, ClipboardCheck, FileCheck2, List, MapPinned, Plus, ReceiptText, Search, Settings2 } from "lucide-react";
 import { api } from "../../lib/api";
 import { JobDetails } from "./JobDetails";
 import { JobTypeManager } from "./JobTypeManager";
 import { JobWizard } from "./JobWizard";
+import { FieldServiceCommercial, type ServiceView } from "./FieldServiceCommercial";
 import type { JobConfig, JobRow } from "./types";
 
-type View="DISPATCH"|"JOBS"|"CUSTOMERS"|"REPORTS"|"TYPES";
+type View="DISPATCH"|"JOBS"|"CUSTOMERS"|"QUOTES"|"RECURRING"|"REPORTS"|"INVOICES"|"TYPES";
 const label=(value:string)=>value.replaceAll("_"," ").toLowerCase().replace(/^./,c=>c.toUpperCase());
 const date=(value:string|null)=>value?new Date(value).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"}):"Not scheduled";
 const finished=new Set(["COMPLETED","CLOSED","CANCELLED","DELIVERED"]);
@@ -31,17 +32,13 @@ export function JobsPage(){
   const inProgress=useMemo(()=>jobs.filter(job=>active.has(job.status)),[jobs]);
   const today=useMemo(()=>jobs.filter(job=>job.scheduledStart&&new Date(job.scheduledStart).toDateString()===new Date().toDateString()&&!finished.has(job.status)),[jobs]);
   const reports=useMemo(()=>jobs.filter(job=>reportReady(job)&&job.status!=="CANCELLED").sort((a,b)=>new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime()),[jobs]);
-  const dispatch=useMemo(()=>jobs.filter(job=>!finished.has(job.status)).sort((a,b)=>{
-    const aTime=a.scheduledStart?new Date(a.scheduledStart).getTime():Number.MAX_SAFE_INTEGER;
-    const bTime=b.scheduledStart?new Date(b.scheduledStart).getTime():Number.MAX_SAFE_INTEGER;
-    return aTime-bTime;
-  }),[jobs]);
+  const dispatch=useMemo(()=>jobs.filter(job=>!finished.has(job.status)).sort((a,b)=>{const aTime=a.scheduledStart?new Date(a.scheduledStart).getTime():Number.MAX_SAFE_INTEGER;const bTime=b.scheduledStart?new Date(b.scheduledStart).getTime():Number.MAX_SAFE_INTEGER;return aTime-bTime;}),[jobs]);
 
   if(selected)return <JobDetails id={selected} onClose={()=>setSelected(null)} onChanged={load}/>;
 
   return <section className="page jobs-page">
     <div className="page-heading">
-      <div><p className="eyebrow">Field service</p><h1>Jobs</h1><p className="subtle">One job from office booking to field completion, customer report and history.</p></div>
+      <div><p className="eyebrow">Field service</p><h1>Field Service</h1><p className="subtle">Customers, sites, quotes, scheduling, field work, reports, planned maintenance and invoice-ready jobs in one place.</p></div>
       <button className="primary-button" onClick={()=>setShowWizard(true)}><Plus/> New job</button>
     </div>
     {error&&<p role="alert" className="form-message error">{error}</p>}
@@ -57,8 +54,11 @@ export function JobsPage(){
       <nav className="job-view-tabs">
         <button className={view==="DISPATCH"?"active":""} onClick={()=>setView("DISPATCH")}><CalendarDays/> Dispatch</button>
         <button className={view==="JOBS"?"active":""} onClick={()=>setView("JOBS")}><List/> Jobs</button>
-        <button className={view==="CUSTOMERS"?"active":""} onClick={()=>setView("CUSTOMERS")}><MapPinned/> Customers & sites</button>
+        <button className={view==="CUSTOMERS"?"active":""} onClick={()=>setView("CUSTOMERS")}><MapPinned/> Customers</button>
+        <button className={view==="QUOTES"?"active":""} onClick={()=>setView("QUOTES")}><FileCheck2/> Quotes</button>
+        <button className={view==="RECURRING"?"active":""} onClick={()=>setView("RECURRING")}><CalendarRepeat/> Planned</button>
         <button className={view==="REPORTS"?"active":""} onClick={()=>setView("REPORTS")}><ClipboardCheck/> Reports</button>
+        <button className={view==="INVOICES"?"active":""} onClick={()=>setView("INVOICES")}><ReceiptText/> Invoices</button>
         <button className={view==="TYPES"?"active":""} onClick={()=>setView("TYPES")}><Settings2/> Setup</button>
       </nav>
 
@@ -79,17 +79,7 @@ export function JobsPage(){
         </section>}
       </>}
 
-      {view==="CUSTOMERS"&&config&&<section className="panel job-register">
-        <div className="job-register-row heading"><span>Customer</span><span>Sites</span><span>Contact</span><span>Jobs</span><span>History</span></div>
-        {config.customers.map(customer=>{const sites=config.sites.filter(site=>site.customerId===customer.id);const customerJobs=jobs.filter(job=>job.customerName===customer.name);return <div className="job-register-row" key={customer.id}>
-          <span><strong>{customer.name}</strong><small>{customer.accountReference||"No account reference"}</small></span>
-          <span><strong>{sites.length}</strong><small>{sites.slice(0,2).map(site=>site.name).join(", ")||"No saved sites"}</small></span>
-          <span><strong>{customer.phone||customer.email||"—"}</strong><small>{customer.email&&customer.phone?customer.email:""}</small></span>
-          <span><strong>{customerJobs.filter(job=>!finished.has(job.status)).length} open</strong><small>{customerJobs.length} total</small></span>
-          <span><strong>{customerJobs.filter(job=>finished.has(job.status)).length} completed</strong><small>Job history retained</small></span>
-        </div>;})}
-        {!config.customers.length&&<div className="empty-state"><h2>No customers yet</h2><p>Create the first job and the customer/site can be captured there with minimum entry.</p><button className="primary-button" onClick={()=>setShowWizard(true)}><Plus/> New job</button></div>}
-      </section>}
+      {config&&(["CUSTOMERS","QUOTES","RECURRING","INVOICES"] as View[]).includes(view)&&<FieldServiceCommercial view={view as ServiceView} config={config}/>} 
 
       {view==="REPORTS"&&<section className="panel job-register">
         <div className="job-register-row heading"><span>Report</span><span>Customer / site</span><span>Field staff</span><span>Stage</span><span>Delivery</span></div>
