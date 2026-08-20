@@ -4,7 +4,11 @@ import { createClient } from "@supabase/supabase-js";
 import { config, SUPABASE_AUTH_KEY } from "../config.js";
 import { prisma } from "../lib/prisma.js";
 
-type Identity = { id: string; email: string };
+type Identity = { id: string; email: string; emailConfirmed: boolean };
+
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
 
 async function linkAuthIdentity(userId: string, authUserId: string) {
   const existing = await prisma.$queryRaw<{ authUserId: string | null }[]>`
@@ -15,40 +19,42 @@ async function linkAuthIdentity(userId: string, authUserId: string) {
 }
 
 async function syncIdentityEmail<T extends { id: string; email: string }>(user: T, identity: Identity) {
-  if (user.email.toLowerCase() === identity.email.toLowerCase()) return user;
-  return prisma.user.update({ where: { id: user.id }, data: { email: identity.email } });
+  if (normalizeEmail(user.email) === normalizeEmail(identity.email)) return user;
+  return prisma.user.update({ where: { id: user.id }, data: { email: normalizeEmail(identity.email) } });
 }
 
 async function ensureUser(identity: Identity) {
+  const canonicalIdentity = { ...identity, email: normalizeEmail(identity.email) };
   const linked = await prisma.$queryRaw<{ id: string }[]>`
-    SELECT id FROM "User" WHERE "authUserId" = ${identity.id}::uuid LIMIT 1
+    SELECT id FROM "User" WHERE "authUserId" = ${canonicalIdentity.id}::uuid LIMIT 1
   `;
   if (linked[0]) {
     const user = await prisma.user.findUnique({ where: { id: linked[0].id } });
-    if (user) return syncIdentityEmail(user, identity);
+    if (user) return syncIdentityEmail(user, canonicalIdentity);
   }
 
-  const existingById = await prisma.user.findUnique({ where: { id: identity.id } });
+  const existingById = await prisma.user.findUnique({ where: { id: canonicalIdentity.id } });
   if (existingById) {
-    await linkAuthIdentity(existingById.id, identity.id);
-    return syncIdentityEmail(existingById, identity);
+    await linkAuthIdentity(existingById.id, canonicalIdentity.id);
+    return syncIdentityEmail(existingById, canonicalIdentity);
   }
 
-  const existingByEmail = await prisma.user.findUnique({ where: { email: identity.email } });
+  const existingByEmail = await prisma.user.findUnique({ where: { email: canonicalIdentity.email } });
   if (existingByEmail) {
-    await linkAuthIdentity(existingByEmail.id, identity.id);
+    if (!canonicalIdentity.emailConfirmed) throw new Error("Email confirmation is required before linking an existing FleetOS account");
+    await linkAuthIdentity(existingByEmail.id, canonicalIdentity.id);
     return existingByEmail;
   }
 
   try {
-    const created = await prisma.user.create({ data: { id: identity.id, email: identity.email } });
-    await linkAuthIdentity(created.id, identity.id);
+    const created = await prisma.user.create({ data: { id: canonicalIdentity.id, email: canonicalIdentity.email } });
+    await linkAuthIdentity(created.id, canonicalIdentity.id);
     return created;
   } catch (error: unknown) {
     if (typeof error === "object" && error !== null && "code" in error && (error as { code?: unknown }).code === "P2002") {
-      const createdByAnotherRequest = await prisma.user.findUnique({ where: { email: identity.email } });
-      if (createdByAnotherRequest) {
-        await linkAuthIdentity(createdByAnotherRequest.id, identity.id);
+      const createdByAnotherRequest = await prisma.user.findUnique({ where: { email: canonicalIdentity.email } });
+      if (createdByAnotherRequest && canonicalIdentity.emailConfirmed) {
+        await linkAuthIdentity(createdByAnotherRequest.id, canonicalIdentity.id);
         return createdByAnotherRequest;
       }
     }
@@ -65,14 +71,17 @@ export async function isPlatformOwner(userId: string) {
 
 export const requireIdentity: RequestHandler = async (req, res, next) => {
   if (res.locals.identity) return next();
+  res.setHeader("Cache-Control", "no-store, private");
+  res.setHeader("Pragma", "no-cache");
   const token = req.header("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token || !config.SUPABASE_URL) return res.status(401).json({ error: "Unauthenticated" });
 
   const supabase = createClient(config.SUPABASE_URL, SUPABASE_AUTH_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
   const { data, error } = await supabase.auth.getUser(token);
-  if (error || !data.user?.email) return res.status(401).json({ error: "Invalid session" });
+  const authUser = data.user;
+  if (error || !authUser?.email) return res.status(401).json({ error: "Invalid session" });
 
-  const user = await ensureUser({ id: data.user.id, email: data.user.email });
+  const user = await ensureUser({ id: authUser.id, email: authUser.email, emailConfirmed: Boolean(authUser.email_confirmed_at) });
   res.locals.identity = { id: user.id, email: user.email };
   next();
 };
