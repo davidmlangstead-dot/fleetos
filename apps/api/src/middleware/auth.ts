@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { config, SUPABASE_AUTH_KEY } from "../config.js";
 import { prisma } from "../lib/prisma.js";
 
-type Identity = { id: string; email: string };
+type Identity = { id: string; email: string; emailConfirmed: boolean };
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
@@ -41,6 +41,7 @@ async function ensureUser(identity: Identity) {
 
   const existingByEmail = await prisma.user.findUnique({ where: { email: canonicalIdentity.email } });
   if (existingByEmail) {
+    if (!canonicalIdentity.emailConfirmed) throw new Error("Email confirmation is required before linking an existing FleetOS account");
     await linkAuthIdentity(existingByEmail.id, canonicalIdentity.id);
     return existingByEmail;
   }
@@ -52,7 +53,7 @@ async function ensureUser(identity: Identity) {
   } catch (error: unknown) {
     if (typeof error === "object" && error !== null && "code" in error && (error as { code?: unknown }).code === "P2002") {
       const createdByAnotherRequest = await prisma.user.findUnique({ where: { email: canonicalIdentity.email } });
-      if (createdByAnotherRequest) {
+      if (createdByAnotherRequest && canonicalIdentity.emailConfirmed) {
         await linkAuthIdentity(createdByAnotherRequest.id, canonicalIdentity.id);
         return createdByAnotherRequest;
       }
@@ -79,9 +80,8 @@ export const requireIdentity: RequestHandler = async (req, res, next) => {
   const { data, error } = await supabase.auth.getUser(token);
   const authUser = data.user;
   if (error || !authUser?.email) return res.status(401).json({ error: "Invalid session" });
-  if (!authUser.email_confirmed_at) return res.status(403).json({ error: "Email confirmation is required" });
 
-  const user = await ensureUser({ id: authUser.id, email: authUser.email });
+  const user = await ensureUser({ id: authUser.id, email: authUser.email, emailConfirmed: Boolean(authUser.email_confirmed_at) });
   res.locals.identity = { id: user.id, email: user.email };
   next();
 };
