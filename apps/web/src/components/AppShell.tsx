@@ -59,6 +59,7 @@ const roleLabels: Record<Role, string> = {
 function routeRoles(pathname: string) {
   if (pathname.startsWith("/control") || pathname.startsWith("/reseller")) return null;
   if (pathname.startsWith("/registers/")) return registerUsers;
+  if (pathname === "/settings/security" || pathname === "/settings/accessibility") return everyone;
   if (pathname === "/driver" || pathname === "/driver/tachograph" || pathname === "/my-work") return driverAppUsers;
   const allNav = [...officeNav, ...driverNav];
   return allNav.find(([path]) => path === pathname)?.[3] ?? null;
@@ -168,6 +169,7 @@ export function AppShell() {
           {accountOpen && <div className="account-menu">
             {canUseDriverMode && <button onClick={() => { setAccountOpen(false); window.location.href = inDriverMode ? "/" : "/driver"; }}><Truck size={16} /> {inDriverMode ? "Back to office" : "Driver mode"}</button>}
             {role && companyManagers.includes(role) && <button onClick={() => { setAccountOpen(false); window.location.href = "/settings/company"; }}><Building2 size={16} /> {t("shell.companySettings")}</button>}
+            <button onClick={() => { setAccountOpen(false); window.location.href = "/settings/security"; }}><ShieldCheck size={16} /> Security & sign-in</button>
             <button onClick={() => { setAccountOpen(false); window.location.href = "/settings/accessibility"; }}><UserRound size={16} /> {t("shell.accessibility")}</button>
             <button onClick={() => { setAccountOpen(false); void supabase.auth.signOut(); }}><LogOut size={16} /> {t("shell.signOut")}</button>
           </div>}
