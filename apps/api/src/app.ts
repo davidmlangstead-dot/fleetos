@@ -27,6 +27,7 @@ import { documentsRouter } from "./modules/documents/routes.js";
 import { reportsRouter } from "./modules/reports/routes.js";
 import { marketplaceRouter } from "./modules/marketplace/routes.js";
 import { medicRouter } from "./modules/medic/routes.js";
+import { medicAdvancedRouter } from "./modules/medic/advancedRoutes.js";
 import { notificationsRouter } from "./modules/notifications/routes.js";
 import { driverOperationsRouter } from "./modules/driver-operations/routes.js";
 import { driverFieldRouter } from "./modules/driver-operations/fieldRoutes.js";
@@ -121,6 +122,7 @@ app.use("/api/tachograph", sensitiveRateLimit, requireAuth, requireCommercialWri
 app.use("/api/reports", reportsRouter);
 app.use("/api/marketplace", requireAuth, requireCommercialWriteAccess, marketplaceRouter);
 app.use("/api/medic", sensitiveRateLimit, medicRouter);
+app.use("/api/medic/advanced", sensitiveRateLimit, medicAdvancedRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/driver-operations", sensitiveRateLimit, requireAuth, requireCommercialWriteAccess, idempotencyMiddleware, driverFieldRouter);
 app.use("/api/driver-operations", sensitiveRateLimit, requireAuth, requireCommercialWriteAccess, idempotencyMiddleware, driverOperationsRouter);
