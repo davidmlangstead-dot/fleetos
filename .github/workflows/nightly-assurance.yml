@@ -26,6 +26,8 @@ jobs:
       - run: pnpm --filter @fleetros/api exec prisma generate
       - run: pnpm build
       - name: Dependency vulnerability audit
+        id: dependency_audit
+        continue-on-error: true
         run: pnpm audit:deps
       - name: Production smoke test
         run: node scripts/smoke.mjs
@@ -37,6 +39,11 @@ jobs:
           FLEETOS_LOAD_STAGES: "5,10,25,50"
           FLEETOS_LOAD_MAX_ERROR_RATE: "0.01"
           FLEETOS_LOAD_MAX_P95_MS: "2500"
+      - name: Enforce dependency audit result
+        if: ${{ steps.dependency_audit.outcome == 'failure' }}
+        run: |
+          echo "Dependency vulnerability audit failed; reliability and security checks were still allowed to complete."
+          exit 1
 
   authenticated-assurance:
     name: Authenticated tenant assurance

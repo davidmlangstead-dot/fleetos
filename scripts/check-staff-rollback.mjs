@@ -7,7 +7,7 @@ const checks = [
   ["tracks only memberships created by the request", /let\s+createdMembershipId:\s*string\s*\|\s*null\s*=\s*null/],
   ["captures the inserted membership id", /\.from\("CompanyMembership"\)\.insert\([\s\S]*?\.select\("id"\)\.single\(\)/],
   ["stores created membership id after successful insert", /createdMembershipId\s*=\s*createdMembership\.id/],
-  ["rolls back only when a membership was created", /if\s*\(createdMembershipId\)\s*\{/],
+  ["rolls back only when a membership was created", /if\s*\(createdMembershipId\)\s*(?:\{|await\b)/],
   ["deletes the created membership during failure cleanup", /\.from\("CompanyMembership"\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\("id",\s*createdMembershipId\)[\s\S]*?\.eq\("companyId",\s*companyId\)/],
   ["preserves existing membership path", /if\s*\(!existingMembership\)\s*\{/],
 ];
