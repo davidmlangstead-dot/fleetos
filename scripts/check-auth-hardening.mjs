@@ -5,7 +5,7 @@ const vercel = fs.readFileSync("vercel.json", "utf8");
 const index = fs.readFileSync("apps/web/index.html", "utf8");
 
 const checks = [
-  ["confirmed email required", auth.includes("email_confirmed_at")],
+  ["email confirmation required before email-based account linking", auth.includes("emailConfirmed") && auth.includes("Email confirmation is required before linking")],
   ["tenant selected through membership", auth.includes("userId_companyId") && auth.includes("companyId: membership.companyId")],
   ["authenticated responses are not cached", auth.includes('Cache-Control", "no-store, private')],
   ["inline scripts removed from HTML", !/<script>(.|\n)*?<\/script>/i.test(index)],
