@@ -19,7 +19,9 @@ await check("Protected Workshop route",`${API}/api/operations/maintenance`,[401]
 await check("Protected document links",`${API}/api/documents/link-options`,[401]);
 await check("Protected Medic route",`${API}/api/medic/status`,[401]);
 await check("Protected driver operations",`${API}/api/driver-operations/me`,[401,404]);
-await check("Unknown API route",`${API}/api/__fleetos_smoke_missing__`,[404]);
+// Unknown /api paths are behind the authentication boundary, so an unauthenticated
+// request may correctly be challenged before the router reaches its final 404.
+await check("Unknown API route",`${API}/api/__fleetos_smoke_missing__`,[401,404]);
 await check("Web app",WEB,[200]);
 for(const item of checks)console.log(`${item.ok?"PASS":"FAIL"} ${item.name} (${item.status}, ${item.ms}ms)`);
 if(checks.some(item=>!item.ok))process.exit(1);
