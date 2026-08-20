@@ -21,20 +21,18 @@ medicAdvancedRouter.get("/status", asyncHandler(async (req, res) => {
 medicAdvancedRouter.get("/intelligence", asyncHandler(async (req, res) => {
   const company = await prisma.company.findUnique({ where: { id: req.user!.companyId }, select: { usesHgv: true, complianceSchemes: true } });
   const schemes = new Set((company?.complianceSchemes ?? []).map((item) => item.toUpperCase()));
-  const allowed = ["DVSA", "RHA", ...(schemes.has("FORS") ? ["FORS"] : []), ...(schemes.has("CLOCS") ? ["CLOCS"] : [])];
-  if (!company?.usesHgv) allowed.splice(allowed.indexOf("RHA"), 1);
+  const allowed = new Set(["DVSA", ...(company?.usesHgv ? ["RHA"] : []), ...(schemes.has("FORS") ? ["FORS"] : []), ...(schemes.has("CLOCS") ? ["CLOCS"] : [])]);
   try {
     const rows = await prisma.$queryRaw<Array<{ id: string; source: string; title: string; url: string; severity: string; topics: string[]; publishedAt: Date | null; firstSeenAt: Date }>>`
       SELECT id,source,title,url,severity,topics,"publishedAt","firstSeenAt"
       FROM "ComplianceIntelligenceItem"
-      WHERE source = ANY(${allowed})
-        AND COALESCE("publishedAt","firstSeenAt") > NOW()-INTERVAL '60 days'
+      WHERE COALESCE("publishedAt","firstSeenAt") > NOW()-INTERVAL '60 days'
       ORDER BY CASE severity WHEN 'CRITICAL' THEN 0 WHEN 'WARNING' THEN 1 ELSE 2 END,
                COALESCE("publishedAt","firstSeenAt") DESC
-      LIMIT 50
+      LIMIT 100
     `;
-    res.json({ sources: allowed, items: rows });
+    res.json({ sources: [...allowed], items: rows.filter((row) => allowed.has(row.source)).slice(0, 50) });
   } catch {
-    res.json({ sources: allowed, items: [], note: "Compliance intelligence has not completed its first storage migration/sweep yet." });
+    res.json({ sources: [...allowed], items: [], note: "Compliance intelligence has not completed its first storage migration/sweep yet." });
   }
 }));
