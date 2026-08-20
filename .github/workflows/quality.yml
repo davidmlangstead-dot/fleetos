@@ -35,6 +35,8 @@ jobs:
         run: node scripts/check-role-contract.mjs
       - name: Staff rollback safety contract
         run: node scripts/check-staff-rollback.mjs
+      - name: Auth and browser hardening contract
+        run: node scripts/check-auth-hardening.mjs
       - name: Web bundle performance budget
         run: node scripts/check-web-bundle.mjs
       - name: PWA installability contract
@@ -53,8 +55,11 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Dependency vulnerability audit
+      - name: Runtime dependency vulnerability audit
         run: pnpm audit:deps
+      - name: Build-tool dependency advisory
+        continue-on-error: true
+        run: pnpm audit:tooling
 
   production-assurance:
     runs-on: ubuntu-latest
@@ -70,13 +75,18 @@ jobs:
       - name: Security perimeter test
         run: node scripts/security-smoke.mjs
       - name: Authenticated tenant isolation
+        if: ${{ secrets.FLEETOS_SECURITY_TOKEN_A != '' && secrets.FLEETOS_SECURITY_TOKEN_B != '' && secrets.FLEETOS_SECURITY_COMPANY_A != '' && secrets.FLEETOS_SECURITY_COMPANY_B != '' }}
         run: node scripts/tenant-attack.mjs
         env:
           FLEETOS_SECURITY_TOKEN_A: ${{ secrets.FLEETOS_SECURITY_TOKEN_A }}
           FLEETOS_SECURITY_TOKEN_B: ${{ secrets.FLEETOS_SECURITY_TOKEN_B }}
           FLEETOS_SECURITY_COMPANY_A: ${{ secrets.FLEETOS_SECURITY_COMPANY_A }}
           FLEETOS_SECURITY_COMPANY_B: ${{ secrets.FLEETOS_SECURITY_COMPANY_B }}
+      - name: Tenant isolation coverage notice
+        if: ${{ secrets.FLEETOS_SECURITY_TOKEN_A == '' || secrets.FLEETOS_SECURITY_TOKEN_B == '' || secrets.FLEETOS_SECURITY_COMPANY_A == '' || secrets.FLEETOS_SECURITY_COMPANY_B == '' }}
+        run: echo "Authenticated cross-tenant attack coverage is not configured in GitHub secrets; perimeter and tenant-selection contracts still run."
       - name: Authenticated read load
+        if: ${{ secrets.FLEETOS_SECURITY_TOKEN_A != '' && secrets.FLEETOS_SECURITY_COMPANY_A != '' }}
         run: node scripts/authenticated-load.mjs
         env:
           FLEETOS_SECURITY_TOKEN_A: ${{ secrets.FLEETOS_SECURITY_TOKEN_A }}
