@@ -25,6 +25,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @fleetros/api exec prisma generate
       - run: pnpm build
+      - name: Backstage Medic health sweep
+        run: pnpm medic:background
       - name: Dependency vulnerability audit
         id: dependency_audit
         continue-on-error: true
