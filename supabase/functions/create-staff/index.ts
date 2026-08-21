@@ -140,9 +140,14 @@ Deno.serve(async (req) => {
         const { data: existingFleetUser } = await admin.from("User").select("id,email").ilike("email", normalizedEmail).maybeSingle();
 
         if (existingFleetUser?.id) {
-          linkedUserId = existingFleetUser.id;
-          inviteDelivery = "EXISTING_ACCOUNT";
-        } else {
+          const { data: existingAuthUser, error: existingAuthError } = await admin.auth.admin.getUserById(existingFleetUser.id);
+          if (!existingAuthError && existingAuthUser.user) {
+            linkedUserId = existingFleetUser.id;
+            inviteDelivery = "EXISTING_ACCOUNT";
+          }
+        }
+
+        if (!linkedUserId) {
           const metadata = { firstName: firstName.trim(), lastName: lastName.trim(), personType, accessRole, brandName: inviteBrandName, companySlug: company.slug };
           const hasBrandedSender = Boolean(Deno.env.get("RESEND_API_KEY") && Deno.env.get("RIVETWAY_INVITE_FROM"));
           if (hasBrandedSender) {
@@ -152,8 +157,8 @@ Deno.serve(async (req) => {
               options: { redirectTo: inviteRedirect, data: metadata },
             });
             if (linkError || !linkData?.user?.id || !linkData?.properties?.action_link) throw new Error(linkError?.message ?? "Could not create the staff invitation link");
-            linkedUserId = linkData.user.id;
             createdAuthUserId = linkData.user.id;
+            linkedUserId = existingFleetUser?.id ?? linkData.user.id;
             const delivery = await sendBrandedInvite({
               to: normalizedEmail,
               firstName: firstName.trim(),
@@ -177,8 +182,8 @@ Deno.serve(async (req) => {
               redirectTo: inviteRedirect,
             });
             if (fallbackError || !fallbackInvite.user?.id) throw new Error(fallbackError?.message ?? "The staff invitation could not be sent");
-            linkedUserId = fallbackInvite.user.id;
             createdAuthUserId = fallbackInvite.user.id;
+            linkedUserId = existingFleetUser?.id ?? fallbackInvite.user.id;
             invited = true;
             inviteDelivery = "SUPABASE_EMAIL";
           }
