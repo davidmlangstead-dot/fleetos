@@ -16,7 +16,15 @@ const jobReaders = requireRoles("DRIVER", "WORKSHOP_TECHNICIAN", "TRANSPORT_PLAN
 const jobRegisterReaders = requireRoles("TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN");
 const jobWriters = requireRoles("TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN");
 const jobStatuses = ["DRAFT", "PLANNED", "ASSIGNED", "SCHEDULED", "DISPATCHED", "TRAVELLING", "ON_SITE", "PAUSED", "IN_PROGRESS", "DELIVERED", "COMPLETED", "COMPLETED_ISSUES", "CLOSED", "CANCELLED"] as const;
-const fieldStatuses = new Set(["ACCEPTED", "TRAVELLING", "ON_SITE", "PAUSED", "COMPLETED", "COMPLETED_ISSUES"]);
+const fieldStatuses = new Set(["TRAVELLING", "ON_SITE", "IN_PROGRESS", "PAUSED"]);
+const fieldTransitions: Record<string, readonly string[]> = {
+  DISPATCHED: ["TRAVELLING", "ON_SITE"],
+  TRAVELLING: ["ON_SITE"],
+  ON_SITE: ["IN_PROGRESS"],
+  IN_PROGRESS: ["PAUSED"],
+  PAUSED: ["IN_PROGRESS"],
+};
+const terminalStatuses = new Set(["COMPLETED", "COMPLETED_ISSUES", "CLOSED", "CANCELLED"]);
 
 const formField = z.object({
   key: z.string().trim().regex(/^[a-z][a-z0-9_]{1,39}$/), label: z.string().trim().min(1).max(120),
@@ -307,7 +315,7 @@ jobsRouter.post("/", jobWriters, asyncHandler(async (req,res)=>{
     let driverId:string|null=null; for(const person of people){if(!driverId&&person.email){const d=await tx.driver.findFirst({where:{companyId,email:{equals:person.email,mode:"insensitive"},isActive:true},select:{id:true}});driverId=d?.id??null;}}
     const status=input.scheduledStart?"SCHEDULED":people.length?"ASSIGNED":"PLANNED";
     await tx.$executeRaw`INSERT INTO "Job" (id,"companyId","jobTypeId","jobNumber",title,description,priority,source,"customerId","siteId","assetId","customerName","collectionAddress","collectionPostcode","scheduledStart","scheduledEnd","dueAt","collectionDateTime","deliveryDateTime","estimatedDurationMinutes","contactName","contactPhone","contactEmail","purchaseOrderNumber","quotePence","estimatedCostPence","customFields","workflowSnapshot","worksheetSchema","worksheetResponses","riskAssessment","customerSignature","vehicleId","driverId",instructions,status,"createdAt","updatedAt") VALUES (${jobId},${companyId},${type.id}::uuid,${reference},${input.title},${input.description||null},${input.priority},${input.source},${customerId}::uuid,${siteId}::uuid,${input.assetId||null}::uuid,${customerName},${siteAddress},${sitePostcode||null},${input.scheduledStart||null},${input.scheduledEnd||null},${input.dueAt||null},${input.scheduledStart||null},${input.scheduledEnd||null},${input.estimatedDurationMinutes||type.defaultDurationMinutes},${input.contactName||null},${input.contactPhone||null},${input.contactEmail||null},${input.purchaseOrderNumber||null},${input.quotePence||null},${input.estimatedCostPence||null},${JSON.stringify(input.customFields)}::jsonb,${JSON.stringify(type.workflow)}::jsonb,${JSON.stringify(type.formSchema)}::jsonb,'{}'::jsonb,'{}'::jsonb,'{}'::jsonb,${input.vehicleId||null},${driverId},${input.description||null},${status}::"JobStatus",NOW(),NOW())`;
-    await tx.$executeRaw`INSERT INTO "JobVisit" (id,"companyId","jobId",sequence,title,status,"scheduledStart","scheduledEnd","createdAt","updatedAt") VALUES (${visitId}::uuid,${companyId},${jobId},1,'Initial visit',${input.scheduledStart?"SCHEDULED":"SCHEDULED"},${input.scheduledStart||null},${input.scheduledEnd||null},NOW(),NOW())`;
+    await tx.$executeRaw`INSERT INTO "JobVisit" (id,"companyId","jobId",sequence,title,status,"scheduledStart","scheduledEnd","createdAt","updatedAt") VALUES (${visitId}::uuid,${companyId},${jobId},1,'Initial visit',${status},${input.scheduledStart||null},${input.scheduledEnd||null},NOW(),NOW())`;
     for(const person of people) await tx.$executeRaw`INSERT INTO "JobAssignment" (id,"companyId","jobId","personId",role,status,"assignedAt") VALUES (${randomUUID()}::uuid,${companyId},${jobId},${person.id},'ASSIGNEE','ASSIGNED',NOW())`;
     await tx.$executeRaw`INSERT INTO "JobTimelineEntry" (id,"companyId","jobId",type,summary,detail,metadata,"createdById","createdAt") VALUES (${randomUUID()}::uuid,${companyId},${jobId},'CREATED',${`Job ${reference} created`},${input.description||null},${JSON.stringify({jobType:type.name,assigned:people.length})}::jsonb,${req.user!.id},NOW())`;
   });
@@ -334,16 +342,28 @@ jobsRouter.get("/:id", jobReaders, asyncHandler(async(req,res)=>{
 
 jobsRouter.post("/:id/issue", jobWriters, asyncHandler(async(req,res)=>{
   const input=lifecycleNoteInput.parse(req.body); const companyId=req.user!.companyId;
+  const current=(await prisma.$queryRaw<Array<{id:string;reference:string|null;status:string;assignmentCount:number}>>`
+    SELECT j.id,j."jobNumber" AS reference,j.status::text,count(ja.id)::int AS "assignmentCount"
+    FROM "Job" j LEFT JOIN "JobAssignment" ja ON ja."jobId"=j.id AND ja."companyId"=j."companyId"
+    WHERE j.id=${req.params.id} AND j."companyId"=${companyId}
+    GROUP BY j.id,j."jobNumber",j.status
+  `)[0];
+  if(!current) return res.status(404).json({error:"Job not found"});
+  if(current.status==="DISPATCHED") return res.json({ok:true,status:current.status});
+  if(!["DRAFT","PLANNED","ASSIGNED","SCHEDULED"].includes(current.status)) return res.status(409).json({error:`This job cannot be issued while it is ${current.status.toLowerCase().replaceAll("_"," ")}`});
+  if(current.assignmentCount<1) return res.status(409).json({error:"Assign at least one active staff member before issuing the job"});
   const rows=await prisma.$queryRaw<Array<{id:string;reference:string|null;title:string|null;status:string;issuedToDriverAt:Date|null}>>`
     UPDATE "Job"
-    SET status=CASE WHEN status IN ('DRAFT','PLANNED','ASSIGNED','SCHEDULED') THEN 'DISPATCHED'::"JobStatus" ELSE status END,
-      "issuedToDriverAt"=COALESCE("issuedToDriverAt",NOW()),"updatedAt"=NOW()
+    SET status='DISPATCHED'::"JobStatus","issuedToDriverAt"=COALESCE("issuedToDriverAt",NOW()),"updatedAt"=NOW()
     WHERE id=${req.params.id} AND "companyId"=${companyId}
     RETURNING id,"jobNumber" AS reference,title,status::text,"issuedToDriverAt"
   `;
   if(!rows[0]) return res.status(404).json({error:"Job not found"});
-  await prisma.$executeRaw`INSERT INTO "JobTimelineEntry" (id,"companyId","jobId",type,summary,detail,metadata,"createdById","createdAt") VALUES (${randomUUID()}::uuid,${companyId},${req.params.id},'ISSUED','Job sheet issued to driver',${input.note||null},${JSON.stringify({stage:"OFFICE_TO_DRIVER"})}::jsonb,${req.user!.id},NOW())`;
-  await writeAuditEvent({companyId,actorUserId:req.user!.id,actorEmail:req.user!.email,action:"ISSUE",entityType:"JOB",entityId:req.params.id,summary:`Issued job sheet ${rows[0].reference??rows[0].id} to driver`,metadata:{stage:"OFFICE_TO_DRIVER"}});
+  await prisma.$transaction([
+    prisma.$executeRaw`UPDATE "JobVisit" SET status='DISPATCHED',"updatedAt"=NOW() WHERE "jobId"=${req.params.id} AND "companyId"=${companyId} AND sequence=(SELECT max(sequence) FROM "JobVisit" WHERE "jobId"=${req.params.id} AND "companyId"=${companyId})`,
+    prisma.$executeRaw`INSERT INTO "JobTimelineEntry" (id,"companyId","jobId",type,summary,detail,metadata,"createdById","createdAt") VALUES (${randomUUID()}::uuid,${companyId},${req.params.id},'ISSUED','Job sheet issued to field staff',${input.note||null},${JSON.stringify({stage:"OFFICE_TO_FIELD"})}::jsonb,${req.user!.id},NOW())`,
+  ]);
+  await writeAuditEvent({companyId,actorUserId:req.user!.id,actorEmail:req.user!.email,action:"ISSUE",entityType:"JOB",entityId:req.params.id,summary:`Issued job sheet ${rows[0].reference??rows[0].id} to field staff`,metadata:{stage:"OFFICE_TO_FIELD"}});
   res.json({ok:true,status:rows[0].status,issuedToDriverAt:rows[0].issuedToDriverAt});
 }));
 
@@ -351,21 +371,22 @@ jobsRouter.post("/:id/submit", asyncHandler(async(req,res)=>{
   const input=lifecycleNoteInput.parse(req.body); const companyId=req.user!.companyId;
   if(req.user!.role==="FINANCE") return res.status(403).json({error:"Finance access is read only"});
   if(!(await canAccessJob(req.user!,req.params.id))) return res.status(403).json({error:"You do not have access to submit this job sheet"});
-  const current=(await prisma.$queryRaw<Array<{worksheetSchema:FormField[];worksheetResponses:Record<string,unknown>;riskAssessment:Record<string,unknown>;customerSignature:Record<string,unknown>;riskAssessmentRequired:boolean;customerSignatureRequired:boolean;reference:string|null}>>`
-    SELECT j."worksheetSchema",j."worksheetResponses",j."riskAssessment",j."customerSignature",j."jobNumber" AS reference,
+  const current=(await prisma.$queryRaw<Array<{status:string;worksheetSchema:FormField[];worksheetResponses:Record<string,unknown>;riskAssessment:Record<string,unknown>;customerSignature:Record<string,unknown>;riskAssessmentRequired:boolean;customerSignatureRequired:boolean;reference:string|null}>>`
+    SELECT j.status::text,j."worksheetSchema",j."worksheetResponses",j."riskAssessment",j."customerSignature",j."jobNumber" AS reference,
       COALESCE(jt."riskAssessmentRequired",false) AS "riskAssessmentRequired",COALESCE(jt."customerSignatureRequired",false) AS "customerSignatureRequired"
     FROM "Job" j LEFT JOIN "JobType" jt ON jt.id=j."jobTypeId"
     WHERE j.id=${req.params.id} AND j."companyId"=${companyId} LIMIT 1
   `)[0];
   if(!current) return res.status(404).json({error:"Job not found"});
+  if(!["IN_PROGRESS","PAUSED"].includes(current.status)) return res.status(409).json({error:"Start the job before completing and sending its report"});
   const missing=assertCompleteJobSheet(current);
   if(missing) return res.status(409).json({error:missing});
   await prisma.$transaction([
     prisma.$executeRaw`UPDATE "Job" SET status='COMPLETED'::"JobStatus","submittedByDriverAt"=COALESCE("submittedByDriverAt",NOW()),"completedAt"=COALESCE("completedAt",NOW()),"updatedAt"=NOW() WHERE id=${req.params.id} AND "companyId"=${companyId}`,
     prisma.$executeRaw`UPDATE "JobVisit" SET status='COMPLETED',"actualEnd"=COALESCE("actualEnd",NOW()),"updatedAt"=NOW() WHERE "jobId"=${req.params.id} AND "companyId"=${companyId} AND sequence=(SELECT max(sequence) FROM "JobVisit" WHERE "jobId"=${req.params.id} AND "companyId"=${companyId})`,
-    prisma.$executeRaw`INSERT INTO "JobTimelineEntry" (id,"companyId","jobId",type,summary,detail,metadata,"createdById","createdAt") VALUES (${randomUUID()}::uuid,${companyId},${req.params.id},'SUBMITTED','Driver submitted completed job sheet to office',${input.note||null},${JSON.stringify({stage:"DRIVER_TO_OFFICE"})}::jsonb,${req.user!.id},NOW())`,
+    prisma.$executeRaw`INSERT INTO "JobTimelineEntry" (id,"companyId","jobId",type,summary,detail,metadata,"createdById","createdAt") VALUES (${randomUUID()}::uuid,${companyId},${req.params.id},'SUBMITTED','Field staff submitted completed job sheet to office',${input.note||null},${JSON.stringify({stage:"FIELD_TO_OFFICE"})}::jsonb,${req.user!.id},NOW())`,
   ]);
-  await writeAuditEvent({companyId,actorUserId:req.user!.id,actorEmail:req.user!.email,action:"SUBMIT",entityType:"JOB",entityId:req.params.id,summary:`Driver submitted job sheet ${current.reference??req.params.id} to office`,metadata:{stage:"DRIVER_TO_OFFICE"}});
+  await writeAuditEvent({companyId,actorUserId:req.user!.id,actorEmail:req.user!.email,action:"SUBMIT",entityType:"JOB",entityId:req.params.id,summary:`Field staff submitted job sheet ${current.reference??req.params.id} to office`,metadata:{stage:"FIELD_TO_OFFICE"}});
   res.json({ok:true,status:"COMPLETED",submittedByDriverAt:new Date().toISOString()});
 }));
 
@@ -373,7 +394,7 @@ jobsRouter.post("/:id/approve", jobWriters, asyncHandler(async(req,res)=>{
   const input=lifecycleNoteInput.parse(req.body); const companyId=req.user!.companyId;
   const rows=await prisma.$queryRaw<Array<{id:string;reference:string|null;submittedByDriverAt:Date|null}>>`SELECT id,"jobNumber" AS reference,"submittedByDriverAt" FROM "Job" WHERE id=${req.params.id} AND "companyId"=${companyId} LIMIT 1`;
   if(!rows[0]) return res.status(404).json({error:"Job not found"});
-  if(!rows[0].submittedByDriverAt) return res.status(409).json({error:"The driver must submit the completed job sheet before office approval"});
+  if(!rows[0].submittedByDriverAt) return res.status(409).json({error:"Field staff must submit the completed job sheet before office approval"});
   await prisma.$transaction([
     prisma.$executeRaw`UPDATE "Job" SET status='CLOSED'::"JobStatus","officeApprovedAt"=COALESCE("officeApprovedAt",NOW()),"updatedAt"=NOW() WHERE id=${req.params.id} AND "companyId"=${companyId}`,
     prisma.$executeRaw`INSERT INTO "JobTimelineEntry" (id,"companyId","jobId",type,summary,detail,metadata,"createdById","createdAt") VALUES (${randomUUID()}::uuid,${companyId},${req.params.id},'APPROVED','Office checked and approved the job sheet',${input.note||null},${JSON.stringify({stage:"OFFICE_APPROVED"})}::jsonb,${req.user!.id},NOW())`,
@@ -427,18 +448,19 @@ jobsRouter.patch("/:id/status", asyncHandler(async(req,res)=>{
   const input=statusInput.parse(req.body); const companyId=req.user!.companyId; const office=officeRoles.has(req.user!.role);
   if(req.user!.role==="FINANCE") return res.status(403).json({error:"Finance access is read only"});
   if(!office&&!(await canAccessJob(req.user!,req.params.id))) return res.status(403).json({error:"You are not assigned to this job"});
-  if(!office&&!fieldStatuses.has(input.status)) return res.status(403).json({error:"This status can only be set by the office"});
-  if(["COMPLETED","COMPLETED_ISSUES","CLOSED"].includes(input.status)){
-    const current=(await prisma.$queryRaw<Array<{worksheetSchema:FormField[];worksheetResponses:Record<string,unknown>;riskAssessment:Record<string,unknown>;customerSignature:Record<string,unknown>;riskAssessmentRequired:boolean;customerSignatureRequired:boolean}>>`SELECT j."worksheetSchema",j."worksheetResponses",j."riskAssessment",j."customerSignature",COALESCE(jt."riskAssessmentRequired",false) AS "riskAssessmentRequired",COALESCE(jt."customerSignatureRequired",false) AS "customerSignatureRequired" FROM "Job" j LEFT JOIN "JobType" jt ON jt.id=j."jobTypeId" WHERE j.id=${req.params.id} AND j."companyId"=${companyId} LIMIT 1`)[0];
-    if(!current) return res.status(404).json({error:"Job not found"});
-    const missing=current.worksheetSchema.filter(field=>field.required).find(field=>current.worksheetResponses[field.key]===undefined||current.worksheetResponses[field.key]===null||current.worksheetResponses[field.key]===""||current.worksheetResponses[field.key]===false);
-    if(missing) return res.status(409).json({error:`Complete the required job-sheet field before closing: ${missing.label}`});
-    if(current.riskAssessmentRequired&&current.riskAssessment.safeToProceed!==true) return res.status(409).json({error:"Complete the point-of-work risk assessment before closing this job"});
-    if(current.customerSignatureRequired&&!current.customerSignature.name) return res.status(409).json({error:"Capture the customer signature before closing this job"});
+  const current=(await prisma.$queryRaw<Array<{status:string;riskAssessment:Record<string,unknown>;riskAssessmentRequired:boolean}>>`SELECT j.status::text,j."riskAssessment",COALESCE(jt."riskAssessmentRequired",false) AS "riskAssessmentRequired" FROM "Job" j LEFT JOIN "JobType" jt ON jt.id=j."jobTypeId" WHERE j.id=${req.params.id} AND j."companyId"=${companyId} LIMIT 1`)[0];
+  if(!current) return res.status(404).json({error:"Job not found"});
+  if(input.status===current.status) return res.json({ok:true,status:input.status});
+  if(office){
+    if(input.status!=="CANCELLED"||terminalStatuses.has(current.status)) return res.status(409).json({error:"Use the job lifecycle actions instead of skipping stages"});
+  }else{
+    if(!fieldStatuses.has(input.status)) return res.status(403).json({error:"This status can only be set by the office"});
+    if(!(fieldTransitions[current.status]??[]).includes(input.status)) return res.status(409).json({error:`Move this job from ${current.status.toLowerCase().replaceAll("_"," ")} using the next available action`});
+    if(input.status==="IN_PROGRESS"&&current.riskAssessmentRequired&&current.riskAssessment.safeToProceed!==true) return res.status(409).json({error:"Complete and save the point-of-work risk assessment before starting work"});
   }
   const rows=await prisma.$queryRaw<Array<{id:string}>>`UPDATE "Job" SET status=${input.status}::"JobStatus","completedAt"=CASE WHEN ${input.status} IN ('COMPLETED','COMPLETED_ISSUES','CLOSED') THEN COALESCE("completedAt",NOW()) ELSE "completedAt" END,"updatedAt"=NOW() WHERE id=${req.params.id} AND "companyId"=${companyId} RETURNING id`;
   if(!rows[0]) return res.status(404).json({error:"Job not found"});
-  await prisma.$transaction([prisma.$executeRaw`UPDATE "JobVisit" SET status=CASE WHEN ${input.status} IN ('DISPATCHED','TRAVELLING','ON_SITE','PAUSED','COMPLETED','COMPLETED_ISSUES','CANCELLED') THEN ${input.status} ELSE status END,"actualStart"=CASE WHEN ${input.status}='ON_SITE' THEN COALESCE("actualStart",NOW()) ELSE "actualStart" END,"actualEnd"=CASE WHEN ${input.status} IN ('COMPLETED','COMPLETED_ISSUES') THEN COALESCE("actualEnd",NOW()) ELSE "actualEnd" END,"updatedAt"=NOW() WHERE "jobId"=${req.params.id} AND "companyId"=${companyId} AND sequence=(SELECT max(sequence) FROM "JobVisit" WHERE "jobId"=${req.params.id} AND "companyId"=${companyId})`,prisma.$executeRaw`INSERT INTO "JobTimelineEntry" (id,"companyId","jobId",type,summary,detail,"createdById","createdAt") VALUES (${randomUUID()}::uuid,${companyId},${req.params.id},'STATUS',${`Status changed to ${input.status}`},${input.note||null},${req.user!.id},NOW())`]);
+  await prisma.$transaction([prisma.$executeRaw`UPDATE "JobVisit" SET status=${input.status},"actualStart"=CASE WHEN ${input.status}='IN_PROGRESS' THEN COALESCE("actualStart",NOW()) ELSE "actualStart" END,"updatedAt"=NOW() WHERE "jobId"=${req.params.id} AND "companyId"=${companyId} AND sequence=(SELECT max(sequence) FROM "JobVisit" WHERE "jobId"=${req.params.id} AND "companyId"=${companyId})`,prisma.$executeRaw`INSERT INTO "JobTimelineEntry" (id,"companyId","jobId",type,summary,detail,"createdById","createdAt") VALUES (${randomUUID()}::uuid,${companyId},${req.params.id},'STATUS',${`Status changed to ${input.status}`},${input.note||null},${req.user!.id},NOW())`]);
   await writeAuditEvent({companyId,actorUserId:req.user!.id,actorEmail:req.user!.email,action:"UPDATE",entityType:"JOB",entityId:req.params.id,summary:`Job moved to ${input.status}`}); res.json({ok:true,status:input.status});
 }));
 
@@ -446,7 +468,6 @@ jobsRouter.post("/:id/worksheet", asyncHandler(async(req,res)=>{
   const input=worksheetInput.parse(req.body); const companyId=req.user!.companyId;
   if(!(await canAccessJob(req.user!,req.params.id))) return res.status(403).json({error:"You do not have access to this job"});
   const jobs=await prisma.$queryRaw<Array<{worksheetSchema:FormField[]}>>`SELECT "worksheetSchema" FROM "Job" WHERE id=${req.params.id} AND "companyId"=${companyId}`; if(!jobs[0]) return res.status(404).json({error:"Job not found"});
-  const missing=jobs[0].worksheetSchema.filter(f=>f.required).find(f=>input.responses[f.key]===undefined||input.responses[f.key]===null||input.responses[f.key]===""||input.responses[f.key]===false); if(missing) return res.status(400).json({error:`Complete required worksheet field: ${missing.label}`});
   const signature=input.customerSignature?{...input.customerSignature,signedAt:(input.customerSignature.signedAt??new Date()).toISOString()}:undefined;
   await prisma.$transaction([prisma.$executeRaw`UPDATE "Job" SET "worksheetResponses"=${JSON.stringify(input.responses)}::jsonb,"riskAssessment"=COALESCE(${input.riskAssessment?JSON.stringify(input.riskAssessment):null}::jsonb,"riskAssessment"),"customerSignature"=COALESCE(${signature?JSON.stringify(signature):null}::jsonb,"customerSignature"),"updatedAt"=NOW() WHERE id=${req.params.id} AND "companyId"=${companyId}`,prisma.$executeRaw`INSERT INTO "JobTimelineEntry" (id,"companyId","jobId",type,summary,"createdById","createdAt") VALUES (${randomUUID()}::uuid,${companyId},${req.params.id},'WORKSHEET','Job worksheet updated',${req.user!.id},NOW())`]);
   res.json({ok:true});
@@ -462,3 +483,4 @@ jobsRouter.post("/:id/costs", asyncHandler(async(req,res)=>{
   const financialAccess=officeRoles.has(req.user!.role)||req.user!.role==="FINANCE";const unitCostPence=financialAccess?input.unitCostPence:0;const unitSellPence=financialAccess?input.unitSellPence:0;
   const rows=await prisma.$queryRaw<Array<{id:string}>>`INSERT INTO "JobCostLine" (id,"companyId","jobId",category,description,quantity,"unitCostPence","unitSellPence","createdById","createdAt") SELECT ${id}::uuid,${req.user!.companyId},id,${input.category},${input.description},${input.quantity},${unitCostPence},${unitSellPence},${req.user!.id},NOW() FROM "Job" WHERE id=${req.params.id} AND "companyId"=${req.user!.companyId} RETURNING id::text`;if(!rows[0]) return res.status(404).json({error:"Job not found"});res.status(201).json({id,...input,unitCostPence,unitSellPence});
 }));
+
