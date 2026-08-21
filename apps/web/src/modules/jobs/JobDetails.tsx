@@ -165,4 +165,3 @@ export function JobDetails({id,onClose,onChanged,fieldMode=false}:{id:string;onC
     </>}
   </section>;
 }
-
