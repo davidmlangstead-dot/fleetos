@@ -419,4 +419,3 @@ export function createCustomerJobReportPdf(report: CustomerJobReport, sourceImag
   parts.push(Buffer.from(tail));
   return Buffer.concat(parts);
 }
-
