@@ -7,6 +7,8 @@ import { config } from "../../config.js";
 import { prisma } from "../../lib/prisma.js";
 import { writeAuditEvent } from "../../lib/audit.js";
 import { requireAuth, requireRoles } from "../../middleware/auth.js";
+import { createClient } from "@supabase/supabase-js";
+import { createCustomerJobReportPdf, type CustomerJobReport, type ReportImage } from "./customerReportPdf.js";
 
 type FormField = { key: string; label: string; type: "TEXT" | "TEXTAREA" | "NUMBER" | "DATE" | "CHECKBOX" | "SELECT"; required: boolean; options?: string[] };
 type JobTypeRow = { id: string; name: string; trade: string; description: string | null; colour: string; defaultPriority: string; defaultDurationMinutes: number; workflow: string[]; formSchema: FormField[]; requiredSkills: string[]; riskAssessmentRequired: boolean; customerSignatureRequired: boolean; isSystem: boolean; isActive: boolean };
@@ -90,6 +92,20 @@ type JobReportRow = {
   riskAssessment: Record<string, unknown>;
   customerSignature: Record<string, unknown>;
   registration: string | null;
+  accessNotes: string | null;
+  assetName: string | null;
+  assetReference: string | null;
+  manufacturer: string | null;
+  model: string | null;
+  serialNumber: string | null;
+  purchaseOrderNumber: string | null;
+  scheduledEnd: Date | null;
+  companyName: string;
+  companyAddress: string | null;
+  companyPostcode: string | null;
+  companyPhone: string | null;
+  companyVatNumber: string | null;
+  companyOperatorLicenceNumber: string | null;
 };
 
 function valueText(value: unknown) {
@@ -111,6 +127,9 @@ function assertCompleteJobSheet(job: Pick<JobReportRow, "worksheetSchema" | "wor
     return value === undefined || value === null || value === "" || value === false;
   });
   if (missing) return `Complete the required job-sheet field before submitting: ${missing.label}`;
+  const customerReportFields: Array<[string,string]> = [["report_summary","Outcome summary / what happened"],["report_work_completed","Work carried out"],["report_findings","Findings / condition"],["report_recommendations","Recommendations / further work"]];
+  const missingReportField=customerReportFields.find(([key])=>!String(job.worksheetResponses[key]??"").trim());
+  if(missingReportField)return `Complete the customer report field before submitting: ${missingReportField[1]}`;
   if (job.riskAssessmentRequired && job.riskAssessment.safeToProceed !== true) return "Complete the point-of-work risk assessment before submitting this job";
   if (job.customerSignatureRequired && !job.customerSignature.name) return "Capture the customer signature before submitting this job";
   return null;
@@ -119,57 +138,53 @@ function assertCompleteJobSheet(job: Pick<JobReportRow, "worksheetSchema" | "wor
 async function loadReportJob(companyId: string, jobId: string) {
   return (await prisma.$queryRaw<JobReportRow[]>`
     SELECT j.id,j."jobNumber" AS reference,j.title,j.description,j.status::text,j.priority,COALESCE(c.name,j."customerName") AS "customerName",
-      j."contactEmail",j."contactName",s.name AS "siteName",COALESCE(s.address,j."collectionAddress") AS "siteAddress",COALESCE(s.postcode,j."collectionPostcode") AS "sitePostcode",
-      j."scheduledStart",j."completedAt",j."issuedToDriverAt",j."submittedByDriverAt",j."officeApprovedAt",j."reportGeneratedAt",j."reportEmailedAt",
-      j."worksheetSchema",j."worksheetResponses",j."riskAssessment",j."customerSignature",v.registration
+      j."contactEmail",j."contactName",s.name AS "siteName",COALESCE(s.address,j."collectionAddress") AS "siteAddress",COALESCE(s.postcode,j."collectionPostcode") AS "sitePostcode",s."accessNotes",
+      j."scheduledStart",j."scheduledEnd",j."completedAt",j."issuedToDriverAt",j."submittedByDriverAt",j."officeApprovedAt",j."reportGeneratedAt",j."reportEmailedAt",j."purchaseOrderNumber",
+      j."worksheetSchema",j."worksheetResponses",j."riskAssessment",j."customerSignature",v.registration,a.name AS "assetName",a."assetReference",a.manufacturer,a.model,a."serialNumber",
+      co.name AS "companyName",co.address AS "companyAddress",co.postcode AS "companyPostcode",co.phone AS "companyPhone",co."vatNumber" AS "companyVatNumber",co."operatorLicenceNumber" AS "companyOperatorLicenceNumber"
     FROM "Job" j
     LEFT JOIN "Customer" c ON c.id=j."customerId"
     LEFT JOIN "CustomerSite" s ON s.id=j."siteId"
     LEFT JOIN "Vehicle" v ON v.id=j."vehicleId"
+    LEFT JOIN "SiteAsset" a ON a.id=j."assetId"
+    JOIN "Company" co ON co.id=j."companyId"
     WHERE j.id=${jobId} AND j."companyId"=${companyId}
     LIMIT 1
   `)[0] ?? null;
 }
 
-function pdfEscape(text: string) {
-  return text.replaceAll("\\", "\\\\").replaceAll("(", "\\(").replaceAll(")", "\\)").replaceAll(/[^\x20-\x7e]/g,"-");
-}
-
-function createJobReportPdf(job: JobReportRow, timeline: Array<{ summary: string; createdAt: Date }>) {
-  const sections:Array<{heading:string;lines:string[]}>= [
-    {heading:"Job details",lines:[`Reference: ${job.reference??job.id}`,`Title: ${job.title??"Job"}`,`Description: ${job.description??"Not recorded"}`,`Customer: ${job.customerName}`,`Site: ${[job.siteName,job.siteAddress,job.sitePostcode].filter(Boolean).join(", ")||"Not recorded"}`,`Contact: ${job.contactName??"Not recorded"}`,`Vehicle: ${job.registration??"Not allocated"}`,`Status: ${job.status.replaceAll("_"," ")}`,`Priority: ${job.priority}`,`Scheduled: ${dateText(job.scheduledStart)}`,`Completed: ${dateText(job.completedAt)}`]},
-    {heading:"Accountability",lines:[`Issued to field staff: ${dateText(job.issuedToDriverAt)}`,`Submitted by field staff: ${dateText(job.submittedByDriverAt)}`,`Office approved: ${dateText(job.officeApprovedAt)}`,`Report generated: ${dateText(job.reportGeneratedAt)}`]},
-    {heading:"Completed job sheet",lines:job.worksheetSchema.length?job.worksheetSchema.map(field=>`${field.label}: ${valueText(job.worksheetResponses[field.key])}`):["No worksheet questions were configured for this job type."]},
-    {heading:"Safety and sign-off",lines:[`Risk assessment - safe to proceed: ${valueText(job.riskAssessment.safeToProceed)}`,`Customer signature: ${valueText(job.customerSignature.name)}`,`Signed at: ${valueText(job.customerSignature.signedAt)}`]},
-    {heading:"Activity record",lines:timeline.length?timeline.slice(0,60).map(item=>`${dateText(item.createdAt)} - ${item.summary}`):["No activity recorded."]},
-  ];
-  const wrap=(line:string,width=88)=>{const words=line.split(/\s+/);const wrapped:string[]=[];let current="";for(const word of words){if(!current){current=word;continue;}if(`${current} ${word}`.length<=width)current+=` ${word}`;else{wrapped.push(current);current=word;}}if(current)wrapped.push(current);return wrapped.length?wrapped:[""];};
-  const allLines:string[]=[];for(const section of sections){if(allLines.length)allLines.push("");allLines.push(section.heading.toUpperCase());for(const line of section.lines)allLines.push(...wrap(line));}
-  const pageSize=49,pages:string[][]=[];for(let index=0;index<allLines.length;index+=pageSize)pages.push(allLines.slice(index,index+pageSize));if(!pages.length)pages.push([]);
-  const fontRef=3+(pages.length*2),pageRefs=pages.map((_,index)=>3+(index*2));
-  const objects:string[]=["<< /Type /Catalog /Pages 2 0 R >>",`<< /Type /Pages /Kids [${pageRefs.map(ref=>`${ref} 0 R`).join(" ")}] /Count ${pages.length} >>`];
-  pages.forEach((pageLines,pageIndex)=>{
-    const content=["BT","/F1 10 Tf","48 778 Td","14 TL",`(FleetOS Job Report - ${pdfEscape(job.reference??job.id)}) Tj`,`T* (Generated ${pdfEscape(dateText(job.reportGeneratedAt))}) Tj`,`T* T*`,...pageLines.map(line=>`(${pdfEscape(line)}) Tj T*`),"ET","BT","/F1 8 Tf",`48 28 Td (Page ${pageIndex+1} of ${pages.length}) Tj`,"390 0 Td (FleetOS accountability record) Tj","ET"].join("\n");
-    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontRef} 0 R >> >> /Contents ${4+(pageIndex*2)} 0 R >>`);
-    objects.push(`<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`);
-  });
-  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
-  let pdf = "%PDF-1.4\n";
-  const offsets = [0];
-  objects.forEach((object, index) => {
-    offsets.push(Buffer.byteLength(pdf));
-    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
-  });
-  const xref = Buffer.byteLength(pdf);
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  for (const offset of offsets.slice(1)) pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
-  return Buffer.from(pdf);
+async function loadCustomerReport(companyId: string, jobId: string, reportGeneratedAt: Date) {
+  const job = await loadReportJob(companyId, jobId);
+  if (!job) return null;
+  const [assignments, visits, costs, attachments] = await Promise.all([
+    prisma.$queryRaw<CustomerJobReport["assignments"]>`SELECT p."firstName",p."lastName",p."personType" FROM "JobAssignment" ja JOIN "Person" p ON p.id=ja."personId" WHERE ja."jobId"=${jobId} AND ja."companyId"=${companyId} ORDER BY p."lastName",p."firstName"`,
+    prisma.$queryRaw<CustomerJobReport["visits"]>`SELECT title,status,"scheduledStart","scheduledEnd","actualStart","actualEnd",notes FROM "JobVisit" WHERE "jobId"=${jobId} AND "companyId"=${companyId} ORDER BY sequence`,
+    prisma.$queryRaw<CustomerJobReport["costs"]>`SELECT category,description,quantity::float8 AS quantity FROM "JobCostLine" WHERE "jobId"=${jobId} AND "companyId"=${companyId} ORDER BY "createdAt"`,
+    prisma.$queryRaw<Array<CustomerJobReport["attachments"][number] & {fileUrl:string}>>`SELECT name,"mimeType","createdAt","fileUrl" FROM "Document" WHERE "jobId"=${jobId} AND "companyId"=${companyId} ORDER BY "createdAt"`,
+  ]);
+  const imageFiles = attachments.filter(item => item.mimeType?.toLowerCase().startsWith("image/")).slice(0, 20);
+  const images: ReportImage[] = [];
+  let logo:ReportImage|null=null;
+  if (config.SUPABASE_SERVICE_ROLE_KEY) {
+    const storage = createClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } }).storage.from("fleet-documents");
+    try {
+      const {data,error}=await storage.download(`${companyId}/branding/document-logo.jpg`);
+      if(!error&&data&&data.size<=4*1024*1024)logo={name:"Company logo",createdAt:new Date(),mimeType:"image/jpeg",data:Buffer.from(await data.arrayBuffer())};
+    } catch { /* Company branding is optional. */ }
+    for (const item of imageFiles) {
+      try {
+        const { data, error } = await storage.download(item.fileUrl);
+        if (!error && data && data.size <= 12 * 1024 * 1024) images.push({ name: item.name, createdAt: item.createdAt, mimeType: item.mimeType, data: Buffer.from(await data.arrayBuffer()) });
+      } catch { /* The attachment remains listed even if private storage is temporarily unavailable. */ }
+    }
+  }
+  const report: CustomerJobReport = { ...job, reportGeneratedAt, assignments, visits, costs, attachments };
+  return { report, images, logo };
 }
 
 function htmlEscape(value:string){return value.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;");}
 
-async function sendReportEmail(args: { to: string; subject: string; message: string; pdf: Buffer; filename: string; idempotencyKey:string; job:JobReportRow }) {
+async function sendReportEmail(args: { to: string; subject: string; message: string; pdf: Buffer; filename: string; idempotencyKey:string; job:Pick<JobReportRow,"id"|"reference"|"title"|"customerName"|"completedAt"> }) {
   if (!config.RESEND_API_KEY || !config.JOB_REPORT_FROM_EMAIL) return { status: "NOT_CONFIGURED", providerId: null as string | null };
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -404,28 +419,28 @@ jobsRouter.post("/:id/approve", jobWriters, asyncHandler(async(req,res)=>{
 }));
 
 jobsRouter.get("/:id/report.pdf", jobRegisterReaders, asyncHandler(async(req,res)=>{
-  const companyId=req.user!.companyId; const job=await loadReportJob(companyId,req.params.id);
-  if(!job) return res.status(404).json({error:"Job not found"});
-  const timeline=await prisma.$queryRaw<Array<{summary:string;createdAt:Date}>>`SELECT summary,"createdAt" FROM "JobTimelineEntry" WHERE "jobId"=${req.params.id} AND "companyId"=${companyId} ORDER BY "createdAt" DESC LIMIT 60`;
+  const companyId=req.user!.companyId; const generatedAt=new Date(); const bundle=await loadCustomerReport(companyId,req.params.id,generatedAt);
+  if(!bundle) return res.status(404).json({error:"Job not found"});
+  const {report:job,images,logo}=bundle;
   await prisma.$transaction([
     prisma.$executeRaw`UPDATE "Job" SET "reportGeneratedAt"=NOW(),"updatedAt"=NOW() WHERE id=${req.params.id} AND "companyId"=${companyId}`,
     prisma.$executeRaw`INSERT INTO "JobTimelineEntry" (id,"companyId","jobId",type,summary,metadata,"createdById","createdAt") VALUES (${randomUUID()}::uuid,${companyId},${req.params.id},'REPORT','Office generated job PDF report',${JSON.stringify({stage:"REPORT_GENERATED"})}::jsonb,${req.user!.id},NOW())`,
   ]);
   await writeAuditEvent({companyId,actorUserId:req.user!.id,actorEmail:req.user!.email,action:"EXPORT",entityType:"JOB_REPORT",entityId:req.params.id,summary:`Generated PDF report for ${job.reference??job.id}`});
-  const pdf=createJobReportPdf({...job,reportGeneratedAt:new Date()},timeline);
+  const pdf=createCustomerJobReportPdf(job,images,logo);
   res.setHeader("content-type","application/pdf");
   res.setHeader("content-disposition",`attachment; filename="${(job.reference??job.id).replace(/[^a-z0-9_-]/gi,"-")}-job-report.pdf"`);
   res.send(pdf);
 }));
 
 jobsRouter.post("/:id/email-report", jobWriters, asyncHandler(async(req,res)=>{
-  const input=emailReportInput.parse(req.body); const companyId=req.user!.companyId; const job=await loadReportJob(companyId,req.params.id);
-  if(!job) return res.status(404).json({error:"Job not found"});
+  const input=emailReportInput.parse(req.body); const companyId=req.user!.companyId; const bundle=await loadCustomerReport(companyId,req.params.id,new Date());
+  if(!bundle) return res.status(404).json({error:"Job not found"});
+  const {report:job,images,logo}=bundle;
   if(!job.officeApprovedAt) return res.status(409).json({error:"Office must approve the completed job before emailing the report"});
   const to=input.to||job.contactEmail;
   if(!to) return res.status(400).json({error:"Add a customer email address before sending the report"});
-  const timeline=await prisma.$queryRaw<Array<{summary:string;createdAt:Date}>>`SELECT summary,"createdAt" FROM "JobTimelineEntry" WHERE "jobId"=${req.params.id} AND "companyId"=${companyId} ORDER BY "createdAt" DESC LIMIT 60`;
-  const pdf=createJobReportPdf({...job,reportGeneratedAt:new Date()},timeline);
+  const pdf=createCustomerJobReportPdf(job,images,logo);
   let providerId:string|null=null; let reportStatus="NOT_CONFIGURED";
   try {
     const sent=await sendReportEmail({to,subject:`Job report ${job.reference??job.id}`,message:input.message||`Please find attached the completed job report for ${job.reference??job.title??job.id}.`,pdf,filename:`${(job.reference??job.id).replace(/[^a-z0-9_-]/gi,"-")}-job-report.pdf`,idempotencyKey:`job-report-${job.id}-${job.reportEmailedAt?.getTime()??"first"}`,job});
