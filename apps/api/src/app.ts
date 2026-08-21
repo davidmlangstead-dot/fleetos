@@ -38,6 +38,7 @@ import { resellersRouter } from "./modules/resellers/routes.js";
 import { platformRouter } from "./modules/platform/routes.js";
 import { passportsRouter } from "./modules/passports/routes.js";
 import { eligibilityRouter } from "./modules/eligibility/routes.js";
+import { onboardingRouter } from "./modules/onboarding/routes.js";
 
 export const app = express();
 app.disable("x-powered-by");
@@ -96,6 +97,7 @@ app.get("/", (_req, res) => res.json({ name: "FleetOS API", status: "ok" }));
 app.get("/health", (_req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));
 app.get("/api", (_req, res) => res.json({ name: "FleetOS API", status: "ok" }));
 app.use("/api", apiRateLimit);
+app.use("/api/onboarding", sensitiveRateLimit, onboardingRouter);
 app.use("/api/platform", sensitiveRateLimit, platformRouter);
 app.use("/api/company/admin", sensitiveRateLimit, protectOwnerCompanyControls);
 app.use("/api/company", sensitiveRateLimit, companyRouter);
