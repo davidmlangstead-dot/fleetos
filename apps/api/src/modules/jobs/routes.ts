@@ -465,6 +465,7 @@ jobsRouter.patch("/:id/status", asyncHandler(async(req,res)=>{
 }));
 
 jobsRouter.post("/:id/worksheet", asyncHandler(async(req,res)=>{
+  if(req.user!.role==="FINANCE") return res.status(403).json({error:"Finance access is read only"});
   const input=worksheetInput.parse(req.body); const companyId=req.user!.companyId;
   if(!(await canAccessJob(req.user!,req.params.id))) return res.status(403).json({error:"You do not have access to this job"});
   const jobs=await prisma.$queryRaw<Array<{worksheetSchema:FormField[]}>>`SELECT "worksheetSchema" FROM "Job" WHERE id=${req.params.id} AND "companyId"=${companyId}`; if(!jobs[0]) return res.status(404).json({error:"Job not found"});
@@ -474,13 +475,15 @@ jobsRouter.post("/:id/worksheet", asyncHandler(async(req,res)=>{
 }));
 
 jobsRouter.post("/:id/timeline", asyncHandler(async(req,res)=>{
+  if(req.user!.role==="FINANCE") return res.status(403).json({error:"Finance access is read only"});
   const detail=z.string().trim().min(1).max(5000).parse(req.body?.detail); if(!(await canAccessJob(req.user!,req.params.id))) return res.status(403).json({error:"You do not have access to this job"});
   const id=randomUUID();await prisma.$executeRaw`INSERT INTO "JobTimelineEntry" (id,"companyId","jobId",type,summary,detail,"createdById","createdAt") SELECT ${id}::uuid,${req.user!.companyId},id,'NOTE','Note added',${detail},${req.user!.id},NOW() FROM "Job" WHERE id=${req.params.id} AND "companyId"=${req.user!.companyId}`;res.status(201).json({id,detail});
 }));
 
 jobsRouter.post("/:id/costs", asyncHandler(async(req,res)=>{
+  if(req.user!.role==="FINANCE") return res.status(403).json({error:"Finance access is read only"});
   const input=costInput.parse(req.body);if(!(await canAccessJob(req.user!,req.params.id))) return res.status(403).json({error:"You do not have access to this job"});const id=randomUUID();
-  const financialAccess=officeRoles.has(req.user!.role)||req.user!.role==="FINANCE";const unitCostPence=financialAccess?input.unitCostPence:0;const unitSellPence=financialAccess?input.unitSellPence:0;
+  const financialAccess=officeRoles.has(req.user!.role);const unitCostPence=financialAccess?input.unitCostPence:0;const unitSellPence=financialAccess?input.unitSellPence:0;
   const rows=await prisma.$queryRaw<Array<{id:string}>>`INSERT INTO "JobCostLine" (id,"companyId","jobId",category,description,quantity,"unitCostPence","unitSellPence","createdById","createdAt") SELECT ${id}::uuid,${req.user!.companyId},id,${input.category},${input.description},${input.quantity},${unitCostPence},${unitSellPence},${req.user!.id},NOW() FROM "Job" WHERE id=${req.params.id} AND "companyId"=${req.user!.companyId} RETURNING id::text`;if(!rows[0]) return res.status(404).json({error:"Job not found"});res.status(201).json({id,...input,unitCostPence,unitSellPence});
 }));
 
