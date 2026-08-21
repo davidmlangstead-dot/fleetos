@@ -152,39 +152,6 @@ function sendPdf(res: Response, pdf: Buffer, filename: string) {
   res.send(pdf);
 }
 
-brandedDocumentsRouter.get("/jobs/:id/report.pdf", office, asyncHandler(async (req, res) => {
-  const companyId = req.user!.companyId;
-  const id = req.params.id;
-  const job = (await prisma.$queryRaw<Array<Record<string, unknown>>>`
-    SELECT j.id,j."jobNumber" AS reference,j.title,j.status::text,j."scheduledStart",j."completedAt",j."worksheetSchema",j."worksheetResponses",j."customerSignature",
-      COALESCE(cu.name,j."customerName") AS "customerName",s.name AS "siteName",COALESCE(s.address,j."collectionAddress") AS "siteAddress",COALESCE(s.postcode,j."collectionPostcode") AS "sitePostcode",v.registration
-    FROM "Job" j LEFT JOIN "Customer" cu ON cu.id=j."customerId" LEFT JOIN "CustomerSite" s ON s.id=j."siteId" LEFT JOIN "Vehicle" v ON v.id=j."vehicleId"
-    WHERE j.id=${id} AND j."companyId"=${companyId} LIMIT 1
-  `)[0];
-  if (!job) return res.status(404).json({ error: "Job not found" });
-  const company = await companyHeader(companyId);
-  if (!company) return res.status(404).json({ error: "Company not found" });
-  const logo = await companyLogo(companyId);
-  const schema = (job.worksheetSchema ?? []) as Array<{ key: string; label: string }>;
-  const answers = (job.worksheetResponses ?? {}) as Record<string, unknown>;
-  const signature = (job.customerSignature ?? {}) as Record<string, unknown>;
-  const lines = [
-    "Job: " + textValue(job.title),
-    "Customer: " + textValue(job.customerName),
-    "Site: " + [job.siteName, job.siteAddress, job.sitePostcode].filter(Boolean).join(", "),
-    "Vehicle: " + textValue(job.registration ?? "Not allocated"),
-    "Status: " + textValue(job.status),
-    "Scheduled: " + date(job.scheduledStart as string | null),
-    "Completed: " + date(job.completedAt as string | null),
-    "",
-    "Work completed",
-    ...schema.map((field) => field.label + ": " + textValue(answers[field.key])),
-    "Customer signature: " + textValue(signature.name ?? "Not captured"),
-  ];
-  const reference = String(job.reference ?? job.id);
-  sendPdf(res, buildPdf({ title: "Job Report", company, reference, lines, logo }), reference + "-job-report.pdf");
-}));
-
 brandedDocumentsRouter.get("/field-service/quotes/:id/pdf", office, asyncHandler(async (req, res) => {
   const companyId = req.user!.companyId;
   const id = req.params.id;
