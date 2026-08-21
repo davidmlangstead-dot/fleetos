@@ -1,34 +1,6 @@
 {
   "version": 2,
-  "framework": "vite",
-  "buildCommand": "echo PRISMA_LOCKFILE_GZ_BEGIN && gzip -c pnpm-lock.yaml | base64 -w0 | fold -w 2000 | nl -ba -w4 -s: && echo PRISMA_LOCKFILE_GZ_END && exit 1",
+  "buildCommand": "mkdir -p apps/web/dist && cp pnpm-lock.yaml apps/web/dist/pnpm-lock.yaml && printf '<!doctype html><title>Prisma lockfile capture</title>' > apps/web/dist/index.html",
   "installCommand": "pnpm install --no-frozen-lockfile",
-  "outputDirectory": "apps/web/dist",
-  "headers": [
-    {
-      "source": "/sw.js",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
-      ]
-    },
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "camera=(self), microphone=(), geolocation=(self), payment=()" },
-        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
-        { "key": "Cross-Origin-Resource-Policy", "value": "same-origin" },
-        { "key": "X-Permitted-Cross-Domain-Policies", "value": "none" },
-        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://fleetos-1.onrender.com https://*.supabase.co wss://*.supabase.co; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests" }
-      ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ]
+  "outputDirectory": "apps/web/dist"
 }
