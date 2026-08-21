@@ -9,8 +9,8 @@
     "prisma:push": "prisma db push"
   },
   "dependencies": {
-    "@prisma/client": "^6.19.2",
-    "@supabase/supabase-js": "^2.110.9",
+    "@prisma/client": "^6.19.3",
+    "@supabase/supabase-js": "^2.112.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^4.22.2",
