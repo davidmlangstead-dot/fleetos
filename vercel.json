@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "bash scripts/prisma-lock-writeback.sh",
+  "buildCommand": "mkdir -p apps/web/dist && base64 -w0 pnpm-lock.yaml > apps/web/dist/pnpm-lock.b64 && printf '<!doctype html><title>Prisma lockfile blob</title>' > apps/web/dist/index.html",
   "installCommand": "pnpm install --no-frozen-lockfile",
   "outputDirectory": "apps/web/dist"
 }
