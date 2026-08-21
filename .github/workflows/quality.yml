@@ -37,6 +37,12 @@ jobs:
         run: node scripts/check-staff-rollback.mjs
       - name: Auth and browser hardening contract
         run: node scripts/check-auth-hardening.mjs
+      - name: Medic routing and monitoring contract
+        run: pnpm check:medic
+      - name: Storage tenant policy contract
+        run: pnpm check:storage
+      - name: Staff and vehicle removal contract
+        run: pnpm check:removal
       - name: Web bundle performance budget
         run: node scripts/check-web-bundle.mjs
       - name: PWA installability contract

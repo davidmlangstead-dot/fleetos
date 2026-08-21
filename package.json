@@ -3,18 +3,25 @@
   "private": true,
   "packageManager": "pnpm@11.18.0",
   "scripts": {
+    "dev": "pnpm -r --parallel dev",
     "dev:web": "pnpm --filter @fleetros/web dev",
     "dev:api": "pnpm --filter @fleetros/api dev",
-    "build": "pnpm -r build",
+    "build": "pnpm db:generate && pnpm -r build",
     "smoke": "node scripts/smoke.mjs",
     "load:test": "node scripts/load-test.mjs",
     "load:auth": "node scripts/authenticated-load.mjs",
     "medic:background": "node scripts/medic-background.mjs",
+    "check:medic": "node scripts/check-medic-contract.mjs",
+    "check:storage": "node scripts/check-storage-policy-contract.mjs",
+    "check:removal": "node scripts/check-removal-contract.mjs",
     "security": "node scripts/security-smoke.mjs && node scripts/tenant-attack.mjs",
     "audit:deps": "pnpm audit --prod --audit-level high",
     "audit:tooling": "pnpm audit --audit-level high",
     "assure:public": "pnpm build && pnpm audit:deps && node scripts/smoke.mjs && node scripts/security-smoke.mjs && node scripts/load-test.mjs",
     "verify": "pnpm build && pnpm smoke && pnpm security",
-    "db:gen": "pnpm --filter @fleetros/api prisma generate"
+    "db:generate": "pnpm --filter @fleetros/api prisma:generate",
+    "db:gen": "pnpm db:generate",
+    "db:migrate": "pnpm --filter @fleetros/api prisma:migrate",
+    "db:push": "pnpm --filter @fleetros/api prisma:push"
   }
 }

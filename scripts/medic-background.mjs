@@ -1,4 +1,4 @@
-const API = (process.env.FLEETOS_API_URL || "https://fleetos-api.onrender.com").replace(/\/$/, "");
+const API = (process.env.FLEETOS_API_URL || "https://fleetos-1.onrender.com").replace(/\/$/, "");
 const WEB = (process.env.FLEETOS_WEB_URL || "https://fleetos-orpin-one.vercel.app").replace(/\/$/, "");
 const timeoutMs = Number(process.env.FLEETOS_MEDIC_TIMEOUT_MS || 10000);
 

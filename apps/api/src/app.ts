@@ -110,6 +110,7 @@ app.use("/api/imports", sensitiveRateLimit, requireAuth, requireCommercialWriteA
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/drivers", sensitiveRateLimit, requireAuth, requireCommercialWriteAccess, idempotencyMiddleware, driversRouter);
 app.use("/api/vehicles", requireAuth, requireCommercialWriteAccess, idempotencyMiddleware, vehiclesRouter);
+app.use("/api/medic", sensitiveRateLimit, medicRouter);
 app.use("/api", requireAuth, requireCommercialWriteAccess, brandedDocumentsRouter);
 app.use("/api/jobs", requireAuth, requireCommercialWriteAccess, idempotencyMiddleware, jobsRouter);
 app.use("/api/field-service", requireAuth, requireCommercialWriteAccess, idempotencyMiddleware, fieldServiceRouter);
@@ -121,7 +122,6 @@ app.use("/api/documents", sensitiveRateLimit, requireAuth, requireCommercialWrit
 app.use("/api/tachograph", sensitiveRateLimit, requireAuth, requireCommercialWriteAccess, idempotencyMiddleware, tachographRouter);
 app.use("/api/reports", reportsRouter);
 app.use("/api/marketplace", requireAuth, requireCommercialWriteAccess, marketplaceRouter);
-app.use("/api/medic", sensitiveRateLimit, medicRouter);
 app.use("/api/medic/advanced", sensitiveRateLimit, medicAdvancedRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/driver-operations", sensitiveRateLimit, requireAuth, requireCommercialWriteAccess, idempotencyMiddleware, driverFieldRouter);

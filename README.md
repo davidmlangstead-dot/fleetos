@@ -4,11 +4,12 @@ Driver-focused transport operations platform. The workspace is split into indepe
 
 ## Getting started
 
-1. Install Node 22+ and pnpm 9+.
+1. Install Node 22+ and pnpm 11.18.0.
 2. Copy `.env.example` into `apps/api/.env` and `apps/web/.env.local`; provide your Supabase values.
 3. Run `pnpm install`.
-4. Start PostgreSQL (or create a Supabase database), then run `pnpm db:generate` and `pnpm db:migrate`.
-5. Run `pnpm dev`.
+4. Run `pnpm db:generate`.
+5. For a blank local development database, run `pnpm db:push`. For an existing managed environment, run `pnpm db:migrate`.
+6. Run `pnpm dev`.
 
 The web app runs on port 5173 and the API on 3001 by default.
 
