@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Bell, Building2, ClipboardList, Clock3, Gauge, History, LogOut, MapPin, Menu, MessageCircle, Plus, ShieldAlert, ShieldCheck, Truck, UserRound, Users, Wrench, X } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { api, ACTIVE_WORKSPACE_KEY } from "../lib/api";
-import { supabase } from "../lib/supabase";
 import { OfflineStatus } from "./OfflineStatus";
 import { BrandLogo, PoweredBy, useBranding } from "../lib/branding";
 import { useI18n } from "../lib/i18n";
+import { signOutCurrentDevice } from "../lib/session";
 
 type Role = "DRIVER" | "WORKSHOP_TECHNICIAN" | "TRANSPORT_PLANNER" | "TRANSPORT_MANAGER" | "OFFICE_STAFF" | "FINANCE" | "COMPANY_ADMIN" | "PLATFORM_ADMIN";
 type Workspace = { id: string; name: string; slug: string; role: Role };
@@ -171,7 +171,7 @@ export function AppShell() {
             {role && companyManagers.includes(role) && <button onClick={() => { setAccountOpen(false); window.location.href = "/settings/company"; }}><Building2 size={16} /> {t("shell.companySettings")}</button>}
             <button onClick={() => { setAccountOpen(false); window.location.href = "/settings/security"; }}><ShieldCheck size={16} /> Security & sign-in</button>
             <button onClick={() => { setAccountOpen(false); window.location.href = "/settings/accessibility"; }}><UserRound size={16} /> {t("shell.accessibility")}</button>
-            <button onClick={() => { setAccountOpen(false); void supabase.auth.signOut(); }}><LogOut size={16} /> {t("shell.signOut")}</button>
+            <button onClick={() => { setAccountOpen(false); void signOutCurrentDevice(); }}><LogOut size={16} /> {t("shell.signOut")}</button>
           </div>}
         </div>
       </header>
@@ -179,3 +179,4 @@ export function AppShell() {
     </main>
   </div>;
 }
+
