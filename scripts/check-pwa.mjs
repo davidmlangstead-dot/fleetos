@@ -1,7 +1,8 @@
 import { access, readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = resolve(new URL("..", import.meta.url).pathname);
+const root = resolve(fileURLToPath(new URL("../", import.meta.url)));
 const webRoot = resolve(root, "apps/web");
 const dist = resolve(webRoot, "dist");
 

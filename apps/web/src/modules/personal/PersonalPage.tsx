@@ -18,6 +18,7 @@ const accessRoles = [
   ["SUPERVISOR", "Supervisor"],
   ["MANAGER", "Manager"],
 ] as const;
+const staffRemovalRoles = new Set(["TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
 
 type PersonType = typeof personTypes[number][0];
 type AccessRole = typeof accessRoles[number][0];
@@ -61,6 +62,7 @@ export function PersonalPage() {
     licenceNumber: "", licenceExpiry: "", cpcExpiry: "", tachoCardNumber: "",
     tachoCardExpiry: "", medicalDue: "", inviteAccount: true,
   });
+  const canRemoveStaff = staffRemovalRoles.has(document.documentElement.dataset.fleetosRole ?? "");
 
   const selectedType = useMemo(() => personTypes.find(([value]) => value === form.personType), [form.personType]);
   const trainingOptions = trainingByType[form.personType];
@@ -144,6 +146,20 @@ export function PersonalPage() {
     await loadOverview();
   }
 
+  async function removeStaff(person: StaffRow) {
+    if (!window.confirm(`Remove ${person.firstName} ${person.lastName} from active staff? Their app access will be revoked, while jobs, training and audit history will be kept.`)) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api<void>(`/organisation/staff/${person.id}`, { method: "DELETE" });
+      await loadOverview();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not remove staff member.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const depotName = depots.find((depot) => depot.id === form.depotId)?.name || "No depot assigned";
 
   if (saved) return <section className="page"><div className="empty-state panel"><div className="company-dot" style={{ margin: "0 auto 16px" }}><Check /></div><h1>Staff member added</h1><p>{form.firstName} {form.lastName} is now in Staff and has a driver profile.</p><p className="subtle">{form.inviteAccount ? "Their Rivetway invitation was sent or existing account linked." : "No app account was created."} · {depotName}</p><button className="primary-button" onClick={() => { setSaved(false); setView("OVERVIEW"); setStep(1); }}>Back to Staff</button></div></section>;
@@ -159,7 +175,7 @@ export function PersonalPage() {
         <button className="panel" onClick={() => setView("LEFT")} style={{ textAlign: "left", padding: 16 }}><UserMinus size={20}/><small>Left / inactive</small><strong style={{ display: "block", fontSize: 28 }}>{leftStaff.length}</strong></button>
       </div>
 
-      {view === "OVERVIEW" && <section className="panel" style={{ padding: 16 }}><div className="panel-heading"><div><h2>Current staff</h2><p>Open Staff to see who is available and what needs attention.</p></div></div>{activeStaff.length ? <div style={{ display: "grid", gap: 8 }}>{activeStaff.map((person) => <article key={person.id} style={{ display: "grid", gridTemplateColumns: "minmax(180px,1.4fr) minmax(120px,1fr) minmax(160px,1fr)", gap: 12, padding: 12, borderTop: "1px solid rgba(148,163,184,.2)" }}><div><strong>{person.firstName} {person.lastName}</strong><small style={{ display: "block" }}>{person.email || person.phone || "No contact details"}</small></div><div><strong>{nice(person.personType)}</strong><small style={{ display: "block" }}>{person.userId ? "App access" : "No app login"}</small></div><div><small>Started {date(person.startDate)}</small></div></article>)}</div> : <p className="subtle">No active staff yet.</p>}</section>}
+      {view === "OVERVIEW" && <section className="panel" style={{ padding: 16 }}><div className="panel-heading"><div><h2>Current staff</h2><p>Open Staff to see who is available and what needs attention.</p></div></div>{activeStaff.length ? <div style={{ display: "grid", gap: 8 }}>{activeStaff.map((person) => <article key={person.id} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12, alignItems:"center", padding: 12, borderTop: "1px solid rgba(148,163,184,.2)" }}><div><strong>{person.firstName} {person.lastName}</strong><small style={{ display: "block" }}>{person.email || person.phone || "No contact details"}</small></div><div><strong>{nice(person.personType)}</strong><small style={{ display: "block" }}>{person.userId ? "App access" : "No app login"}</small></div><div><small>Started {date(person.startDate)}</small></div>{canRemoveStaff&&<button type="button" className="secondary-button" disabled={busy} onClick={()=>void removeStaff(person)}><UserMinus size={16}/> Remove</button>}</article>)}</div> : <p className="subtle">No active staff yet.</p>}</section>}
 
       {view === "ABSENCE" && <section className="panel" style={{ padding: 16 }}><div className="panel-heading"><div><h2>Holiday, sickness & absence</h2><p>Approved leave, reported sickness and other absence records.</p></div></div>{overview?.absences.length ? <div style={{ display: "grid", gap: 8 }}>{overview.absences.map((item) => { const person = staffByDriver.get(item.driverId); return <article key={item.id} style={{ padding: 12, borderTop: "1px solid rgba(148,163,184,.2)" }}><strong>{person ? `${person.firstName} ${person.lastName}` : "Staff member"} · {nice(item.type)}</strong><p>{date(item.startsOn)} to {date(item.endsOn)} · {nice(item.status)}</p>{item.reason && <small>{item.reason}</small>}</article>; })}</div> : <p className="subtle">No absence records.</p>}</section>}
 

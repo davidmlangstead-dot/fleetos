@@ -1,7 +1,8 @@
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const assetsDir = new URL("../apps/web/dist/assets/", import.meta.url);
+const assetsDir = fileURLToPath(new URL("../apps/web/dist/assets/", import.meta.url));
 const maxChunkBytes = Number(process.env.FLEETOS_MAX_WEB_CHUNK_BYTES ?? 450 * 1024);
 
 const files = await readdir(assetsDir);
@@ -12,7 +13,7 @@ if (!javascript.length) {
 }
 
 const chunks = await Promise.all(javascript.map(async (name) => {
-  const info = await stat(join(assetsDir.pathname, name));
+  const info = await stat(join(assetsDir, name));
   return { name, bytes: info.size };
 }));
 chunks.sort((a, b) => b.bytes - a.bytes);
