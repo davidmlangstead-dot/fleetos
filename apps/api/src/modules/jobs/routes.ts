@@ -501,4 +501,3 @@ jobsRouter.post("/:id/costs", asyncHandler(async(req,res)=>{
   const financialAccess=officeRoles.has(req.user!.role);const unitCostPence=financialAccess?input.unitCostPence:0;const unitSellPence=financialAccess?input.unitSellPence:0;
   const rows=await prisma.$queryRaw<Array<{id:string}>>`INSERT INTO "JobCostLine" (id,"companyId","jobId",category,description,quantity,"unitCostPence","unitSellPence","createdById","createdAt") SELECT ${id}::uuid,${req.user!.companyId},id,${input.category},${input.description},${input.quantity},${unitCostPence},${unitSellPence},${req.user!.id},NOW() FROM "Job" WHERE id=${req.params.id} AND "companyId"=${req.user!.companyId} RETURNING id::text`;if(!rows[0]) return res.status(404).json({error:"Job not found"});res.status(201).json({id,...input,unitCostPence,unitSellPence});
 }));
-
