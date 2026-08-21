@@ -23,6 +23,7 @@ const accessRoles = [
 ] as const;
 const staffRemovalRoles = new Set(["TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
 const driverCapableTypes = new Set(["DRIVER", "SUPERVISOR", "MANAGER", "WORKSHOP", "CONTRACTOR"]);
+const STAFF_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type PersonType = typeof personTypes[number][0];
 type AccessRole = typeof accessRoles[number][0];
@@ -57,6 +58,7 @@ export function PersonalPage() {
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [onboardingKey, setOnboardingKey] = useState(() => crypto.randomUUID());
   const [depots, setDepots] = useState<Depot[]>([]);
   const [form, setForm] = useState({
     firstName: "", lastName: "", email: "", phone: "",
@@ -113,6 +115,7 @@ export function PersonalPage() {
     if (step === 1 && !form.personType) return "Choose a staff type.";
     if (step === 2 && (!form.firstName.trim() || !form.lastName.trim())) return "First and last name are required.";
     if (step === 2 && form.inviteAccount && !form.email.trim()) return "Email is required when creating an account.";
+    if (step === 2 && form.inviteAccount && !STAFF_EMAIL_PATTERN.test(form.email.trim())) return "Enter a valid email address for the staff invitation.";
     if (step === 3 && form.licenceExpiry && !form.licenceNumber.trim()) return "Licence number is required when a licence expiry is entered.";
     return "";
   }
@@ -132,7 +135,13 @@ export function PersonalPage() {
     if (!companyId) return setError("No active company workspace is selected.");
     setBusy(true);
     setError("");
-    const { data, error: functionError } = await supabase.functions.invoke("create-staff", { body: { ...form, depotId: form.depotId || null, companyId } });
+    const body = { ...form, email: form.email.trim().toLowerCase(), depotId: form.depotId || null, companyId, onboardingKey };
+    let result = await supabase.functions.invoke("create-staff", { body });
+    if (result.error && !(result.error instanceof FunctionsHttpError)) {
+      const refreshed = await supabase.auth.refreshSession();
+      if (refreshed.data.session) result = await supabase.functions.invoke("create-staff", { body });
+    }
+    const { data, error: functionError } = result;
     setBusy(false);
     if (functionError) {
       if (functionError instanceof FunctionsHttpError) {
@@ -148,6 +157,7 @@ export function PersonalPage() {
     if (data?.error) return setError(data.error);
     if (form.inviteAccount && data?.inviteWarning) return setError(`Staff record created, but the login invitation could not be sent: ${data.inviteWarning}`);
     setSaved(true);
+    setOnboardingKey(crypto.randomUUID());
     await loadOverview();
   }
 
