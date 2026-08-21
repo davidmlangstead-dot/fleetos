@@ -35,6 +35,13 @@ type PlatformIdentity={isPlatformOwner:boolean};
 type ResellerMembership={id:string;name:string;role:string};
 const DRIVER_APP_ROLES = new Set(["DRIVER", "WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
 
+function workspaceHome(role: string) {
+  if (role === "DRIVER") return "/driver";
+  if (role === "WORKSHOP_TECHNICIAN") return "/workshop";
+  if (role === "FINANCE") return "/tachograph";
+  return "/";
+}
+
 function setResolvedRole(role?: string) { if (role) document.documentElement.dataset.fleetosRole = role; else delete document.documentElement.dataset.fleetosRole; window.dispatchEvent(new CustomEvent("fleetos:role", { detail: { role: role ?? null } })); }
 function replacePath(path: string) {
   if (window.location.pathname === path) return false;
@@ -91,6 +98,7 @@ function FleetOSApp() {
       if (!DRIVER_APP_ROLES.has(active.role) && window.location.pathname.startsWith("/driver") && replacePath("/")) return;
       setResolvedRole(active.role); try { setBranding(await loadCurrentBranding()); } catch { }
       if (active.role === "DRIVER" && !window.location.pathname.startsWith("/driver") && window.location.pathname !== "/messages" && window.location.pathname !== "/my-work" && replacePath("/driver")) return;
+      if (window.location.pathname === "/" && workspaceHome(active.role) !== "/" && replacePath(workspaceHome(active.role))) return;
       setError(""); setState("ready");
     } catch (err) {
       console.error("FleetOS workspace bootstrap failed", err);
@@ -119,3 +127,4 @@ function FleetOSApp() {
 createRoot(document.getElementById("root")!).render(<StrictMode><QueryClientProvider client={client}><I18nProvider><BrandingProvider><FleetOSApp />{portalKind==="CUSTOMER"&&<DriverBreakdownStatusBanner />}</BrandingProvider></I18nProvider></QueryClientProvider></StrictMode>);
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) { window.addEventListener("load", () => { void navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).then((registration) => registration.update()).catch((error) => console.error("FleetOS service worker registration failed", error)); }); }
+

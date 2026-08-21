@@ -14,6 +14,7 @@ html[data-fleetos-role="DRIVER"] .app-shell>.sidebar .nav-item{min-width:0!impor
 html[data-fleetos-role="DRIVER"] .app-shell>.sidebar .nav-item svg{width:21px!important;height:21px!important}
 html[data-fleetos-role="DRIVER"] .app-shell>.sidebar .nav-item.active{background:#172033!important;color:#f8fafc!important}
 html[data-fleetos-role="DRIVER"] .app-shell>.sidebar .nav-item:hover{background:#172033!important;color:#dbeafe!important}
+html[data-fleetos-role="DRIVER"] .app-shell>.sidebar .driver-signout{border:0!important;cursor:pointer!important;font-family:inherit!important}
 
 html[data-fleetos-role="DRIVER"] .page,
 html[data-fleetos-role="DRIVER"] .page-shell{max-width:900px!important;margin:0 auto!important;padding:20px 16px 120px!important;background:#0b1220!important;color:#f8fafc!important}
@@ -69,3 +70,4 @@ html[data-fleetos-role="DRIVER"] .page [style*="border-bottom"]{border-color:#33
   html[data-fleetos-role="DRIVER"] .app-shell>.sidebar .nav-item svg{width:20px!important;height:20px!important}
   html[data-fleetos-role="DRIVER"] .page>div[style*="grid-template-columns"]{grid-template-columns:1fr!important}
 }
+

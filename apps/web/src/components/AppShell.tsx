@@ -56,6 +56,13 @@ const roleLabels: Record<Role, string> = {
   COMPANY_ADMIN: "Company admin", PLATFORM_ADMIN: "Platform admin",
 };
 
+function workspaceHome(role?: Role) {
+  if (role === "DRIVER") return "/driver";
+  if (role === "WORKSHOP_TECHNICIAN") return "/workshop";
+  if (role === "FINANCE") return "/tachograph";
+  return "/";
+}
+
 function routeRoles(pathname: string) {
   if (pathname.startsWith("/control") || pathname.startsWith("/reseller")) return null;
   if (pathname.startsWith("/registers/")) return registerUsers;
@@ -113,7 +120,7 @@ export function AppShell() {
   function switchWorkspace(id: string) {
     const selected = workspaces.find((item) => item.id === id);
     localStorage.setItem(ACTIVE_WORKSPACE_KEY, id);
-    window.location.href = selected?.role === "DRIVER" ? "/driver" : "/";
+    window.location.href = workspaceHome(selected?.role);
   }
 
   async function addWorkspace() {
@@ -149,6 +156,7 @@ export function AppShell() {
       </div>}
       <nav>
         {visibleNav.map(([to, label, Icon]) => <NavLink key={to} to={to} end={to === "/" || to === "/driver"} onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}><Icon size={20} /><span>{to === "/messages" ? t("nav.messages") : label}</span></NavLink>)}
+        {role === "DRIVER" && <button type="button" className="nav-item driver-signout" onClick={() => void signOutCurrentDevice()}><LogOut size={20}/><span>{t("shell.signOut")}</span></button>}
         {!company && resellerAccess && onResellerHost && <NavLink to="/reseller" onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}><Building2 size={20}/><span>Reseller Portal</span></NavLink>}
       </nav>
       <div className="sidebar-bottom"><div className="company-dot">{initials}</div><div><strong>{companyName}</strong><small>{role ? roleLabels[role] : resellerAccess ? "Reseller account" : platformOwner ? "Rivetway owner" : "Account"}</small><PoweredBy /></div></div>
@@ -175,7 +183,7 @@ export function AppShell() {
           </div>}
         </div>
       </header>
-      {accessDenied ? <main className="loading-page"><div><h1>{t("shell.accessDenied")}</h1><p>{t("shell.accessDeniedDetail")}</p><button onClick={() => { window.location.href = role === "DRIVER" ? "/driver" : resellerAccess && !company && onResellerHost ? "/reseller" : "/"; }}>{t("shell.return")}</button></div></main> : <Outlet />}
+      {accessDenied ? <main className="loading-page"><div><h1>{t("shell.accessDenied")}</h1><p>{t("shell.accessDeniedDetail")}</p><button onClick={() => { window.location.href = resellerAccess && !company && onResellerHost ? "/reseller" : workspaceHome(role); }}>{t("shell.return")}</button></div></main> : <Outlet />}
     </main>
   </div>;
 }

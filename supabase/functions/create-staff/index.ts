@@ -13,6 +13,7 @@ const roleMap: Record<string, string> = {
   SUPERVISOR: "TRANSPORT_PLANNER",
   MANAGER: "TRANSPORT_MANAGER",
   ADMIN: "COMPANY_ADMIN",
+  FINANCE: "FINANCE",
 };
 
 const personTypes = new Set([
@@ -131,6 +132,7 @@ Deno.serve(async (req) => {
     let inviteWarning: string | null = null;
     let inviteDelivery = "NOT_REQUESTED";
     let createdMembershipId: string | null = null;
+    let createdAuthUserId: string | null = null;
 
     try {
       if (inviteAccount) {
@@ -141,17 +143,17 @@ Deno.serve(async (req) => {
           linkedUserId = existingFleetUser.id;
           inviteDelivery = "EXISTING_ACCOUNT";
         } else {
-          const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
-            type: "invite",
-            email: normalizedEmail,
-            options: {
-              redirectTo: inviteRedirect,
-              data: { firstName: firstName.trim(), lastName: lastName.trim(), personType, accessRole, brandName: inviteBrandName, companySlug: company.slug },
-            },
-          });
-
-          if (!linkError && linkData?.user?.id && linkData?.properties?.action_link) {
+          const metadata = { firstName: firstName.trim(), lastName: lastName.trim(), personType, accessRole, brandName: inviteBrandName, companySlug: company.slug };
+          const hasBrandedSender = Boolean(Deno.env.get("RESEND_API_KEY") && Deno.env.get("RIVETWAY_INVITE_FROM"));
+          if (hasBrandedSender) {
+            const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+              type: "invite",
+              email: normalizedEmail,
+              options: { redirectTo: inviteRedirect, data: metadata },
+            });
+            if (linkError || !linkData?.user?.id || !linkData?.properties?.action_link) throw new Error(linkError?.message ?? "Could not create the staff invitation link");
             linkedUserId = linkData.user.id;
+            createdAuthUserId = linkData.user.id;
             const delivery = await sendBrandedInvite({
               to: normalizedEmail,
               firstName: firstName.trim(),
@@ -161,30 +163,24 @@ Deno.serve(async (req) => {
               roleLabel: personType.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase()),
               actionLink: linkData.properties.action_link,
             });
-            if (delivery.sent) {
-              invited = true;
-              inviteDelivery = "BRANDED_EMAIL";
-            } else {
-              inviteWarning = delivery.reason ?? "Professional email could not be sent";
+            if (!delivery.sent) {
+              await admin.auth.admin.deleteUser(createdAuthUserId);
+              createdAuthUserId = null;
+              linkedUserId = null;
+              throw new Error(delivery.reason ?? "Professional email could not be sent");
             }
-          }
-
-          if (!invited) {
+            invited = true;
+            inviteDelivery = "BRANDED_EMAIL";
+          } else {
             const { data: fallbackInvite, error: fallbackError } = await admin.auth.admin.inviteUserByEmail(normalizedEmail, {
-              data: { firstName: firstName.trim(), lastName: lastName.trim(), personType, accessRole, brandName: inviteBrandName, companySlug: company.slug },
+              data: metadata,
               redirectTo: inviteRedirect,
             });
-            if (!fallbackError) {
-              linkedUserId = fallbackInvite.user?.id ?? linkedUserId;
-              invited = !!linkedUserId;
-              inviteDelivery = "SUPABASE_FALLBACK";
-              inviteWarning = null;
-            } else if (!linkedUserId) {
-              const { data: usersPage } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-              const existingAuth = usersPage?.users?.find((u) => u.email?.toLowerCase() === normalizedEmail);
-              linkedUserId = existingAuth?.id ?? null;
-              inviteWarning = fallbackError.message;
-            }
+            if (fallbackError || !fallbackInvite.user?.id) throw new Error(fallbackError?.message ?? "The staff invitation could not be sent");
+            linkedUserId = fallbackInvite.user.id;
+            createdAuthUserId = fallbackInvite.user.id;
+            invited = true;
+            inviteDelivery = "SUPABASE_EMAIL";
           }
         }
 
@@ -223,6 +219,7 @@ Deno.serve(async (req) => {
       if (createdMembershipId) await admin.from("CompanyMembership").delete().eq("id", createdMembershipId).eq("companyId", companyId);
       await admin.from("Driver").delete().eq("id", person.id).eq("companyId", companyId);
       await admin.from("Person").delete().eq("id", person.id).eq("companyId", companyId);
+      if (createdAuthUserId) await admin.auth.admin.deleteUser(createdAuthUserId);
       return json({ error: error instanceof Error ? error.message : "Could not create staff record" }, 400);
     }
 
@@ -232,3 +229,4 @@ Deno.serve(async (req) => {
     return json({ error: "Unexpected error creating staff record" }, 500);
   }
 });
+

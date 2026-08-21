@@ -10,7 +10,7 @@ import type { JobConfig, JobRow } from "./types";
 type View="DISPATCH"|"JOBS"|"CUSTOMERS"|"QUOTES"|"RECURRING"|"REPORTS"|"INVOICES"|"TYPES";
 const label=(value:string)=>value.replaceAll("_"," ").toLowerCase().replace(/^./,c=>c.toUpperCase());
 const date=(value:string|null)=>value?new Date(value).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"}):"Not scheduled";
-const finished=new Set(["COMPLETED","CLOSED","CANCELLED","DELIVERED"]);
+const finished=new Set(["COMPLETED","COMPLETED_ISSUES","CLOSED","CANCELLED","DELIVERED"]);
 const active=new Set(["TRAVELLING","ON_SITE","PAUSED","IN_PROGRESS"]);
 const reportReady=(job:JobRow)=>Boolean(job.submittedByDriverAt||job.officeApprovedAt||job.reportGeneratedAt||job.reportEmailedAt);
 
@@ -73,7 +73,7 @@ export function JobsPage(){
             <span><strong>{job.customerName}</strong><small>{job.siteName||job.siteAddress}</small></span>
             <span><strong>{date(job.scheduledStart)}</strong><small>{job.assignments.map(person=>person.name).join(", ")||"Needs assigning"}</small></span>
             <span><em className={`driver-status ${job.status.toLowerCase()}`}>{label(job.status)}</em></span>
-            <span><strong>{!job.assignments.length?"Assign":active.has(job.status)?"Field working":reportReady(job)?"Review report":"Await field work"}</strong><small>{job.registration?`Vehicle ${job.registration}`:"Open job"}</small></span>
+            <span><strong>{!job.assignments.length?"Assign staff":!job.scheduledStart?"Set a time":reportReady(job)?"Review report":active.has(job.status)?"Field working":job.status==="DISPATCHED"?"Waiting for field staff":"Issue to field staff"}</strong><small>{job.registration?`Vehicle ${job.registration}`:"Open job"}</small></span>
           </button>)}
           {!(view==="DISPATCH"?dispatch:filtered).length&&<div className="empty-state"><h2>{view==="DISPATCH"?"Nothing waiting to dispatch":"No jobs found"}</h2><p>Create a job once, assign staff and it will appear in their field app.</p><button className="primary-button" onClick={()=>setShowWizard(true)}><Plus/> New job</button></div>}
         </section>}
@@ -95,3 +95,4 @@ export function JobsPage(){
     </>}
   </section>;
 }
+
