@@ -1,10 +1,10 @@
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum Role {
@@ -95,7 +95,7 @@ model Company {
   vatNumber             String?
   address               String?
   postcode              String?
-  phone                 String?
+  phone                  String?
   industries            String[]          @default([])
   teamSize              String?
   operatorLicenceNumber String?
@@ -135,34 +135,34 @@ model CompanyMembership {
 }
 
 model Vehicle {
-  id                   String          @id @default(cuid())
-  companyId            String
-  registration         String
-  fleetNumber          String?
-  make                 String?
-  model                String?
-  year                 Int?
-  type                 VehicleType     @default(TRUCK)
-  status               VehicleStatus   @default(ACTIVE)
-  vin                   String?
-  firstRegisteredAt    DateTime?
-  acquiredAt           DateTime?
-  motDue               DateTime?
-  taxDue               DateTime?
-  insuranceDue         DateTime?
-  tachoCalibrationDue  DateTime?
-  mileage              Int?
-  fuelType             String?
-  colour               String?
-  depot                String?
-  notes                String?
-  createdAt            DateTime        @default(now())
-  updatedAt            DateTime        @updatedAt
-  company              Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  jobs                 Job[]
-  defects              Defect[]
-  complianceItems      ComplianceItem[]
-  documents            Document[]
+  id                  String        @id @default(cuid())
+  companyId           String
+  registration        String
+  fleetNumber         String?
+  make                String?
+  model               String?
+  year                Int?
+  type                VehicleType   @default(TRUCK)
+  status              VehicleStatus @default(ACTIVE)
+  vin                 String?
+  firstRegisteredAt   DateTime?
+  acquiredAt          DateTime?
+  motDue              DateTime?
+  taxDue              DateTime?
+  insuranceDue        DateTime?
+  tachoCalibrationDue DateTime?
+  mileage             Int?
+  fuelType            String?
+  colour              String?
+  depot               String?
+  notes               String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  company             Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  jobs                Job[]
+  defects             Defect[]
+  complianceItems     ComplianceItem[]
+  documents           Document[]
 
   @@unique([companyId, registration])
   @@index([companyId])
@@ -170,96 +170,96 @@ model Vehicle {
 }
 
 model Driver {
-  id                String    @id @default(cuid())
-  companyId         String
-  firstName         String
-  lastName          String
-  email             String?
-  phone             String?
-  licenceNumber     String?
-  licenceExpiry     DateTime?
-  cpcExpiry         DateTime?
-  dcpcExpiry        DateTime?
-  tachoCardNumber   String?
-  tachoCardExpiry   DateTime?
-  medicalDue        DateTime?
-  dateOfBirth       DateTime?
-  address           String?
-  postcode          String?
-  emergencyContact  String?
-  emergencyPhone    String?
-  startDate         DateTime?
-  leftDate          DateTime?
-  isActive          Boolean   @default(true)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  jobs              Job[]
-  documents         Document[]
-  defects           Defect[]  @relation("ReportedByDriver")
+  id               String    @id @default(cuid())
+  companyId        String
+  firstName        String
+  lastName         String
+  email            String?
+  phone            String?
+  licenceNumber    String?
+  licenceExpiry    DateTime?
+  cpcExpiry        DateTime?
+  dcpcExpiry       DateTime?
+  tachoCardNumber  String?
+  tachoCardExpiry  DateTime?
+  medicalDue       DateTime?
+  dateOfBirth      DateTime?
+  address          String?
+  postcode         String?
+  emergencyContact String?
+  emergencyPhone   String?
+  startDate        DateTime?
+  leftDate         DateTime?
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  jobs             Job[]
+  documents        Document[]
+  defects          Defect[]  @relation("ReportedByDriver")
 
   @@index([companyId])
   @@index([isActive])
 }
 
 model Job {
-  id                 String      @id @default(cuid())
-  companyId          String
-  jobTypeId          String?     @db.Uuid
-  title              String?
-  description        String?
-  priority           String      @default("NORMAL")
-  source             String      @default("OFFICE")
-  customerId         String?     @db.Uuid
-  siteId             String?     @db.Uuid
-  assetId            String?     @db.Uuid
-  contactName        String?
-  contactPhone       String?
-  contactEmail       String?
-  scheduledStart     DateTime?
-  scheduledEnd       DateTime?
-  dueAt              DateTime?
+  id                       String    @id @default(cuid())
+  companyId                String
+  jobTypeId                String?   @db.Uuid
+  title                    String?
+  description              String?
+  priority                 String    @default("NORMAL")
+  source                   String    @default("OFFICE")
+  customerId               String?   @db.Uuid
+  siteId                   String?   @db.Uuid
+  assetId                  String?   @db.Uuid
+  contactName              String?
+  contactPhone             String?
+  contactEmail             String?
+  scheduledStart           DateTime?
+  scheduledEnd             DateTime?
+  dueAt                    DateTime?
   estimatedDurationMinutes Int?
-  purchaseOrderNumber String?
-  quotePence         Int?
-  estimatedCostPence Int?
-  customFields       Json        @default("{}")
-  workflowSnapshot   Json        @default("[]")
-  worksheetSchema    Json        @default("[]")
-  worksheetResponses Json        @default("{}")
-  riskAssessment     Json        @default("{}")
-  customerSignature  Json        @default("{}")
-  issuedToDriverAt   DateTime?
-  submittedByDriverAt DateTime?
-  officeApprovedAt   DateTime?
-  reportGeneratedAt  DateTime?
-  reportEmailedAt    DateTime?
-  reportEmailTo      String?
-  reportEmailStatus  String?
-  completedAt        DateTime?
-  vehicleId          String?
-  driverId           String?
-  jobNumber          String?
-  customerName       String
-  collectionAddress  String?
-  collectionPostcode String?
-  deliveryAddress    String?
-  deliveryPostcode   String?
-  collectionDateTime DateTime?
-  deliveryDateTime   DateTime?
-  status             JobStatus   @default(PLANNED)
-  instructions       String?
-  podUrl             String?
-  invoiceUrl         String?
-  rate               Decimal?    @db.Decimal(10, 2)
-  weightKg           Decimal?    @db.Decimal(10, 2)
-  pallets            Int?
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
-  company            Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  vehicle            Vehicle?    @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
-  driver             Driver?     @relation(fields: [driverId], references: [id], onDelete: SetNull)
-  documents          Document[]
+  purchaseOrderNumber      String?
+  quotePence               Int?
+  estimatedCostPence       Int?
+  customFields             Json      @default("{}")
+  workflowSnapshot         Json      @default("[]")
+  worksheetSchema          Json      @default("[]")
+  worksheetResponses       Json      @default("{}")
+  riskAssessment           Json      @default("{}")
+  customerSignature        Json      @default("{}")
+  issuedToDriverAt         DateTime?
+  submittedByDriverAt      DateTime?
+  officeApprovedAt         DateTime?
+  reportGeneratedAt        DateTime?
+  reportEmailedAt          DateTime?
+  reportEmailTo            String?
+  reportEmailStatus        String?
+  completedAt              DateTime?
+  vehicleId                String?
+  driverId                 String?
+  jobNumber                String?
+  customerName             String
+  collectionAddress        String?
+  collectionPostcode       String?
+  deliveryAddress          String?
+  deliveryPostcode         String?
+  collectionDateTime       DateTime?
+  deliveryDateTime         DateTime?
+  status                   JobStatus @default(PLANNED)
+  instructions             String?
+  podUrl                   String?
+  invoiceUrl               String?
+  rate                     Decimal?  @db.Decimal(10, 2)
+  weightKg                 Decimal?  @db.Decimal(10, 2)
+  pallets                  Int?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  company                  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vehicle                  Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  driver                   Driver?   @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  documents                Document[]
 
   @@index([companyId])
   @@index([vehicleId])
@@ -268,22 +268,22 @@ model Job {
 }
 
 model Defect {
-  id               String       @id @default(cuid())
-  companyId        String
-  vehicleId        String?
-  reportedById     String?
-  title            String
-  description      String?
-  status           DefectStatus @default(OPEN)
-  severity         String?
-  resolvedAt       DateTime?
-  resolutionNotes  String?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  company          Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  vehicle          Vehicle?     @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
-  reportedBy       Driver?      @relation("ReportedByDriver", fields: [reportedById], references: [id], onDelete: SetNull)
-  documents        Document[]
+  id              String       @id @default(cuid())
+  companyId       String
+  vehicleId       String?
+  reportedById    String?
+  title           String
+  description     String?
+  status          DefectStatus @default(OPEN)
+  severity        String?
+  resolvedAt      DateTime?
+  resolutionNotes String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  company         Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vehicle         Vehicle?     @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  reportedBy      Driver?      @relation("ReportedByDriver", fields: [reportedById], references: [id], onDelete: SetNull)
+  documents       Document[]
 
   @@index([companyId])
   @@index([vehicleId])
@@ -346,12 +346,12 @@ model Document {
 }
 
 model RegisterItem {
-  id           String    @id @default(uuid()) @db.Uuid
+  id           String   @id @default(uuid()) @db.Uuid
   companyId    String
   module       String
   reference    String?
   title        String
-  status       String    @default("OPEN")
+  status       String   @default("OPEN")
   occurredAt   DateTime?
   dueAt        DateTime?
   amountPence  Int?
@@ -361,11 +361,9 @@ model RegisterItem {
   notes        String?
   createdById  String?
   archivedAt   DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@index([companyId, module, archivedAt])
   @@index([companyId, dueAt])
 }
-
-
