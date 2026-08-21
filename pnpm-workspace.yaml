@@ -12,4 +12,5 @@ minimumReleaseAgeExclude:
   - nanoid@3.3.18
 overrides:
   effect@<3.20.0: ^3.20.0
-  deepmerge-ts@<8.0.0: 8.0.1
+  deepmerge-ts@<8.0.0: ^8.0.1
+
