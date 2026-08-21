@@ -105,6 +105,48 @@ organisationRouter.delete("/staff/:id", managers, asyncHandler(async (req, res) 
   res.status(204).end();
 }));
 
+
+organisationRouter.delete("/staff/:id", managers, asyncHandler(async (req, res) => {
+  const companyId = req.user!.companyId;
+  const rows = await prisma.$queryRaw<Array<{ id:string; userId:string|null; firstName:string; lastName:string; isActive:boolean }>>`
+    SELECT id,"userId","firstName","lastName","isActive"
+    FROM "Person"
+    WHERE id=${req.params.id} AND "companyId"=${companyId}
+    LIMIT 1
+  `;
+  const person = rows[0];
+  if (!person) return res.status(404).json({ error:"Staff member not found" });
+  if (person.userId === req.user!.id) return res.status(409).json({ error:"You cannot remove your own staff access" });
+
+  if (person.userId) {
+    const membership = (await prisma.$queryRaw<Array<{ role:string }>>`
+      SELECT role::text FROM "CompanyMembership"
+      WHERE "companyId"=${companyId} AND "userId"=${person.userId}
+      LIMIT 1
+    `)[0];
+    if (membership && ["COMPANY_ADMIN","PLATFORM_ADMIN"].includes(membership.role)) {
+      const admins = await prisma.$queryRaw<Array<{ count:bigint }>>`
+        SELECT count(*) FROM "CompanyMembership"
+        WHERE "companyId"=${companyId} AND role IN ('COMPANY_ADMIN','PLATFORM_ADMIN')
+      `;
+      if (Number(admins[0]?.count ?? 0) <= 1) return res.status(409).json({ error:"Add another company administrator before removing the last administrator" });
+    }
+  }
+
+  await prisma.$transaction(async tx => {
+    await tx.$executeRaw`UPDATE "Person" SET "isActive"=false,"updatedAt"=NOW() WHERE id=${person.id} AND "companyId"=${companyId}`;
+    await tx.$executeRaw`UPDATE "Driver" SET "isActive"=false,"leftDate"=COALESCE("leftDate",NOW()),"updatedAt"=NOW() WHERE id=${person.id} AND "companyId"=${companyId}`;
+    if (person.userId) await tx.$executeRaw`DELETE FROM "CompanyMembership" WHERE "userId"=${person.userId} AND "companyId"=${companyId}`;
+  });
+  if (person.isActive) await writeAuditEvent({
+    companyId, actorUserId:req.user!.id, actorEmail:req.user!.email,
+    action:"ARCHIVE", entityType:"PERSON", entityId:person.id,
+    summary:`Removed ${person.firstName} ${person.lastName} from active staff`,
+    metadata:{ revokedUserId:person.userId },
+  });
+  res.status(204).send();
+}));
+
 organisationRouter.get("/audit", managers, asyncHandler(async (req, res) => {
   const limit = Math.min(200,Math.max(1,Number(req.query.limit)||100));
   const rows = await prisma.$queryRaw<AuditRow[]>`SELECT id::text,"companyId","actorUserId","actorEmail",action,"entityType","entityId",summary,metadata,"createdAt" FROM "AuditEvent" WHERE "companyId"=${req.user!.companyId} ORDER BY "createdAt" DESC LIMIT ${limit}`;

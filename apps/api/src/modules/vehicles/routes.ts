@@ -107,3 +107,30 @@ vehiclesRouter.delete("/:id", vehicleWriters, asyncHandler(async (req, res) => {
   await writeAuditEvent({ companyId,actorUserId:req.user!.id,actorEmail:req.user!.email,action:"ARCHIVE",entityType:"VEHICLE",entityId:vehicle.id,summary:`Removed vehicle ${vehicle.registration}`,metadata:{previousStatus:vehicle.status} });
   res.status(204).end();
 }));
+
+
+vehiclesRouter.delete("/:id", vehicleWriters, asyncHandler(async (req, res) => {
+  const companyId = req.user!.companyId;
+  const rows = await prisma.$queryRaw<Array<{ id: string; registration: string; status: string }>>`
+    SELECT id,registration,status::text
+    FROM "Vehicle"
+    WHERE id=${req.params.id} AND "companyId"=${companyId}
+    LIMIT 1
+  `;
+  const vehicle = rows[0];
+  if (!vehicle) return res.status(404).json({ error: "Vehicle not found" });
+  if (vehicle.status !== "ARCHIVED") {
+    await prisma.$executeRaw`
+      UPDATE "Vehicle"
+      SET status='ARCHIVED'::"VehicleStatus","updatedAt"=NOW()
+      WHERE id=${vehicle.id} AND "companyId"=${companyId}
+    `;
+    await writeAuditEvent({
+      companyId, actorUserId: req.user!.id, actorEmail: req.user!.email,
+      action: "ARCHIVE", entityType: "VEHICLE", entityId: vehicle.id,
+      summary: `Removed vehicle ${vehicle.registration} from the active fleet`,
+      metadata: { previousStatus: vehicle.status },
+    });
+  }
+  res.status(204).send();
+}));
