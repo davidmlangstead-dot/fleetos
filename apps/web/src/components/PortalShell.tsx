@@ -1,6 +1,6 @@
 import { Building2, CircleDollarSign, Gauge, LogOut, Palette, Store, Users } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
-import { supabase } from "../lib/supabase";
+import { signOutCurrentDevice } from "../lib/session";
 
 type NavItem = readonly [string, string, typeof Gauge];
 
@@ -25,7 +25,7 @@ function PortalShell({ title, subtitle, nav }: { title: string; subtitle: string
       <div className="sidebar-bottom"><div className="company-dot">FO</div><div><strong>{title}</strong><small>{subtitle}</small></div></div>
     </aside>
     <main>
-      <header className="topbar"><div className="presence">{title}</div><div className="top-actions"><button className="secondary-button" onClick={()=>void supabase.auth.signOut()}><LogOut size={16}/> Sign out</button></div></header>
+      <header className="topbar"><div className="presence">{title}</div><div className="top-actions"><button className="secondary-button" onClick={()=>void signOutCurrentDevice()}><LogOut size={16}/> Sign out</button></div></header>
       <Outlet />
     </main>
   </div>;
@@ -38,3 +38,4 @@ export function ManagerShell(){
 export function ResellerShell(){
   return <PortalShell title="White-label Portal" subtitle="Reseller-only commercial workspace" nav={resellerNav}/>;
 }
+
