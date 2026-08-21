@@ -1,15 +1,17 @@
 name: Prisma 7 Upgrade
 
 on:
-  push:
+  pull_request:
     branches:
-      - codex/prisma-7-upgrade
+      - main
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
 
 jobs:
   upgrade:
+    if: github.head_ref == 'codex/prisma-7-upgrade'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -31,30 +33,24 @@ jobs:
             echo "Prisma 7.9.1 migration already applied."
             exit 0
           fi
-
           pnpm --filter @fleetros/api add @prisma/client@7.9.1 @prisma/adapter-pg@7.9.1 pg
           pnpm --filter @fleetros/api add -D prisma@7.9.1 @types/pg
-
           python3 - <<'PY'
           from pathlib import Path
           import json
-
           pkg_path = Path('apps/api/package.json')
           pkg = json.loads(pkg_path.read_text())
           pkg['type'] = 'module'
           pkg_path.write_text(json.dumps(pkg, indent=2) + '\n')
-
           schema_path = Path('apps/api/prisma/schema.prisma')
           schema = schema_path.read_text()
           schema = schema.replace('generator client {\n  provider = "prisma-client-js"\n}', 'generator client {\n  provider = "prisma-client"\n  output   = "../src/generated/prisma"\n}')
           schema = schema.replace('  url      = env("DATABASE_URL")\n', '')
           schema_path.write_text(schema)
-
           ts_path = Path('apps/api/tsconfig.json')
           ts = json.loads(ts_path.read_text())
           ts['compilerOptions']['target'] = 'ES2023'
           ts_path.write_text(json.dumps(ts, indent=2) + '\n')
-
           replacements = {
             'apps/api/src/middleware/auth.ts': ('from "@prisma/client"', 'from "../generated/prisma/client.js"'),
             'apps/api/src/modules/onboarding/routes.ts': ('from "@prisma/client"', 'from "../../generated/prisma/client.js"'),
@@ -65,27 +61,21 @@ jobs:
             text = p.read_text()
             if old in text:
               p.write_text(text.replace(old, new))
-
-          Path('apps/api/src/lib/prisma.ts').write_text('''import { PrismaPg } from "@prisma/adapter-pg";\nimport { PrismaClient } from "../generated/prisma/client.js";\n\nconst connectionString = process.env.DATABASE_URL;\nif (!connectionString) throw new Error("DATABASE_URL is required");\n\nconst adapter = new PrismaPg({\n  connectionString,\n  max: 1,\n});\n\nexport const prisma = new PrismaClient({ adapter });\n''')
-
-          Path('apps/api/prisma.config.ts').write_text('''import "dotenv/config";\nimport { defineConfig, env } from "prisma/config";\n\nexport default defineConfig({\n  schema: "prisma/schema.prisma",\n  migrations: {\n    path: "prisma/migrations",\n  },\n  datasource: {\n    url: env("DATABASE_URL"),\n  },\n});\n''')
-
+          Path('apps/api/src/lib/prisma.ts').write_text('''import { PrismaPg } from "@prisma/adapter-pg";\nimport { PrismaClient } from "../generated/prisma/client.js";\n\nconst connectionString = process.env.DATABASE_URL;\nif (!connectionString) throw new Error("DATABASE_URL is required");\n\nconst adapter = new PrismaPg({ connectionString, max: 1 });\nexport const prisma = new PrismaClient({ adapter });\n''')
+          Path('apps/api/prisma.config.ts').write_text('''import "dotenv/config";\nimport { defineConfig, env } from "prisma/config";\n\nexport default defineConfig({\n  schema: "prisma/schema.prisma",\n  migrations: { path: "prisma/migrations" },\n  datasource: { url: env("DATABASE_URL") },\n});\n''')
           gitignore = Path('.gitignore')
           text = gitignore.read_text() if gitignore.exists() else ''
           entry = 'apps/api/src/generated/prisma/\n'
           if entry not in text:
             gitignore.write_text(text + ('\n' if text and not text.endswith('\n') else '') + entry)
           PY
-
           pnpm --filter @fleetros/api exec prisma generate
           pnpm build
           pnpm audit --prod --audit-level high
-
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -- apps/api/package.json apps/api/prisma/schema.prisma apps/api/prisma.config.ts apps/api/tsconfig.json apps/api/src/lib/prisma.ts apps/api/src/middleware/auth.ts apps/api/src/modules/onboarding/routes.ts apps/api/src/modules/jobs/routes.ts pnpm-lock.yaml .gitignore
           if git diff --cached --quiet; then
-            echo "No upgrade changes to commit."
             exit 0
           fi
           git commit -m "Upgrade Prisma ORM to 7.9.1"
