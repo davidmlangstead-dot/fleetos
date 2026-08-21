@@ -1,7 +1,7 @@
 {
   "version": 2,
   "framework": "vite",
-  "buildCommand": "echo PRISMA_LOCKFILE_BEGIN && base64 -w0 pnpm-lock.yaml && echo && echo PRISMA_LOCKFILE_END && exit 1",
+  "buildCommand": "echo PRISMA_LOCKFILE_GZ_BEGIN && gzip -c pnpm-lock.yaml | base64 -w0 | fold -w 2000 | nl -ba -w4 -s: && echo PRISMA_LOCKFILE_GZ_END && exit 1",
   "installCommand": "pnpm install --no-frozen-lockfile",
   "outputDirectory": "apps/web/dist",
   "headers": [
