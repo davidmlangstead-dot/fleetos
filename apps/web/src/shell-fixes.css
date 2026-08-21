@@ -1,4 +1,4 @@
-.avatar { cursor: pointer; }
+.avatar { cursor: pointer; }\n.topbar {\n  position: relative;\n  z-index: 70;\n}
 .mobile-close,
 .mobile-overlay { display: none; }
 
