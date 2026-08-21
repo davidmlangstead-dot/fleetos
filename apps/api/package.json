@@ -20,8 +20,8 @@
     "@fleetros/shared": "workspace:*",
     "@types/cors": "^2.8.19",
     "@types/express": "^4.17.25",
-    "prisma": "6.19.2",
-    "tsx": "^4.23.1",
+    "prisma": "6.19.3",
+    "tsx": "^4.23.12",
     "typescript": "^5.9.3"
   }
 }
