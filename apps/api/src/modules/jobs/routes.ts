@@ -53,6 +53,10 @@ const createJobInput = z.object({
   if (input.scheduledEnd && input.scheduledStart && input.scheduledEnd < input.scheduledStart) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["scheduledEnd"], message: "End time cannot be before start time" });
 });
 const statusInput = z.object({ status: z.enum(jobStatuses), note: z.string().trim().max(3000).optional() });
+const scheduleInput = z.object({
+  scheduledStart:z.union([z.coerce.date(),z.null()]).optional(), scheduledEnd:z.union([z.coerce.date(),z.null()]).optional(), dueAt:z.union([z.coerce.date(),z.null()]).optional(),
+  personIds:z.array(z.string().trim().min(1)).max(30).optional(), vehicleId:z.union([z.string().trim().min(1),z.null()]).optional(), note:z.string().trim().max(1000).optional(),
+}).superRefine((input,ctx)=>{if(input.scheduledStart&&input.scheduledEnd&&input.scheduledEnd<input.scheduledStart)ctx.addIssue({code:z.ZodIssueCode.custom,path:["scheduledEnd"],message:"End time cannot be before start time"});});
 const worksheetInput = z.object({ responses: z.record(z.unknown()), riskAssessment: z.record(z.unknown()).optional(), customerSignature: z.object({ name: z.string().trim().min(2).max(160), signedAt: z.coerce.date().optional() }).optional() });
 const costInput = z.object({ category: z.enum(["LABOUR", "PART", "MATERIAL", "EXPENSE", "SUBCONTRACT", "OTHER"]), description: z.string().trim().min(2).max(500), quantity: z.number().positive().max(1_000_000), unitCostPence: z.number().int().min(0).max(2_000_000_000), unitSellPence: z.number().int().min(0).max(2_000_000_000) });
 const lifecycleNoteInput = z.object({ note: z.string().trim().max(3000).optional() });
@@ -128,57 +132,28 @@ async function loadReportJob(companyId: string, jobId: string) {
 }
 
 function pdfEscape(text: string) {
-  return text.replaceAll("\\", "\\\\").replaceAll("(", "\\(").replaceAll(")", "\\)");
+  return text.replaceAll("\\", "\\\\").replaceAll("(", "\\(").replaceAll(")", "\\)").replaceAll(/[^\x20-\x7e]/g,"-");
 }
 
 function createJobReportPdf(job: JobReportRow, timeline: Array<{ summary: string; createdAt: Date }>) {
-  const lines = [
-    "FleetOS Job Report",
-    `Reference: ${job.reference ?? job.id}`,
-    `Title: ${job.title ?? "Job"}`,
-    `Customer: ${job.customerName}`,
-    `Site: ${[job.siteName, job.siteAddress, job.sitePostcode].filter(Boolean).join(", ") || "Not recorded"}`,
-    `Vehicle: ${job.registration ?? "Not allocated"}`,
-    `Status: ${job.status}`,
-    `Scheduled: ${dateText(job.scheduledStart)}`,
-    `Completed: ${dateText(job.completedAt)}`,
-    "",
-    "Accountability",
-    `Issued to driver: ${dateText(job.issuedToDriverAt)}`,
-    `Submitted by driver: ${dateText(job.submittedByDriverAt)}`,
-    `Office approved: ${dateText(job.officeApprovedAt)}`,
-    `Report generated: ${dateText(job.reportGeneratedAt)}`,
-    `Report emailed: ${dateText(job.reportEmailedAt)}`,
-    "",
-    "Job Sheet",
-    ...job.worksheetSchema.map(field => `${field.label}: ${valueText(job.worksheetResponses[field.key])}`),
-    `Risk assessment safe to proceed: ${valueText(job.riskAssessment.safeToProceed)}`,
-    `Customer signature: ${valueText(job.customerSignature.name)}`,
-    "",
-    "Timeline",
-    ...timeline.slice(0, 20).map(item => `${dateText(item.createdAt)} - ${item.summary}`),
+  const sections:Array<{heading:string;lines:string[]}>= [
+    {heading:"Job details",lines:[`Reference: ${job.reference??job.id}`,`Title: ${job.title??"Job"}`,`Description: ${job.description??"Not recorded"}`,`Customer: ${job.customerName}`,`Site: ${[job.siteName,job.siteAddress,job.sitePostcode].filter(Boolean).join(", ")||"Not recorded"}`,`Contact: ${job.contactName??"Not recorded"}`,`Vehicle: ${job.registration??"Not allocated"}`,`Status: ${job.status.replaceAll("_"," ")}`,`Priority: ${job.priority}`,`Scheduled: ${dateText(job.scheduledStart)}`,`Completed: ${dateText(job.completedAt)}`]},
+    {heading:"Accountability",lines:[`Issued to field staff: ${dateText(job.issuedToDriverAt)}`,`Submitted by field staff: ${dateText(job.submittedByDriverAt)}`,`Office approved: ${dateText(job.officeApprovedAt)}`,`Report generated: ${dateText(job.reportGeneratedAt)}`]},
+    {heading:"Completed job sheet",lines:job.worksheetSchema.length?job.worksheetSchema.map(field=>`${field.label}: ${valueText(job.worksheetResponses[field.key])}`):["No worksheet questions were configured for this job type."]},
+    {heading:"Safety and sign-off",lines:[`Risk assessment - safe to proceed: ${valueText(job.riskAssessment.safeToProceed)}`,`Customer signature: ${valueText(job.customerSignature.name)}`,`Signed at: ${valueText(job.customerSignature.signedAt)}`]},
+    {heading:"Activity record",lines:timeline.length?timeline.slice(0,60).map(item=>`${dateText(item.createdAt)} - ${item.summary}`):["No activity recorded."]},
   ];
-  const pageLines = lines.flatMap(line => {
-    if (line.length <= 92) return [line];
-    const chunks: string[] = [];
-    for (let i = 0; i < line.length; i += 92) chunks.push(line.slice(i, i + 92));
-    return chunks;
-  }).slice(0, 64);
-  const content = [
-    "BT",
-    "/F1 11 Tf",
-    "50 790 Td",
-    "14 TL",
-    ...pageLines.map((line, index) => `${index === 0 ? "" : "T* "}${`(${pdfEscape(line)}) Tj`}`),
-    "ET",
-  ].join("\n");
-  const objects = [
-    "<< /Type /Catalog /Pages 2 0 R >>",
-    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
-    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-    `<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`,
-  ];
+  const wrap=(line:string,width=88)=>{const words=line.split(/\s+/);const wrapped:string[]=[];let current="";for(const word of words){if(!current){current=word;continue;}if(`${current} ${word}`.length<=width)current+=` ${word}`;else{wrapped.push(current);current=word;}}if(current)wrapped.push(current);return wrapped.length?wrapped:[""];};
+  const allLines:string[]=[];for(const section of sections){if(allLines.length)allLines.push("");allLines.push(section.heading.toUpperCase());for(const line of section.lines)allLines.push(...wrap(line));}
+  const pageSize=49,pages:string[][]=[];for(let index=0;index<allLines.length;index+=pageSize)pages.push(allLines.slice(index,index+pageSize));if(!pages.length)pages.push([]);
+  const fontRef=3+(pages.length*2),pageRefs=pages.map((_,index)=>3+(index*2));
+  const objects:string[]=["<< /Type /Catalog /Pages 2 0 R >>",`<< /Type /Pages /Kids [${pageRefs.map(ref=>`${ref} 0 R`).join(" ")}] /Count ${pages.length} >>`];
+  pages.forEach((pageLines,pageIndex)=>{
+    const content=["BT","/F1 10 Tf","48 778 Td","14 TL",`(FleetOS Job Report - ${pdfEscape(job.reference??job.id)}) Tj`,`T* (Generated ${pdfEscape(dateText(job.reportGeneratedAt))}) Tj`,`T* T*`,...pageLines.map(line=>`(${pdfEscape(line)}) Tj T*`),"ET","BT","/F1 8 Tf",`48 28 Td (Page ${pageIndex+1} of ${pages.length}) Tj`,"390 0 Td (FleetOS accountability record) Tj","ET"].join("\n");
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontRef} 0 R >> >> /Contents ${4+(pageIndex*2)} 0 R >>`);
+    objects.push(`<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`);
+  });
+  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
   let pdf = "%PDF-1.4\n";
   const offsets = [0];
   objects.forEach((object, index) => {
@@ -192,16 +167,19 @@ function createJobReportPdf(job: JobReportRow, timeline: Array<{ summary: string
   return Buffer.from(pdf);
 }
 
-async function sendReportEmail(args: { to: string; subject: string; message: string; pdf: Buffer; filename: string }) {
+function htmlEscape(value:string){return value.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;");}
+
+async function sendReportEmail(args: { to: string; subject: string; message: string; pdf: Buffer; filename: string; idempotencyKey:string; job:JobReportRow }) {
   if (!config.RESEND_API_KEY || !config.JOB_REPORT_FROM_EMAIL) return { status: "NOT_CONFIGURED", providerId: null as string | null };
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
-    headers: { authorization: `Bearer ${config.RESEND_API_KEY}`, "content-type": "application/json" },
+    headers: { authorization: `Bearer ${config.RESEND_API_KEY}`, "content-type": "application/json", "Idempotency-Key":args.idempotencyKey },
     body: JSON.stringify({
       from: config.JOB_REPORT_FROM_EMAIL,
       to: [args.to],
       subject: args.subject,
       text: args.message,
+      html:`<div style="font-family:Arial,sans-serif;color:#1f2937;line-height:1.55;max-width:640px"><h1 style="font-size:22px;margin-bottom:8px">Completed job report</h1><p>${htmlEscape(args.message)}</p><table style="border-collapse:collapse;width:100%;margin:20px 0"><tr><td style="padding:8px;border-bottom:1px solid #ddd"><strong>Reference</strong></td><td style="padding:8px;border-bottom:1px solid #ddd">${htmlEscape(args.job.reference??args.job.id)}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #ddd"><strong>Job</strong></td><td style="padding:8px;border-bottom:1px solid #ddd">${htmlEscape(args.job.title??"Job")}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #ddd"><strong>Customer</strong></td><td style="padding:8px;border-bottom:1px solid #ddd">${htmlEscape(args.job.customerName)}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #ddd"><strong>Completed</strong></td><td style="padding:8px;border-bottom:1px solid #ddd">${htmlEscape(dateText(args.job.completedAt))}</td></tr></table><p>The signed accountability record is attached as a PDF.</p><p style="font-size:12px;color:#6b7280">Sent securely by FleetOS.</p></div>`,
       attachments: [{ filename: args.filename, content: args.pdf.toString("base64") }],
     }),
   });
@@ -340,6 +318,28 @@ jobsRouter.get("/:id", jobReaders, asyncHandler(async(req,res)=>{
   res.json({...visibleJob,assignments,visits,timeline,costs:visibleCosts,documents,canManage:officeRoles.has(req.user!.role),financialAccess});
 }));
 
+jobsRouter.patch("/:id/schedule", jobWriters, asyncHandler(async(req,res)=>{
+  const input=scheduleInput.parse(req.body),companyId=req.user!.companyId,jobId=req.params.id;
+  const current=(await prisma.$queryRaw<Array<{id:string;reference:string|null;status:string}>>`SELECT id,"jobNumber" AS reference,status::text FROM "Job" WHERE id=${jobId} AND "companyId"=${companyId}`)[0];
+  if(!current)return res.status(404).json({error:"Job not found"});
+  if(terminalStatuses.has(current.status))return res.status(409).json({error:"Closed, completed or cancelled jobs cannot be rescheduled"});
+  const selectedIds=input.personIds??(await prisma.$queryRaw<Array<{personId:string}>>`SELECT "personId" FROM "JobAssignment" WHERE "jobId"=${jobId} AND "companyId"=${companyId}`).map(row=>row.personId);
+  const people=selectedIds.length?await prisma.$queryRaw<Array<{id:string;email:string|null}>>`SELECT id,email FROM "Person" WHERE "companyId"=${companyId} AND id IN (${Prisma.join(selectedIds)}) AND "isActive"=true`:[];
+  if(people.length!==new Set(selectedIds).size)return res.status(400).json({error:"One or more assigned staff are not active in this company"});
+  if(input.vehicleId&&!(await prisma.vehicle.findFirst({where:{id:input.vehicleId,companyId,status:{not:"ARCHIVED"}},select:{id:true}})))return res.status(400).json({error:"Vehicle is not active in this company"});
+  let driverId:string|null=null;for(const person of people){if(!driverId&&person.email)driverId=(await prisma.driver.findFirst({where:{companyId,email:{equals:person.email,mode:"insensitive"},isActive:true},select:{id:true}}))?.id??null;}
+  const scheduledStart=input.scheduledStart!==undefined?input.scheduledStart:(await prisma.$queryRaw<Array<{scheduledStart:Date|null}>>`SELECT "scheduledStart" FROM "Job" WHERE id=${jobId} AND "companyId"=${companyId}`)[0]?.scheduledStart??null;
+  const nextStatus=["DRAFT","PLANNED","ASSIGNED","SCHEDULED"].includes(current.status)?scheduledStart?"SCHEDULED":people.length?"ASSIGNED":"PLANNED":current.status;
+  await prisma.$transaction(async tx=>{
+    await tx.$executeRaw`UPDATE "Job" SET "scheduledStart"=CASE WHEN ${input.scheduledStart!==undefined} THEN ${input.scheduledStart??null} ELSE "scheduledStart" END,"scheduledEnd"=CASE WHEN ${input.scheduledEnd!==undefined} THEN ${input.scheduledEnd??null} ELSE "scheduledEnd" END,"dueAt"=CASE WHEN ${input.dueAt!==undefined} THEN ${input.dueAt??null} ELSE "dueAt" END,"collectionDateTime"=CASE WHEN ${input.scheduledStart!==undefined} THEN ${input.scheduledStart??null} ELSE "collectionDateTime" END,"deliveryDateTime"=CASE WHEN ${input.scheduledEnd!==undefined} THEN ${input.scheduledEnd??null} ELSE "deliveryDateTime" END,"vehicleId"=CASE WHEN ${input.vehicleId!==undefined} THEN ${input.vehicleId??null} ELSE "vehicleId" END,"driverId"=${driverId},status=${nextStatus}::"JobStatus","updatedAt"=NOW() WHERE id=${jobId} AND "companyId"=${companyId}`;
+    await tx.$executeRaw`UPDATE "JobVisit" SET "scheduledStart"=CASE WHEN ${input.scheduledStart!==undefined} THEN ${input.scheduledStart??null} ELSE "scheduledStart" END,"scheduledEnd"=CASE WHEN ${input.scheduledEnd!==undefined} THEN ${input.scheduledEnd??null} ELSE "scheduledEnd" END,status=${nextStatus},"updatedAt"=NOW() WHERE "jobId"=${jobId} AND "companyId"=${companyId} AND sequence=(SELECT max(sequence) FROM "JobVisit" WHERE "jobId"=${jobId} AND "companyId"=${companyId})`;
+    if(input.personIds){await tx.$executeRaw`DELETE FROM "JobAssignment" WHERE "jobId"=${jobId} AND "companyId"=${companyId}`;for(const person of people)await tx.$executeRaw`INSERT INTO "JobAssignment" (id,"companyId","jobId","personId",role,status,"assignedAt") VALUES (${randomUUID()}::uuid,${companyId},${jobId},${person.id},'ASSIGNEE','ASSIGNED',NOW())`;}
+    await tx.$executeRaw`INSERT INTO "JobTimelineEntry" (id,"companyId","jobId",type,summary,detail,metadata,"createdById","createdAt") VALUES (${randomUUID()}::uuid,${companyId},${jobId},'SCHEDULE','Job schedule or assignment updated',${input.note??null},${JSON.stringify({scheduledStart:input.scheduledStart,scheduledEnd:input.scheduledEnd,dueAt:input.dueAt,personIds:selectedIds,vehicleId:input.vehicleId})}::jsonb,${req.user!.id},NOW())`;
+  });
+  await writeAuditEvent({companyId,actorUserId:req.user!.id,actorEmail:req.user!.email,action:"UPDATE",entityType:"JOB",entityId:jobId,summary:`Rescheduled or reassigned ${current.reference??jobId}`,metadata:{personIds:selectedIds,vehicleId:input.vehicleId}});
+  res.json({ok:true,status:nextStatus,scheduledStart,assignedPeople:people.length});
+}));
+
 jobsRouter.post("/:id/issue", jobWriters, asyncHandler(async(req,res)=>{
   const input=lifecycleNoteInput.parse(req.body); const companyId=req.user!.companyId;
   const current=(await prisma.$queryRaw<Array<{id:string;reference:string|null;status:string;assignmentCount:number}>>`
@@ -428,7 +428,7 @@ jobsRouter.post("/:id/email-report", jobWriters, asyncHandler(async(req,res)=>{
   const pdf=createJobReportPdf({...job,reportGeneratedAt:new Date()},timeline);
   let providerId:string|null=null; let reportStatus="NOT_CONFIGURED";
   try {
-    const sent=await sendReportEmail({to,subject:`Job report ${job.reference??job.id}`,message:input.message||`Please find attached the completed job report for ${job.reference??job.title??job.id}.`,pdf,filename:`${(job.reference??job.id).replace(/[^a-z0-9_-]/gi,"-")}-job-report.pdf`});
+    const sent=await sendReportEmail({to,subject:`Job report ${job.reference??job.id}`,message:input.message||`Please find attached the completed job report for ${job.reference??job.title??job.id}.`,pdf,filename:`${(job.reference??job.id).replace(/[^a-z0-9_-]/gi,"-")}-job-report.pdf`,idempotencyKey:`job-report-${job.id}-${job.reportEmailedAt?.getTime()??"first"}`,job});
     providerId=sent.providerId; reportStatus=sent.status;
   } catch (error) {
     reportStatus="FAILED";

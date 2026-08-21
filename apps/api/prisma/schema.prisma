@@ -237,6 +237,8 @@ model Job {
   reportEmailTo      String?
   reportEmailStatus  String?
   completedAt        DateTime?
+  recurringJobId     String?     @db.Uuid
+  recurringDueAt     DateTime?
   vehicleId          String?
   driverId           String?
   jobNumber          String?
@@ -265,6 +267,7 @@ model Job {
   @@index([vehicleId])
   @@index([driverId])
   @@index([status])
+  @@index([companyId, recurringJobId, recurringDueAt])
 }
 
 model Defect {
@@ -367,5 +370,6 @@ model RegisterItem {
   @@index([companyId, module, archivedAt])
   @@index([companyId, dueAt])
 }
+
 
 
