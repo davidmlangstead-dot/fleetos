@@ -8,6 +8,13 @@ import { BrandLogo, BrandSupport, PoweredBy, useBranding } from "../../lib/brand
 const STAFF_INVITE_ROLES = new Set([
   "DRIVER", "OFFICE", "WORKSHOP", "SUPERVISOR", "MANAGER", "ADMIN", "FINANCE",
 ]);
+const EXPIRED_INVITE_PATTERN = /invalid|expired|one-time token|otp_expired/i;
+
+function inviteErrorMessage(message: string) {
+  return EXPIRED_INVITE_PATTERN.test(message)
+    ? "This one-time invitation has already been used or has expired. If you completed setup on the first click, sign in with your email and password. Otherwise ask the office to send a fresh invitation."
+    : message;
+}
 
 let inviteSessionPromise: ReturnType<typeof resolveInviteSession> | null = null;
 
@@ -41,7 +48,7 @@ export function StaffInvitePage({ onComplete }: { onComplete: () => void }) {
       const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ""));
       const query = new URLSearchParams(window.location.search);
       const linkError = fragment.get("error_description") || query.get("error_description");
-      if (linkError) { if (mounted) setError(linkError); return; }
+      if (linkError) { if (mounted) setError(inviteErrorMessage(linkError)); return; }
       inviteSessionPromise ??= resolveInviteSession();
       const { data: { session }, error: sessionError } = await inviteSessionPromise;
       if (!mounted) return;
@@ -87,6 +94,6 @@ export function StaffInvitePage({ onComplete }: { onComplete: () => void }) {
     onComplete();
   }
 
-  return <main className="auth-page"><section className="auth-card" style={{ maxWidth: 520 }}><div className="brand auth-brand"><BrandLogo /></div><div className="company-dot" style={{ marginBottom: 18 }}><KeyRound size={17} /></div><p className="eyebrow">{branding.name} staff invitation</p><h1>Set up your login</h1><p className="subtle">{email ? `Your invitation for ${email} has been accepted.` : `${branding.name} is checking your invitation.`}</p>{error && <p role="alert" className="form-message error">{error}</p>}{ready && <form onSubmit={submit} style={{ display: "grid", gap: 14, marginTop: 22 }}><PasswordInput label="Create password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" /><PasswordInput label="Confirm password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" /><button className="primary-button auth-submit" disabled={busy}><Check size={17} /> {busy ? "Saving…" : `Open ${branding.name}`}</button></form>}<BrandSupport /><PoweredBy /></section></main>;
+  return <main className="auth-page"><section className="auth-card" style={{ maxWidth: 520 }}><div className="brand auth-brand"><BrandLogo /></div><div className="company-dot" style={{ marginBottom: 18 }}><KeyRound size={17} /></div><p className="eyebrow">{branding.name} staff invitation</p><h1>Set up your login</h1><p className="subtle">{email ? `Your invitation for ${email} has been accepted.` : `${branding.name} is checking your invitation.`}</p>{error && <><p role="alert" className="form-message error">{error}</p><button type="button" className="secondary-button" onClick={() => window.location.replace("/")}>Return to {branding.name}</button></>}{ready && <form onSubmit={submit} style={{ display: "grid", gap: 14, marginTop: 22 }}><PasswordInput label="Create password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" /><PasswordInput label="Confirm password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" /><button className="primary-button auth-submit" disabled={busy}><Check size={17} /> {busy ? "Saving…" : `Open ${branding.name}`}</button></form>}<BrandSupport /><PoweredBy /></section></main>;
 }
 
