@@ -7,6 +7,7 @@ import { supabase } from "./lib/supabase";
 import { api, ACTIVE_WORKSPACE_KEY, clearOfflineData, startOfflineSync } from "./lib/api";
 import { AuthPage } from "./modules/auth/AuthPage";
 import { LandingPage } from "./modules/landing/LandingPage";
+import { PricingPage } from "./modules/landing/PricingPage";
 import { OnboardingPage } from "./modules/onboarding/OnboardingPage";
 import { StaffInvitePage } from "./modules/auth/StaffInvitePage";
 import { BrandingProvider, DEFAULT_BRANDING, loadCurrentBranding, loadPublicBranding, useBranding } from "./lib/branding";
@@ -26,14 +27,16 @@ import "./job-paperwork-permissions.css";
 import "./branding.css";
 import "./accessibility.css";
 import "./dark-glass.css";
+import "./pricing.css";
 
 bootstrapAccessibilityPreferences();
 const client = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1 } } });
-type AppState = "loading" | "landing" | "auth" | "onboarding" | "ready" | "error";
+type AppState = "loading" | "landing" | "pricing" | "auth" | "onboarding" | "ready" | "error";
 type Workspace = { id: string; name: string; slug: string; role: string };
 type PlatformIdentity={isPlatformOwner:boolean};
 type ResellerMembership={id:string;name:string;role:string};
 const DRIVER_APP_ROLES = new Set(["DRIVER", "WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
+const SELECTED_PLAN_KEY = "fleetos:selected-plan";
 
 function workspaceHome(role: string) {
   if (role === "DRIVER") return "/driver";
@@ -117,8 +120,9 @@ function FleetOSApp() {
 
   if (portalKind === "CUSTOMER" && window.location.pathname === "/staff-invite") return <StaffInvitePage onComplete={() => { setState("loading"); void resolveWorkspace(); }} />;
   if (state === "loading") return <main className="loading-page">{portalTitle(portalKind)} is checking your access…</main>;
-  if (state === "landing") return <LandingPage onLogin={() => { setAuthMode("login"); setState("auth"); }} onSignup={() => { setAuthMode("signup"); setState("auth"); }} />;
-  if (state === "auth") return <AuthPage initialMode={portalKind === "CUSTOMER" ? authMode : "login"} allowSignup={portalKind !== "MANAGER"} onBack={portalKind === "CUSTOMER" ? () => setState("landing") : undefined} />;
+  if (state === "landing") return <LandingPage onLogin={() => { setAuthMode("login"); setState("auth"); }} onSignup={() => setState("pricing")} />;
+  if (state === "pricing") return <PricingPage onBack={() => setState("landing")} onLogin={() => { setAuthMode("login"); setState("auth"); }} onSelectPlan={(plan) => { localStorage.setItem(SELECTED_PLAN_KEY, plan); setAuthMode("signup"); setState("auth"); }} />;
+  if (state === "auth") return <AuthPage initialMode={portalKind === "CUSTOMER" ? authMode : "login"} allowSignup={portalKind !== "MANAGER"} onBack={portalKind === "CUSTOMER" ? () => setState(authMode === "signup" ? "pricing" : "landing") : undefined} />;
   if (state === "onboarding") return <OnboardingPage onComplete={(workspace) => { localStorage.setItem(ACTIVE_WORKSPACE_KEY, workspace.id); setResolvedRole(workspace.role); setState("ready"); }} />;
   if (state === "error") return <main className="loading-page"><div><p className="eyebrow">{portalTitle(portalKind)}</p><h1>Access could not be opened</h1><p>{error}</p><button onClick={() => { setState("loading"); void resolveWorkspace(); }}>Run check again</button><button onClick={() => void supabase.auth.signOut()} style={{ marginLeft: 8 }}>Sign out</button></div></main>;
   return <RouterProvider router={router} />;
@@ -127,4 +131,3 @@ function FleetOSApp() {
 createRoot(document.getElementById("root")!).render(<StrictMode><QueryClientProvider client={client}><I18nProvider><BrandingProvider><FleetOSApp />{portalKind==="CUSTOMER"&&<DriverBreakdownStatusBanner />}</BrandingProvider></I18nProvider></QueryClientProvider></StrictMode>);
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) { window.addEventListener("load", () => { void navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).then((registration) => registration.update()).catch((error) => console.error("FleetOS service worker registration failed", error)); }); }
-
