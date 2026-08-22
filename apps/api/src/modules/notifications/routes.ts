@@ -5,14 +5,13 @@ import { requireAuth } from "../../middleware/auth.js";
 
 type Alert = {
   id: string;
-  kind: "COMPLIANCE" | "DEFECT" | "MAINTENANCE" | "MEDIC" | "DRIVER" | "JOB" | "TACHOGRAPH";
+  kind: "COMPLIANCE" | "DEFECT" | "MAINTENANCE" | "DRIVER" | "JOB" | "TACHOGRAPH";
   severity: "INFO" | "WARNING" | "CRITICAL";
   title: string;
   detail: string | null;
   occurredAt: string;
   href: string;
 };
-type MedicRow = { id: string; severity: string; summary: string; detail: string | null; createdAt: Date };
 type PlanRow = { id: string; title: string; category: string; nextDueAt: Date; registration: string };
 type WorkRow = { id: string; title: string; status: string; priority: string; dueAt: Date | null; scheduledFor: Date | null; createdAt: Date; registration: string };
 type DriverOpsAlertRow = { id: string; severity: "WARNING" | "CRITICAL"; title: string; detail: string; occurredAt: Date };
@@ -22,7 +21,6 @@ type TachoAlertRow = { id: string; severity: "WARNING" | "CRITICAL"; title: stri
 const complianceRoles = new Set(["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
 const defectRoles = new Set(["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
 const workshopRoles = new Set(["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
-const medicRoles = new Set(["TRANSPORT_MANAGER", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
 const driverOpsRoles = new Set(["TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
 const jobOpsRoles = new Set(["TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
 const tachographOfficeRoles = new Set(["WORKSHOP_TECHNICIAN", "TRANSPORT_PLANNER", "TRANSPORT_MANAGER", "OFFICE_STAFF", "FINANCE", "COMPANY_ADMIN", "PLATFORM_ADMIN"]);
@@ -74,7 +72,7 @@ notificationsRouter.get("/", asyncHandler(async (req, res) => {
         `
       : Promise.resolve([] as TachoAlertRow[]);
 
-  const [compliance, defects, plans, workOrders, medic, driverOps, jobOps, tacho] = await Promise.all([
+  const [compliance, defects, plans, workOrders, driverOps, jobOps, tacho] = await Promise.all([
     complianceRoles.has(role)
       ? prisma.complianceItem.findMany({ where: { companyId, status: { not: "RESOLVED" }, dueDate: { lte: soon } }, select: { id: true, title: true, dueDate: true, description: true }, orderBy: { dueDate: "asc" }, take: 20 })
       : Promise.resolve([]),
@@ -97,14 +95,6 @@ notificationsRouter.get("/", asyncHandler(async (req, res) => {
           ORDER BY COALESCE(w."dueAt",w."scheduledFor",w."createdAt") ASC LIMIT 20
         `
       : Promise.resolve([] as WorkRow[]),
-    medicRoles.has(role)
-      ? prisma.$queryRaw<MedicRow[]>`
-          SELECT id::text, severity, summary, detail, "createdAt"
-          FROM "MedicIncident"
-          WHERE "companyId" = ${companyId} AND status <> 'RESOLVED'
-          ORDER BY "createdAt" DESC LIMIT 20
-        `
-      : Promise.resolve([] as MedicRow[]),
     driverOpsRoles.has(role)
       ? prisma.$queryRaw<DriverOpsAlertRow[]>`
           SELECT 'breakdown:'||b.id::text AS id,
@@ -160,9 +150,6 @@ notificationsRouter.get("/", asyncHandler(async (req, res) => {
   for (const work of workOrders) {
     const when = work.dueAt ?? work.scheduledFor ?? work.createdAt;
     alerts.push({ id: `work-order:${work.id}`, kind: "MAINTENANCE", severity: "CRITICAL", title: `${work.registration}: vehicle off road`, detail: `${work.title} · ${work.status.replaceAll("_", " ")}`, occurredAt: when.toISOString(), href: "/workshop" });
-  }
-  for (const incident of medic) {
-    alerts.push({ id: `medic:${incident.id}`, kind: "MEDIC", severity: incident.severity === "CRITICAL" ? "CRITICAL" : "WARNING", title: incident.summary, detail: incident.detail, occurredAt: incident.createdAt.toISOString(), href: "/settings/medic" });
   }
   for (const item of driverOps) {
     alerts.push({ id: item.id, kind: "DRIVER", severity: item.severity, title: item.title, detail: item.detail, occurredAt: item.occurredAt.toISOString(), href: "/driver-operations" });
