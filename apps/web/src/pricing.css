@@ -1,0 +1,24 @@
+.pricing-page{min-height:100vh;padding:0 0 44px;background:radial-gradient(circle at 14% 0%,rgba(53,201,151,.14),transparent 30rem),radial-gradient(circle at 86% 14%,rgba(76,128,184,.12),transparent 32rem),linear-gradient(155deg,var(--bg-0),var(--bg-1) 52%,#08131d)}
+.pricing-page .landing-header{max-width:1240px;margin:0 auto;padding:24px 28px}
+.pricing-hero{max-width:860px;margin:42px auto 26px;padding:0 28px;text-align:center}
+.pricing-hero h1{font-size:clamp(2.1rem,5vw,4rem);line-height:1.04;margin:8px 0 16px}
+.pricing-hero .landing-lead{max-width:680px;margin:0 auto}
+.founder-offer{max-width:1184px;margin:30px auto;padding:24px;display:grid;grid-template-columns:auto 1fr auto;gap:18px;align-items:center}
+.founder-icon{width:48px;height:48px;border-radius:12px;display:grid;place-items:center;background:rgba(53,201,151,.12);color:var(--accent)}
+.founder-offer h2{margin:2px 0 6px}
+.pricing-grid{max-width:1184px;margin:24px auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:0 28px}
+.pricing-card{position:relative;padding:24px;display:flex;flex-direction:column;min-height:365px}
+.pricing-card.featured{border-color:rgba(53,201,151,.5)!important;box-shadow:0 16px 40px rgba(24,132,97,.13)!important}
+.pricing-badge{position:absolute;top:18px;right:18px;padding:5px 9px;border-radius:999px;background:rgba(53,201,151,.14);color:#8be4c4;font-size:12px;font-weight:800}
+.pricing-card h2{margin:5px 0 10px}
+.pricing-price{display:flex;align-items:flex-end;gap:8px;margin:4px 0 12px}
+.pricing-price strong{font-size:2.25rem;line-height:1}
+.pricing-price span{color:var(--muted);font-weight:700}
+.pricing-note{min-height:44px}
+.pricing-included{display:grid;gap:9px;margin:18px 0 24px}
+.pricing-included span{display:flex;gap:8px;align-items:flex-start;color:#c8d4de;font-size:14px}
+.pricing-included svg{color:var(--accent);flex:0 0 auto;margin-top:2px}
+.pricing-card button{margin-top:auto;justify-content:center}
+.enterprise-card{grid-column:span 2;min-height:0}
+.pricing-footer{max-width:1184px;margin:18px auto 0;padding:0 28px;text-align:center}
+@media(max-width:760px){.pricing-page .landing-header{padding:18px}.pricing-hero{margin-top:26px;padding:0 18px}.founder-offer{margin:22px 18px;grid-template-columns:auto 1fr}.founder-offer button{grid-column:1/-1;justify-content:center}.pricing-grid{grid-template-columns:1fr;padding:0 18px}.enterprise-card{grid-column:auto}.pricing-card{min-height:0}.pricing-footer{padding:0 18px}}
