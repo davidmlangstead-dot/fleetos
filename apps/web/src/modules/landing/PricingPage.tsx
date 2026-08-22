@@ -7,12 +7,20 @@ type Props = {
   onSelectPlan: (plan: string) => void;
 };
 
-const plans = [
-  { name: "Starter", fleet: "1–5 vehicles", price: 79, note: "For owner-drivers and small operators." },
+type PricingPlan = {
+  name: string;
+  fleet: string;
+  price: number;
+  note: string;
+  featured: boolean;
+};
+
+const plans: PricingPlan[] = [
+  { name: "Starter", fleet: "1–5 vehicles", price: 79, note: "For owner-drivers and small operators.", featured: false },
   { name: "Growth", fleet: "6–15 vehicles", price: 129, note: "For growing fleets coordinating drivers and office work.", featured: true },
-  { name: "Business", fleet: "16–30 vehicles", price: 179, note: "For established teams needing stronger operational control." },
-  { name: "Pro", fleet: "31–50 vehicles", price: 249, note: "For larger fleets running more people, jobs and compliance." },
-] as const;
+  { name: "Business", fleet: "16–30 vehicles", price: 179, note: "For established teams needing stronger operational control.", featured: false },
+  { name: "Pro", fleet: "31–50 vehicles", price: 249, note: "For larger fleets running more people, jobs and compliance.", featured: false },
+];
 
 const included = [
   "Vehicles, staff and company records",
